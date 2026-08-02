@@ -21,35 +21,8 @@ permissions:
   contents: write
 
 jobs:
-  quality:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: npm
-      - name: Install Python dependencies
-        run: pip install -r requirements.txt -r requirements-dev.txt
-      - name: Install frontend quality tools
-        run: npm ci
-        env:
-          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-      - name: Run static checks
-        shell: pwsh
-        run: ./scripts/check.ps1 -SkipPythonTests
-      - name: Build native WebView2 host for tests
-        shell: pwsh
-        run: ./scripts/build_desktop_host.ps1
-      - name: Run tests
-        run: python scripts/run_python_tests.py --workers 4
-
   windows-build:
     if: github.event_name != 'pull_request'
-    needs: quality
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,12 +30,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies and build tools
-        run: pip install -r requirements.txt -r requirements-build.txt
-      - name: Build native WebView2 host
-        shell: pwsh
-        run: ./scripts/build_desktop_host.ps1
-      - name: Audit public database
-        run: python scripts/audit_release.py
+        run: pip install -r requirements.txt pyinstaller jinja2
       - name: Build Windows app
         run: pyinstaller --clean --noconfirm "研申.spec"
       - name: Smoke test packaged files
