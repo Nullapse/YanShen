@@ -1,0 +1,1360 @@
+{
+  "schema_version": "agent-multiturn-eval-report-v1",
+  "suite_name": "agent-v2-multiturn-v1",
+  "created_at": "2026-07-10T14:26:46.941670+00:00",
+  "dataset": {
+    "path": "C:\\Users\\lwq\\Documents\\gongkao\\evals\\agent_v2\\multiturn-v1.jsonl",
+    "sha256": "58d5b98af653dbcbbfa18b7fb5af125ea1314af7ffb8b13ceb54a8f9f7871a68",
+    "case_count": 3
+  },
+  "versions": {
+    "prompt": "agent-prompts-v3-context-budget",
+    "retrieval": "4e8117e44705"
+  },
+  "summary": {
+    "average_score": 91.7667,
+    "failed_cases": 0,
+    "case_count": 3,
+    "turn_count": 8,
+    "category_scores": {
+      "correction": 77.5,
+      "isolation": 97.8,
+      "reference": 100.0
+    },
+    "latency_ms": {
+      "p50": 41912.84,
+      "p95": 151828.99
+    },
+    "token_usage": {
+      "input_tokens": 69027,
+      "output_tokens": 16857,
+      "total_tokens": 85884
+    }
+  },
+  "results": [
+    {
+      "case": {
+        "id": "followup_why_recommendation",
+        "title": "追问推荐理由",
+        "category": "reference",
+        "turns": [
+          {
+            "user": "推荐一道浙江综合分析题"
+          },
+          {
+            "user": "为什么是这道"
+          }
+        ],
+        "expected_context_terms": [
+          "浙江",
+          "综合分析",
+          "推荐"
+        ],
+        "final_expected_keywords": [
+          "理由",
+          "证据"
+        ]
+      },
+      "conversations": {
+        "main": 19
+      },
+      "turns": [
+        {
+          "thread": "main",
+          "turn": 1,
+          "run_id": 45,
+          "duration_ms": 41912.84,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 5937,
+            "output_tokens": 1735,
+            "total_tokens": 7672,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "next_question",
+            "task_type": "recommend",
+            "filters": {
+              "question_type": "综合分析",
+              "region": "浙江"
+            },
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 1,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "recommend_questions",
+              "query_plan": {
+                "action": "recommend",
+                "scope": "candidate_questions",
+                "sources": [
+                  "candidate_question",
+                  "weakness_profile",
+                  "aggregate"
+                ],
+                "module": "analysis",
+                "reason": "recommend_task_constraint"
+              },
+              "retrieval_policy": "Recommend from candidate questions using user profile and filters.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "推荐证据可用",
+                "note": "已有候选题或画像证据，可用于择题建议。"
+              },
+              "evidence_card_count": 6,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "question:629",
+                "question:623",
+                "question:631",
+                "question:620",
+                "question:633",
+                "question:626"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "question:629",
+                  "source_type": "candidate_question",
+                  "title": "GKS-608-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 629, \"question_code\": \"GKS-608-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 629,
+                  "attempt_id": null,
+                  "url": "/questions/629",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:623",
+                  "source_type": "candidate_question",
+                  "title": "GKS-606-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 623, \"question_code\": \"GKS-606-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（A卷）\", \"questio...",
+                  "question_id": 623,
+                  "attempt_id": null,
+                  "url": "/questions/623",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:631",
+                  "source_type": "candidate_question",
+                  "title": "GKS-609-Q1 第1题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 631, \"question_code\": \"GKS-609-Q1\", \"title\": \"第1题\", \"question_type\": \"综合分析\", \"year\": 2020, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2020年浙江省公考《申论》题（A卷）\", \"questio...",
+                  "question_id": 631,
+                  "attempt_id": null,
+                  "url": "/questions/631",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:620",
+                  "source_type": "candidate_question",
+                  "title": "GKS-605-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 620, \"question_code\": \"GKS-605-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2023, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2023年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 620,
+                  "attempt_id": null,
+                  "url": "/questions/620",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:633",
+                  "source_type": "candidate_question",
+                  "title": "GKS-610-Q1 第1题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 633, \"question_code\": \"GKS-610-Q1\", \"title\": \"第1题\", \"question_type\": \"综合分析\", \"year\": 2020, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2020年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 633,
+                  "attempt_id": null,
+                  "url": "/questions/633",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:626",
+                  "source_type": "candidate_question",
+                  "title": "GKS-607-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 626, \"question_code\": \"GKS-607-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 626,
+                  "attempt_id": null,
+                  "url": "/questions/626",
+                  "confidence": 0.78
+                }
+              ]
+            }
+          },
+          "answer_length": 2751,
+          "answer_sha256": "81a807fda834fad4",
+          "answer_preview": "## 推荐顺序 - 优先练习 **620（2023浙江C卷 第2题）** - 其次练习 **623（2021浙江A卷 第2题）** - 再次可做 **626（2021浙江B卷 第2题）** - 之后可以考虑 **631（2020浙江A卷 第1题）** 和 **633（2020浙江B卷 第1题）** ## 推荐理由 - **620（2023浙江C卷 第2题）**：这是所有候选题中最新的一套，接近当前命题风格。你目前的综合分析练习量（20次）在总训练中占比不高，而这道题字数要求600字，比常见的400字多一半，能强化你..."
+        },
+        {
+          "thread": "main",
+          "turn": 2,
+          "run_id": 46,
+          "duration_ms": 45389.52,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 7228,
+            "output_tokens": 2290,
+            "total_tokens": 9518,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "next_question",
+            "task_type": "recommend",
+            "filters": {
+              "question_type": "综合分析",
+              "region": "浙江"
+            },
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 3,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "recommend_questions",
+              "query_plan": {
+                "action": "recommend",
+                "scope": "candidate_questions",
+                "sources": [
+                  "candidate_question",
+                  "weakness_profile",
+                  "aggregate"
+                ],
+                "module": "overview",
+                "reason": "recommend_task_constraint"
+              },
+              "retrieval_policy": "Recommend from candidate questions using user profile and filters.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "推荐证据可用",
+                "note": "已有候选题或画像证据，可用于择题建议。"
+              },
+              "evidence_card_count": 6,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "question:629",
+                "question:623",
+                "question:631",
+                "question:620",
+                "question:633",
+                "question:626"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "question:629",
+                  "source_type": "candidate_question",
+                  "title": "GKS-608-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 629, \"question_code\": \"GKS-608-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 629,
+                  "attempt_id": null,
+                  "url": "/questions/629",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:623",
+                  "source_type": "candidate_question",
+                  "title": "GKS-606-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 623, \"question_code\": \"GKS-606-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（A卷）\", \"questio...",
+                  "question_id": 623,
+                  "attempt_id": null,
+                  "url": "/questions/623",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:631",
+                  "source_type": "candidate_question",
+                  "title": "GKS-609-Q1 第1题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 631, \"question_code\": \"GKS-609-Q1\", \"title\": \"第1题\", \"question_type\": \"综合分析\", \"year\": 2020, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2020年浙江省公考《申论》题（A卷）\", \"questio...",
+                  "question_id": 631,
+                  "attempt_id": null,
+                  "url": "/questions/631",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:620",
+                  "source_type": "candidate_question",
+                  "title": "GKS-605-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 620, \"question_code\": \"GKS-605-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2023, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2023年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 620,
+                  "attempt_id": null,
+                  "url": "/questions/620",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:633",
+                  "source_type": "candidate_question",
+                  "title": "GKS-610-Q1 第1题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 633, \"question_code\": \"GKS-610-Q1\", \"title\": \"第1题\", \"question_type\": \"综合分析\", \"year\": 2020, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2020年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 633,
+                  "attempt_id": null,
+                  "url": "/questions/633",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:626",
+                  "source_type": "candidate_question",
+                  "title": "GKS-607-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 626, \"question_code\": \"GKS-607-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 626,
+                  "attempt_id": null,
+                  "url": "/questions/626",
+                  "confidence": 0.78
+                }
+              ]
+            }
+          },
+          "answer_length": 3010,
+          "answer_sha256": "7f996f1842e32b0f",
+          "answer_preview": "## 推荐顺序 - 优先练习 **620（2023浙江C卷 第2题）** - 其次练习 **623（2021浙江A卷 第2题）** - 再次可做 **626（2021浙江B卷 第2题）** - 之后可以考虑 **631（2020浙江A卷 第1题）** 和 **633（2020浙江B卷 第1题）** ## 推荐理由 你问\"为什么是这道\"，我按优先级拆开说清楚。 **620 排第一，因为它最贴近当前命题节奏，且你的训练缺口最大。** 2023年的题是6道候选里最新的，浙江这三四年命题风格一直在微调，练最新的最能对齐当下..."
+        }
+      ],
+      "metrics": {
+        "score": 100.0,
+        "final_keyword_accuracy": 1.0,
+        "context_literal_accuracy": 1.0,
+        "forbidden_term_accuracy": 1.0,
+        "thread_continuity": 1.0,
+        "semantic_score": 1.0,
+        "judge": {
+          "status": "ok",
+          "scores": {
+            "context_retention": 1.0,
+            "constraint_adherence": 1.0,
+            "correction_adherence": 1.0,
+            "thread_isolation": 1.0,
+            "answer_relevance": 1.0
+          },
+          "reason": "正确理解“这道”指620，保留浙江、综合分析、推荐，提供理由和证据，无串入其他线程，无纠正，完全相关。"
+        },
+        "errors": [],
+        "turn_count": 2,
+        "duration_ms": 87302.36,
+        "token_usage": {
+          "input_tokens": 13165,
+          "output_tokens": 4025,
+          "total_tokens": 17190
+        },
+        "runtime": {
+          "prompt_version": "agent-prompts-v3-context-budget",
+          "retrieval_version": "4e8117e44705",
+          "dataset_version": "agent-v2-multiturn-v1",
+          "case_sha256": "0a5703e80063ace4"
+        }
+      }
+    },
+    {
+      "case": {
+        "id": "correction_change_style",
+        "title": "纠正回答风格",
+        "category": "correction",
+        "turns": [
+          {
+            "user": "回答尽量详细"
+          },
+          {
+            "user": "以后还是简洁一点"
+          },
+          {
+            "user": "总结我的最大问题"
+          }
+        ],
+        "expected_context_terms": [
+          "简洁"
+        ],
+        "final_expected_keywords": [
+          "问题"
+        ]
+      },
+      "conversations": {
+        "main": 19
+      },
+      "turns": [
+        {
+          "thread": "main",
+          "turn": 1,
+          "run_id": 45,
+          "duration_ms": 76375.96,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 4928,
+            "output_tokens": 3152,
+            "total_tokens": 8080,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {},
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 1,
+              "summarized_count": 0,
+              "long_term_memory_count": 1,
+              "remembered_count": 1
+            },
+            "rag": {
+              "rag_route": "writing_guidance",
+              "query_plan": {
+                "action": "guide",
+                "scope": "overall_history",
+                "sources": [
+                  "aggregate"
+                ],
+                "module": "overview",
+                "reason": "用户表达详细回答偏好，视为询问如何做到回答尽量详细，需提供通用详细回答指导"
+              },
+              "retrieval_policy": "Answer the user's writing-method question directly with concept, structures, types, examples, and pitfalls; do not organize personal notes unless explicitly requested.",
+              "evidence_sufficiency": {
+                "level": "insufficient",
+                "label": "证据不足",
+                "note": "本轮没有检索到可用证据，不能做确定性诊断。"
+              },
+              "evidence_card_count": 0,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [],
+              "evidence_cards": []
+            }
+          },
+          "answer_length": 2804,
+          "answer_sha256": "3bb7cd5762768964",
+          "answer_preview": "## 先说结论 本轮检索未命中申论教材库中关于“回答尽量详细”的写作知识证据（evidence_sufficiency 为 insufficient），因此以下讲解基于申论作答的通用原则，不构成学理定义，仅供阶段性参考。 在申论语境中，“回答尽量详细”并非单纯堆砌字数，而是指： - **要点充分**：不漏材料中的关键信息，尤其别丢采分点背后的隐性要点； - **层次清楚**：按“总—分—梳理—举例/对策”等逻辑展开，而非一句话带过； - **论证扎实**：综合分析、公文写作中的分析和对策部分要有推导和依据； - *..."
+        },
+        {
+          "thread": "main",
+          "turn": 2,
+          "run_id": 46,
+          "duration_ms": 136649.4,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 10742,
+            "output_tokens": 1152,
+            "total_tokens": 11894,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {},
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 3,
+              "summarized_count": 0,
+              "long_term_memory_count": 1,
+              "remembered_count": 1
+            },
+            "rag": {
+              "rag_route": "overview_diagnosis",
+              "query_plan": {
+                "action": "explain",
+                "scope": "overall_history",
+                "sources": [
+                  "aggregate",
+                  "weakness_profile",
+                  "attempt",
+                  "grading_report",
+                  "personal_note"
+                ],
+                "module": "overview",
+                "reason": "reject_unrequested_notes_scope"
+              },
+              "retrieval_policy": "Analyze overall history with aggregate coverage plus representative evidence cards.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "历史证据充分",
+                "note": "已覆盖多次作答及代表证据，可用于模块/总体趋势判断。"
+              },
+              "evidence_card_count": 32,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "profile:overview:coverage",
+                "profile:overview:weakness:1",
+                "profile:overview:weakness:2",
+                "profile:overview:weakness:3",
+                "profile:overview:weakness:4",
+                "profile:overview:weakness:5",
+                "profile:overview:weakness:6",
+                "profile:overview:weakness:7",
+                "attempt:112",
+                "attempt:66",
+                "attempt:73",
+                "attempt:90"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "profile:overview:coverage",
+                  "source_type": "aggregate",
+                  "title": "总览 覆盖统计",
+                  "claim": "选定模块全量匹配历史的覆盖、来源和问题分布统计。",
+                  "content": "{\"coverage\": {\"attempt_count\": 103, \"report_count\": 119, \"note_count\": 26, \"chunk_count\": 20435}, \"source_counts\": {\"reference_answer\": 9410, \"material\": 9005, \"question\": 1750, \"g...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:1",
+                  "source_type": "weakness_profile",
+                  "title": "对策针对性",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"对策针对性\", \"frequency\": 165, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:2",
+                  "source_type": "weakness_profile",
+                  "title": "材料遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"材料遗漏\", \"frequency\": 144, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:3",
+                  "source_type": "weakness_profile",
+                  "title": "采分点遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"采分点遗漏\", \"frequency\": 120, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:4",
+                  "source_type": "weakness_profile",
+                  "title": "语言概括",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"语言概括\", \"frequency\": 118, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:5",
+                  "source_type": "weakness_profile",
+                  "title": "结构表达",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"结构表达\", \"frequency\": 107, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"knowledge:summary:method\", \"title\": \"归纳概括题方法\", \"source_type\": \"knowledge\", \"score\": null}, {\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:6",
+                  "source_type": "weakness_profile",
+                  "title": "格式规范",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"格式规范\", \"frequency\": 48, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:7",
+                  "source_type": "weakness_profile",
+                  "title": "审题偏差",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"审题偏差\", \"frequency\": 43, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "attempt:112",
+                  "source_type": "grading_report",
+                  "title": "GKS-754-Q3 第3题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：14/20分 - 等级：良好 - 核心判断：成效部分覆盖了主要产业亮点，但对“传承人获得政府支持”“民间文化价值认知提升”两个共性核心点遗漏或表达不足；改进建议中“多部门联合办事，严厉处罚”等超出材料，属于不基于材料的发挥。 ## 得分点清单 - 题型分类：公文写作（情况报告） - 参考答案融合说明：本题为综合分析类公文，需从12份...",
+                  "question_id": 647,
+                  "attempt_id": 112,
+                  "url": "/attempts/112",
+                  "confidence": 0.744
+                },
+                {
+                  "evidence_id": "attempt:66",
+                  "source_type": "grading_report",
+                  "title": "GKS-10-Q4 第4题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：18/25分 - 等级：良好 - 核心判断：最大得分点在于三个市场均有问题梳理与措施对应；最大失分点在豹岭农贸早市遗漏“噪音扰民”关键问题，且部分措施不够具体（如“合理规划让原摊主重回老地方”表述模糊，未体现材料中“原则上回到原摊位”的确定性）。 ## 得分点清单 - 题型分类：提出对策题 - 标准采分点： 1. 莲池市场-问题-环...",
+                  "question_id": 611,
+                  "attempt_id": 66,
+                  "url": "/attempts/66",
+                  "confidence": 0.7177
+                },
+                {
+                  "evidence_id": "attempt:73",
+                  "source_type": "grading_report",
+                  "title": "GKS-9-Q4 第4题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：13/25分 - 等级：一般 - 核心判断：最大得分点在问题梳理基本覆盖了工时、合同等核心劳动权益问题，最大失分点在于遗漏了“以罚代管”引发的安全风险、公众缺乏尊重与认可等关键采分点，且建议部分缺乏具体性和可操作性，结构未分“问题”与“建议”两大块。 ## 得分点清单 - 题型分类：公文写作（调研报告提纲） - 标准采分点： **问...",
+                  "question_id": 606,
+                  "attempt_id": 73,
+                  "url": "/attempts/73",
+                  "confidence": 0.7159
+                },
+                {
+                  "evidence_id": "attempt:90",
+                  "source_type": "grading_report",
+                  "title": "GKS-4-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：7/10分 - 等级：良好 - 核心判断：要点覆盖较全面，但对关键信息提炼不够精准，部分表达笼统，遗漏了“允许科研失败”“遵守国际知识产权”等重要启示点。 ## 得分点清单 - 题型分类：启示类综合分析题 - 标准采分点： 1. **超前研发、敢为人先**：材料“我们就是要做别人没做过的”“通过超前研发，拥有强大的差异化竞争力” →...",
+                  "question_id": 578,
+                  "attempt_id": 90,
+                  "url": "/attempts/90",
+                  "confidence": 0.7062
+                }
+              ]
+            }
+          },
+          "answer_length": 956,
+          "answer_sha256": "538615cb3467bc84",
+          "answer_preview": "收到。以后回答会精简：直接给结论、关键证据和动作。 **你当前最大的短板是对策针对性（165次，严重度1.0）和材料遗漏（144次）。** 典型问题：你写的对策常超出材料自行发挥（如建议\"多部门联合办事，严厉处罚\"），把材料该写的原话漏掉。证据：attempt-112 的公文写作只拿了14/20分，主要失在\"成效遗漏核心采分点\"和\"措施脱离材料\"两个老问题。 **动作：** 1. 下次做提出对策/公文写作时，每提一条对策都先用笔划出材料依据句； 2. 做完后对照参考答案加一道\"材料反查\"：看你漏掉了材料里哪句关键原..."
+        },
+        {
+          "thread": "main",
+          "turn": 3,
+          "run_id": 47,
+          "duration_ms": 27875.08,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 11747,
+            "output_tokens": 1342,
+            "total_tokens": 13089,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {},
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 5,
+              "summarized_count": 0,
+              "long_term_memory_count": 1,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "overview_diagnosis",
+              "query_plan": {
+                "action": "diagnose",
+                "scope": "overall_history",
+                "sources": [
+                  "weakness_profile",
+                  "aggregate"
+                ],
+                "module": "overview",
+                "reason": "总结用户最大短板，需基于全部练习历史的弱点档案和聚合数据"
+              },
+              "retrieval_policy": "Analyze overall history with aggregate coverage plus representative evidence cards.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "历史证据充分",
+                "note": "已覆盖多次作答及代表证据，可用于模块/总体趋势判断。"
+              },
+              "evidence_card_count": 8,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "profile:overview:coverage",
+                "profile:overview:weakness:1",
+                "profile:overview:weakness:2",
+                "profile:overview:weakness:3",
+                "profile:overview:weakness:4",
+                "profile:overview:weakness:5",
+                "profile:overview:weakness:6",
+                "profile:overview:weakness:7"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "profile:overview:coverage",
+                  "source_type": "aggregate",
+                  "title": "总览 覆盖统计",
+                  "claim": "选定模块全量匹配历史的覆盖、来源和问题分布统计。",
+                  "content": "{\"coverage\": {\"attempt_count\": 103, \"report_count\": 119, \"note_count\": 26, \"chunk_count\": 20435}, \"source_counts\": {\"reference_answer\": 9410, \"material\": 9005, \"question\": 1750, \"g...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:1",
+                  "source_type": "weakness_profile",
+                  "title": "对策针对性",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"对策针对性\", \"frequency\": 165, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:2",
+                  "source_type": "weakness_profile",
+                  "title": "材料遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"材料遗漏\", \"frequency\": 144, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:3",
+                  "source_type": "weakness_profile",
+                  "title": "采分点遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"采分点遗漏\", \"frequency\": 120, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:4",
+                  "source_type": "weakness_profile",
+                  "title": "语言概括",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"语言概括\", \"frequency\": 118, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:5",
+                  "source_type": "weakness_profile",
+                  "title": "结构表达",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"结构表达\", \"frequency\": 107, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"knowledge:summary:method\", \"title\": \"归纳概括题方法\", \"source_type\": \"knowledge\", \"score\": null}, {\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:6",
+                  "source_type": "weakness_profile",
+                  "title": "格式规范",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"格式规范\", \"frequency\": 48, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:7",
+                  "source_type": "weakness_profile",
+                  "title": "审题偏差",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"审题偏差\", \"frequency\": 43, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                }
+              ]
+            }
+          },
+          "answer_length": 1123,
+          "answer_sha256": "e9d2119cffcb0291",
+          "answer_preview": "你的最大短板是**对策针对性（165次）和材料遗漏（144次）**，两者严重度均为最高。采分点遗漏（120次）紧随其后。 **关键证据：** - 你做提出对策/公文写作时频繁超出材料自拟措施（如\"严厉处罚\"），同时遗漏材料原话（evidence: grading_report:attempt-112） - 综合分析中关键信息提炼不够精准，表达笼统（evidence: grading_report:attempt-90） **三个动作：** 1. 每次做对策/公文题，写完后用5分钟反查：每条对策是否都能在材料中找到直..."
+        }
+      ],
+      "metrics": {
+        "score": 77.5,
+        "final_keyword_accuracy": 0.0,
+        "context_literal_accuracy": 0.0,
+        "forbidden_term_accuracy": 1.0,
+        "thread_continuity": 1.0,
+        "semantic_score": 1.0,
+        "judge": {
+          "status": "ok",
+          "scores": {
+            "context_retention": 1.0,
+            "constraint_adherence": 1.0,
+            "correction_adherence": 1.0,
+            "thread_isolation": 1.0,
+            "answer_relevance": 1.0
+          },
+          "reason": "回答简洁总结核心问题，保留简洁约束，接受纠正并正确回应，线程无污染。"
+        },
+        "errors": [],
+        "turn_count": 3,
+        "duration_ms": 240900.44,
+        "token_usage": {
+          "input_tokens": 27417,
+          "output_tokens": 5646,
+          "total_tokens": 33063
+        },
+        "runtime": {
+          "prompt_version": "agent-prompts-v3-context-budget",
+          "retrieval_version": "4e8117e44705",
+          "dataset_version": "agent-v2-multiturn-v1",
+          "case_sha256": "0803899134607b4b"
+        }
+      }
+    },
+    {
+      "case": {
+        "id": "isolation_exam_goal",
+        "title": "新线程不继承考试目标消息",
+        "category": "isolation",
+        "threads": {
+          "a": [
+            {
+              "user": "线程甲只备考江苏"
+            }
+          ],
+          "b": [
+            {
+              "user": "线程乙只备考浙江"
+            },
+            {
+              "user": "按刚才目标推荐"
+            }
+          ]
+        },
+        "expected_context_terms": [
+          "线程乙",
+          "浙江"
+        ],
+        "forbidden_context_terms": [
+          "线程甲",
+          "江苏"
+        ],
+        "final_expected_keywords": [
+          "浙江"
+        ]
+      },
+      "conversations": {
+        "a": 20,
+        "b": 21
+      },
+      "turns": [
+        {
+          "thread": "a",
+          "turn": 1,
+          "run_id": 47,
+          "duration_ms": 40705.79,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 4875,
+            "output_tokens": 2012,
+            "total_tokens": 6887,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {
+              "region": "江苏"
+            },
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 1,
+              "summarized_count": 0,
+              "long_term_memory_count": 1,
+              "remembered_count": 1
+            },
+            "rag": {
+              "rag_route": "recommend_questions",
+              "query_plan": {
+                "action": "recommend",
+                "scope": "overall_history",
+                "sources": [
+                  "aggregate",
+                  "knowledge"
+                ],
+                "module": "overview",
+                "reason": "用户声明只备考江苏，需推荐江苏备考相关资源和策略"
+              },
+              "retrieval_policy": "Recommend from candidate questions using user profile and filters.",
+              "evidence_sufficiency": {
+                "level": "insufficient",
+                "label": "证据不足",
+                "note": "本轮没有检索到可用证据，不能做确定性诊断。"
+              },
+              "evidence_card_count": 0,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [],
+              "evidence_cards": []
+            }
+          },
+          "answer_length": 2248,
+          "answer_sha256": "fa13b40dbeb82b3e",
+          "answer_preview": "## 训练判断 当前证据不足，无法形成确定性诊断。但从现有训练数据看，存在明显矛盾：用户虽明确“只备考江苏”，但103次作答中仅3题来自江苏，其余散落在全国、浙江等考区。这会导致训练靶向性严重偏离目标考区。 ## 主要短板 由于rag_context未提供具体作答报告或批改记录，只能从训练分布做阶段性判断： - **区域错配**：103次作答中仅3题江苏（evidence_refs: regions数据），与“只备考江苏”目标严重不符。 - **综合写作练习不足**：5次练习/4题该类（evidence_refs:..."
+        },
+        {
+          "thread": "b",
+          "turn": 1,
+          "run_id": 48,
+          "duration_ms": 151828.99,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 13657,
+            "output_tokens": 2871,
+            "total_tokens": 16528,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {
+              "region": "浙江"
+            },
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 1,
+              "summarized_count": 0,
+              "long_term_memory_count": 1,
+              "remembered_count": 1
+            },
+            "rag": {
+              "rag_route": "overview_diagnosis",
+              "query_plan": {
+                "action": "explain",
+                "scope": "overall_history",
+                "sources": [
+                  "aggregate",
+                  "weakness_profile",
+                  "attempt",
+                  "grading_report",
+                  "personal_note"
+                ],
+                "module": "overview",
+                "reason": "reject_unrequested_notes_scope"
+              },
+              "retrieval_policy": "Analyze overall history with aggregate coverage plus representative evidence cards.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "历史证据充分",
+                "note": "已覆盖多次作答及代表证据，可用于模块/总体趋势判断。"
+              },
+              "evidence_card_count": 29,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "profile:overview:coverage",
+                "profile:overview:weakness:1",
+                "profile:overview:weakness:2",
+                "profile:overview:weakness:3",
+                "profile:overview:weakness:4",
+                "profile:overview:weakness:5",
+                "profile:overview:weakness:6",
+                "profile:overview:weakness:7",
+                "attempt:46",
+                "attempt:57",
+                "attempt:60",
+                "attempt:42"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "profile:overview:coverage",
+                  "source_type": "aggregate",
+                  "title": "总览 覆盖统计",
+                  "claim": "选定模块全量匹配历史的覆盖、来源和问题分布统计。",
+                  "content": "{\"coverage\": {\"attempt_count\": 25, \"report_count\": 33, \"note_count\": 2, \"chunk_count\": 781}, \"source_counts\": {\"material\": 397, \"reference_answer\": 267, \"question\": 57, \"grading_re...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:1",
+                  "source_type": "weakness_profile",
+                  "title": "材料遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"材料遗漏\", \"frequency\": 34, \"severity\": 0.85, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-46\", \"title\": \"GKS-605-Q2 第2题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:2",
+                  "source_type": "weakness_profile",
+                  "title": "对策针对性",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"对策针对性\", \"frequency\": 33, \"severity\": 0.825, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-46\", \"title\": \"GKS-605-Q2 第2题 批改报告\", \"source_type\": \"grading_report\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:3",
+                  "source_type": "weakness_profile",
+                  "title": "采分点遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"采分点遗漏\", \"frequency\": 33, \"severity\": 0.825, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-46\", \"title\": \"GKS-605-Q2 第2题 批改报告\", \"source_type\": \"grading_report\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:4",
+                  "source_type": "weakness_profile",
+                  "title": "结构表达",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"结构表达\", \"frequency\": 31, \"severity\": 0.775, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-46\", \"title\": \"GKS-605-Q2 第2题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:5",
+                  "source_type": "weakness_profile",
+                  "title": "语言概括",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"语言概括\", \"frequency\": 31, \"severity\": 0.775, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-46\", \"title\": \"GKS-605-Q2 第2题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:6",
+                  "source_type": "weakness_profile",
+                  "title": "格式规范",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"格式规范\", \"frequency\": 11, \"severity\": 0.275, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-60\", \"title\": \"GKS-764-Q1 第1题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:overview:weakness:7",
+                  "source_type": "weakness_profile",
+                  "title": "审题偏差",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"审题偏差\", \"frequency\": 9, \"severity\": 0.225, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-57\", \"title\": \"GKS-765-Q1 第1题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "attempt:46",
+                  "source_type": "grading_report",
+                  "title": "GKS-605-Q2 第2题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：27/30 - 等级：优秀 - 核心判断：最大得分点是结构清晰、要点覆盖全面，能将材料信息有效整合为三个论证维度；最大失分点是“为共同富裕示范区提供法治保障”这一重要政治定位在开头提及后，未在正文论证中充分展开和体现。 ## 得分点清单 - 题型分类：综合分析（理解类） - 标准采分点： 1. 概念阐释：材料“充分利用大数据、区块链...",
+                  "question_id": 620,
+                  "attempt_id": 46,
+                  "url": "/attempts/46",
+                  "confidence": 0.7758
+                },
+                {
+                  "evidence_id": "attempt:57",
+                  "source_type": "grading_report",
+                  "title": "GKS-765-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：14/20 - 等级：良好 - 核心判断：四个核心采分点均命中，但概括程度参差不齐，部分表达与材料微观细节略有偏差，结构“点线面”逻辑层次感稍弱。 ## 得分点清单 - 题型分类：归纳概括 - 标准采分点（综合多份参考答案提炼）： 1. **数智化亲情监测**：材料第1段“通过物联网感知设备，家属可实时监测老人身体健康数据等情况”-...",
+                  "question_id": 653,
+                  "attempt_id": 57,
+                  "url": "/attempts/57",
+                  "confidence": 0.7204
+                },
+                {
+                  "evidence_id": "attempt:60",
+                  "source_type": "grading_report",
+                  "title": "GKS-764-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "好的，我们开始本次申论批改。 ## 总体评分 - 总分：14/20分 - 等级：良好 - 核心判断：**最大得分点**在于对材料核心要点（开幕式、赛事保障、未来生活节）有较全面的覆盖；**最大失分点**在于答案更像“要点概述”而非“微评论”，观点不够鲜明，论述缺乏深度，逻辑层次和语言表现力不足。 ## 得分点清单 - 题型分类：公文写作（微评论） - 标准采...",
+                  "question_id": 650,
+                  "attempt_id": 60,
+                  "url": "/attempts/60",
+                  "confidence": 0.7137
+                },
+                {
+                  "evidence_id": "attempt:42",
+                  "source_type": "grading_report",
+                  "title": "GKS-607-Q2 第2题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：8/30分 - 等级：较弱 - 核心判断：最大得分点在于大致识别了新型举国体制的事例；最大失分点在于对题干句子的理解未点出“团结协作、汇聚力量与智慧”的核心内涵，且对材料逻辑的组织混乱、观点不鲜明。 ## 得分点清单 - 题型分类：综合分析（语句理解题） - 标准采分点： 1. 句子内涵解释：强调团结协作、汇聚力量智慧的重要性，是对...",
+                  "question_id": 626,
+                  "attempt_id": 42,
+                  "url": "/attempts/42",
+                  "confidence": 0.6452
+                }
+              ]
+            }
+          },
+          "answer_length": 4427,
+          "answer_sha256": "7cf5deb2a29dab53",
+          "answer_preview": "## 结论摘要 基于您备考浙江的目标，本次扫描覆盖了25次作答、33份批改报告、2条复盘笔记及781个上下文片段。当前最关键的问题是：**材料遗漏系统性地拉低了各题型得分，同时综合写作训练量严重不足，导致在公文写作和综合分析等高分值题型中频繁失分。** ## 证据分析 从33份批改报告中抽取的28条代表证据显示，您的薄弱点高度集中在几个特定维度，以下为代表证据： - **材料遗漏（高频）**：在 attempt-46（综合分析，27/30）中，批改报告明确指出“**重要政治定位**在开头提及后，未在正文论证中充分展..."
+        },
+        {
+          "thread": "b",
+          "turn": 2,
+          "run_id": 49,
+          "duration_ms": 40844.22,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 9913,
+            "output_tokens": 2303,
+            "total_tokens": 12216,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "next_question",
+            "task_type": "recommend",
+            "filters": {
+              "region": "浙江"
+            },
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 3,
+              "summarized_count": 0,
+              "long_term_memory_count": 1,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "recommend_questions",
+              "query_plan": {
+                "action": "recommend",
+                "scope": "candidate_questions",
+                "sources": [
+                  "candidate_question",
+                  "weakness_profile",
+                  "aggregate"
+                ],
+                "module": "improvement",
+                "reason": "recommend_task_constraint"
+              },
+              "retrieval_policy": "Recommend from candidate questions using user profile and filters.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "推荐证据可用",
+                "note": "已有候选题或画像证据，可用于择题建议。"
+              },
+              "evidence_card_count": 15,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "question:706",
+                "question:705",
+                "question:704",
+                "question:703",
+                "question:702",
+                "question:701",
+                "question:700",
+                "question:699",
+                "profile:global:1",
+                "profile:global:2",
+                "profile:global:3",
+                "profile:global:4"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "question:706",
+                  "source_type": "candidate_question",
+                  "title": "GKS-945-Q3 第3题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 706, \"question_code\": \"GKS-945-Q3\", \"title\": \"第3题\", \"question_type\": \"综合写作\", \"year\": 2026, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2026年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 706,
+                  "attempt_id": null,
+                  "url": "/questions/706",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:705",
+                  "source_type": "candidate_question",
+                  "title": "GKS-945-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 705, \"question_code\": \"GKS-945-Q2\", \"title\": \"第2题\", \"question_type\": \"公文写作\", \"year\": 2026, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2026年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 705,
+                  "attempt_id": null,
+                  "url": "/questions/705",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:704",
+                  "source_type": "candidate_question",
+                  "title": "GKS-945-Q1 第1题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 704, \"question_code\": \"GKS-945-Q1\", \"title\": \"第1题\", \"question_type\": \"归纳概括\", \"year\": 2026, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2026年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 704,
+                  "attempt_id": null,
+                  "url": "/questions/704",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:703",
+                  "source_type": "candidate_question",
+                  "title": "GKS-944-Q3 第3题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 703, \"question_code\": \"GKS-944-Q3\", \"title\": \"第3题\", \"question_type\": \"综合写作\", \"year\": 2026, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2026年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 703,
+                  "attempt_id": null,
+                  "url": "/questions/703",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:702",
+                  "source_type": "candidate_question",
+                  "title": "GKS-944-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 702, \"question_code\": \"GKS-944-Q2\", \"title\": \"第2题\", \"question_type\": \"公文写作\", \"year\": 2026, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2026年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 702,
+                  "attempt_id": null,
+                  "url": "/questions/702",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:701",
+                  "source_type": "candidate_question",
+                  "title": "GKS-944-Q1 第1题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 701, \"question_code\": \"GKS-944-Q1\", \"title\": \"第1题\", \"question_type\": \"归纳概括\", \"year\": 2026, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2026年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 701,
+                  "attempt_id": null,
+                  "url": "/questions/701",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:700",
+                  "source_type": "candidate_question",
+                  "title": "GKS-943-Q3 第3题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 700, \"question_code\": \"GKS-943-Q3\", \"title\": \"第3题\", \"question_type\": \"综合写作\", \"year\": 2026, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2026年浙江省公考《申论》题（A卷）\", \"questio...",
+                  "question_id": 700,
+                  "attempt_id": null,
+                  "url": "/questions/700",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:699",
+                  "source_type": "candidate_question",
+                  "title": "GKS-943-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 699, \"question_code\": \"GKS-943-Q2\", \"title\": \"第2题\", \"question_type\": \"公文写作\", \"year\": 2026, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2026年浙江省公考《申论》题（A卷）\", \"questio...",
+                  "question_id": 699,
+                  "attempt_id": null,
+                  "url": "/questions/699",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "profile:global:1",
+                  "source_type": "weakness_profile",
+                  "title": "材料遗漏",
+                  "claim": "用户长期训练画像中的弱项，用于解释为什么推荐这些题。",
+                  "content": "{\"module\": \"overview\", \"question_type\": \"\", \"problem_type\": \"材料遗漏\", \"frequency\": 34, \"severity\": 0.85, \"last_seen_at\": \"2026-07-01 05:51:43\"}",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.75
+                },
+                {
+                  "evidence_id": "profile:global:2",
+                  "source_type": "weakness_profile",
+                  "title": "采分点遗漏",
+                  "claim": "用户长期训练画像中的弱项，用于解释为什么推荐这些题。",
+                  "content": "{\"module\": \"overview\", \"question_type\": \"\", \"problem_type\": \"采分点遗漏\", \"frequency\": 33, \"severity\": 0.825, \"last_seen_at\": \"2026-07-01 05:51:43\"}",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.75
+                },
+                {
+                  "evidence_id": "profile:global:3",
+                  "source_type": "weakness_profile",
+                  "title": "对策针对性",
+                  "claim": "用户长期训练画像中的弱项，用于解释为什么推荐这些题。",
+                  "content": "{\"module\": \"overview\", \"question_type\": \"\", \"problem_type\": \"对策针对性\", \"frequency\": 33, \"severity\": 0.825, \"last_seen_at\": \"2026-07-01 05:51:43\"}",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.75
+                },
+                {
+                  "evidence_id": "profile:global:4",
+                  "source_type": "weakness_profile",
+                  "title": "结构表达",
+                  "claim": "用户长期训练画像中的弱项，用于解释为什么推荐这些题。",
+                  "content": "{\"module\": \"overview\", \"question_type\": \"\", \"problem_type\": \"结构表达\", \"frequency\": 31, \"severity\": 0.775, \"last_seen_at\": \"2026-07-01 05:51:43\"}",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.75
+                }
+              ]
+            }
+          },
+          "answer_length": 3414,
+          "answer_sha256": "b801b3b303d97d39",
+          "answer_preview": "## 推荐顺序 按优先级排列，建议依次完成： 1. **第3题（综合写作 / GKS-945-Q3）** — 2026浙江C卷 2. **第2题（公文写作 / GKS-945-Q2）** — 2026浙江C卷 3. **第1题（归纳概括 / GKS-945-Q1）** — 2026浙江C卷 4. **第3题（综合写作 / GKS-944-Q3）** — 2026浙江B卷（备选） 5. **第2题（公文写作 / GKS-944-Q2）** — 2026浙江B卷（备选） ## 推荐理由 **第3题（综合写作 / 706..."
+        }
+      ],
+      "metrics": {
+        "score": 97.8,
+        "final_keyword_accuracy": 1.0,
+        "context_literal_accuracy": 0.5,
+        "forbidden_term_accuracy": 1.0,
+        "thread_continuity": 1.0,
+        "semantic_score": 1.0,
+        "judge": {
+          "status": "ok",
+          "scores": {
+            "context_retention": 1.0,
+            "constraint_adherence": 1.0,
+            "correction_adherence": 1.0,
+            "thread_isolation": 1.0,
+            "answer_relevance": 1.0
+          },
+          "reason": "回答聚焦浙江题目推荐，未提及江苏或线程甲，准确回应“刚才目标”，且无其他线程信息串入。"
+        },
+        "errors": [],
+        "turn_count": 3,
+        "duration_ms": 233379.0,
+        "token_usage": {
+          "input_tokens": 28445,
+          "output_tokens": 7186,
+          "total_tokens": 35631
+        },
+        "runtime": {
+          "prompt_version": "agent-prompts-v3-context-budget",
+          "retrieval_version": "4e8117e44705",
+          "dataset_version": "agent-v2-multiturn-v1",
+          "case_sha256": "13c6b21674e3d3e0"
+        }
+      }
+    }
+  ]
+}

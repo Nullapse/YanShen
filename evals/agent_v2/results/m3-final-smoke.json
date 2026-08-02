@@ -1,0 +1,362 @@
+{
+  "schema_version": "agent-multiturn-eval-report-v1",
+  "suite_name": "agent-v2-multiturn-v1",
+  "created_at": "2026-07-10T19:49:12.804427+00:00",
+  "dataset": {
+    "path": "C:\\Users\\lwq\\Documents\\gongkao\\evals\\agent_v2\\multiturn-v1.jsonl",
+    "sha256": "58d5b98af653dbcbbfa18b7fb5af125ea1314af7ffb8b13ceb54a8f9f7871a68",
+    "case_count": 1
+  },
+  "versions": {
+    "prompt": "agent-prompts-v3-context-budget",
+    "retrieval": "eb6f8a28fc62"
+  },
+  "summary": {
+    "average_score": 99.2,
+    "failed_cases": 0,
+    "case_count": 1,
+    "turn_count": 2,
+    "category_scores": {
+      "reference": 99.2
+    },
+    "semantic_average": 1.0,
+    "semantic_success_rate": 1.0,
+    "latency_ms": {
+      "p50": 18478.13,
+      "p95": 32236.35
+    },
+    "token_usage": {
+      "input_tokens": 26341,
+      "output_tokens": 2767,
+      "total_tokens": 29108
+    }
+  },
+  "results": [
+    {
+      "case": {
+        "id": "followup_why_recommendation",
+        "title": "追问推荐理由",
+        "category": "reference",
+        "turns": [
+          {
+            "user": "推荐一道浙江综合分析题"
+          },
+          {
+            "user": "为什么是这道"
+          }
+        ],
+        "expected_context_terms": [
+          "浙江",
+          "综合分析",
+          "推荐"
+        ],
+        "final_expected_keywords": [
+          "理由",
+          "证据"
+        ]
+      },
+      "conversations": {
+        "main": 19
+      },
+      "turns": [
+        {
+          "thread": "main",
+          "turn": 1,
+          "run_id": 45,
+          "duration_ms": 32236.35,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 12782,
+            "output_tokens": 1728,
+            "total_tokens": 14510,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "next_question",
+            "task_type": "recommend",
+            "filters": {
+              "question_type": "综合分析",
+              "region": "浙江"
+            },
+            "module": "analysis",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 1,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "recommend_questions",
+              "query_plan": {
+                "action": "recommend",
+                "scope": "candidate_questions",
+                "sources": [
+                  "candidate_question",
+                  "weakness_profile",
+                  "aggregate"
+                ],
+                "module": "analysis",
+                "reason": "recommend_task_constraint"
+              },
+              "retrieval_policy": "Recommend from candidate questions using user profile and filters.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "推荐证据可用",
+                "note": "已有候选题或画像证据，可用于择题建议。"
+              },
+              "evidence_card_count": 6,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "question:620",
+                "question:623",
+                "question:626",
+                "question:629",
+                "question:631",
+                "question:633"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "question:620",
+                  "source_type": "candidate_question",
+                  "title": "GKS-605-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 620, \"question_code\": \"GKS-605-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2023, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2023年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 620,
+                  "attempt_id": null,
+                  "url": "/questions/620",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:623",
+                  "source_type": "candidate_question",
+                  "title": "GKS-606-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 623, \"question_code\": \"GKS-606-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（A卷）\", \"questio...",
+                  "question_id": 623,
+                  "attempt_id": null,
+                  "url": "/questions/623",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:626",
+                  "source_type": "candidate_question",
+                  "title": "GKS-607-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 626, \"question_code\": \"GKS-607-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 626,
+                  "attempt_id": null,
+                  "url": "/questions/626",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:629",
+                  "source_type": "candidate_question",
+                  "title": "GKS-608-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 629, \"question_code\": \"GKS-608-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 629,
+                  "attempt_id": null,
+                  "url": "/questions/629",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:631",
+                  "source_type": "candidate_question",
+                  "title": "GKS-609-Q1 第1题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 631, \"question_code\": \"GKS-609-Q1\", \"title\": \"第1题\", \"question_type\": \"综合分析\", \"year\": 2020, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2020年浙江省公考《申论》题（A卷）\", \"questio...",
+                  "question_id": 631,
+                  "attempt_id": null,
+                  "url": "/questions/631",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:633",
+                  "source_type": "candidate_question",
+                  "title": "GKS-610-Q1 第1题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 633, \"question_code\": \"GKS-610-Q1\", \"title\": \"第1题\", \"question_type\": \"综合分析\", \"year\": 2020, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2020年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 633,
+                  "attempt_id": null,
+                  "url": "/questions/633",
+                  "confidence": 0.78
+                }
+              ]
+            }
+          },
+          "answer_length": 2248,
+          "answer_sha256": "6d5465b14f246e81",
+          "answer_preview": "好的，教练。以下是依据你的训练记录和当前题库，为你定制的浙江综合分析题择题建议。 ## 推荐顺序 - 首选：**第2题**（2023年浙江省考C卷，ID 620） - 次选：**第1题**（2020年浙江省考A卷，ID 631） - 备选：**第2题**（2021年浙江省考B卷，ID 626） / **第2题**（2021年浙江省考A卷，ID 623） ## 推荐理由 - **首选：第2题（2023年浙江省考C卷，ID 620）** 这是最新的浙江真题，字数要求“不超过600字”，在所有候选题中篇幅最长，能充分训练..."
+        },
+        {
+          "thread": "main",
+          "turn": 2,
+          "run_id": 46,
+          "duration_ms": 18478.13,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 13559,
+            "output_tokens": 1039,
+            "total_tokens": 14598,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "next_question",
+            "task_type": "recommend",
+            "filters": {
+              "question_type": "综合分析",
+              "region": "浙江"
+            },
+            "module": "analysis",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 3,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "recommend_questions",
+              "query_plan": {
+                "action": "recommend",
+                "scope": "candidate_questions",
+                "sources": [
+                  "candidate_question",
+                  "weakness_profile",
+                  "aggregate"
+                ],
+                "module": "analysis",
+                "reason": "recommend_task_constraint"
+              },
+              "retrieval_policy": "Recommend from candidate questions using user profile and filters.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "推荐证据可用",
+                "note": "已有候选题或画像证据，可用于择题建议。"
+              },
+              "evidence_card_count": 6,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "question:620",
+                "question:623",
+                "question:626",
+                "question:629",
+                "question:631",
+                "question:633"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "question:620",
+                  "source_type": "candidate_question",
+                  "title": "GKS-605-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 620, \"question_code\": \"GKS-605-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2023, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2023年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 620,
+                  "attempt_id": null,
+                  "url": "/questions/620",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:623",
+                  "source_type": "candidate_question",
+                  "title": "GKS-606-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 623, \"question_code\": \"GKS-606-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（A卷）\", \"questio...",
+                  "question_id": 623,
+                  "attempt_id": null,
+                  "url": "/questions/623",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:626",
+                  "source_type": "candidate_question",
+                  "title": "GKS-607-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 626, \"question_code\": \"GKS-607-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 626,
+                  "attempt_id": null,
+                  "url": "/questions/626",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:629",
+                  "source_type": "candidate_question",
+                  "title": "GKS-608-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 629, \"question_code\": \"GKS-608-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 629,
+                  "attempt_id": null,
+                  "url": "/questions/629",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:631",
+                  "source_type": "candidate_question",
+                  "title": "GKS-609-Q1 第1题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 631, \"question_code\": \"GKS-609-Q1\", \"title\": \"第1题\", \"question_type\": \"综合分析\", \"year\": 2020, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2020年浙江省公考《申论》题（A卷）\", \"questio...",
+                  "question_id": 631,
+                  "attempt_id": null,
+                  "url": "/questions/631",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:633",
+                  "source_type": "candidate_question",
+                  "title": "GKS-610-Q1 第1题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 633, \"question_code\": \"GKS-610-Q1\", \"title\": \"第1题\", \"question_type\": \"综合分析\", \"year\": 2020, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2020年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 633,
+                  "attempt_id": null,
+                  "url": "/questions/633",
+                  "confidence": 0.78
+                }
+              ]
+            }
+          },
+          "answer_length": 834,
+          "answer_sha256": "deb8300cff6e38e3",
+          "answer_preview": "看你问的是我上一轮说的“首选这道”。 直接回答：选它，是因为它在“新题练手”和“旧题复盘”之间是**当前最合理的选择**，理由有三： 1. **年份最新，最贴近考情**。它是2023年的浙江真题，在候选题里年份最近，练它对认知当前命题风格最有帮助。`evidence_id: question:620` 2. **已有1次作答基础和2份报告**。你并不是从零开始做一道完全陌生的题，而是基于已有批改证据进行复盘提升，这样练效率最高——能直接把报告里指出的问题变成下一次的改进点。`evidence_id: questio..."
+        }
+      ],
+      "metrics": {
+        "score": 99.2,
+        "final_keyword_accuracy": 1.0,
+        "context_literal_accuracy": 0.6667,
+        "forbidden_term_accuracy": 1.0,
+        "thread_continuity": 1.0,
+        "semantic_score": 1.0,
+        "semantic_success": true,
+        "deterministic_score": 0.9667,
+        "judge": {
+          "status": "ok",
+          "scores": {
+            "context_retention": 1.0,
+            "constraint_adherence": 1.0,
+            "correction_adherence": 1.0,
+            "thread_isolation": 1.0,
+            "answer_relevance": 1.0
+          },
+          "reason": "指代理解准确，约束保持完整，理由证据充分，无线程干扰。"
+        },
+        "errors": [],
+        "turn_count": 2,
+        "duration_ms": 50714.48,
+        "token_usage": {
+          "input_tokens": 26341,
+          "output_tokens": 2767,
+          "total_tokens": 29108
+        },
+        "runtime": {
+          "prompt_version": "agent-prompts-v3-context-budget",
+          "retrieval_version": "eb6f8a28fc62",
+          "dataset_version": "agent-v2-multiturn-v1",
+          "case_sha256": "0a5703e80063ace4"
+        }
+      }
+    }
+  ]
+}

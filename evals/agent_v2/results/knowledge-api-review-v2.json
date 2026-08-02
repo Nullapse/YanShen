@@ -1,0 +1,227 @@
+{
+  "schema_version": "knowledge-api-review-v1",
+  "created_at": "2026-07-10T19:15:33.126160+00:00",
+  "sample_count": 36,
+  "pass_count": 36,
+  "pass_rate": 1.0,
+  "major_issues": 0,
+  "minor_issues": 0,
+  "results": [
+    {
+      "id": "knowledge:analysis:angles:checklist",
+      "pass": true,
+      "severity": "none",
+      "reason": "规则明确，正反例匹配，强调依据材料选角度，避免机械凑维度，边界清晰。"
+    },
+    {
+      "id": "knowledge:analysis:angles:counterexample",
+      "pass": true,
+      "severity": "none",
+      "reason": "反例准确，与规则对应，修正路径具体，不会误导脱离材料。"
+    },
+    {
+      "id": "knowledge:analysis:angles:diagnostic",
+      "pass": true,
+      "severity": "none",
+      "reason": "诊断触发信号及修复动作合理，判断依据与核心规则一致，可操作性强。"
+    },
+    {
+      "id": "knowledge:analysis:angles:example",
+      "pass": true,
+      "severity": "none",
+      "reason": "正例体现从材料出发的多角度，反例点明机械套模板错误，匹配规则核心。"
+    },
+    {
+      "id": "knowledge:analysis:angles:method",
+      "pass": true,
+      "severity": "none",
+      "reason": "操作步骤紧扣材料证据中心，并设置题干复核环节，防止偏离任务。"
+    },
+    {
+      "id": "knowledge:analysis:angles:rewrite",
+      "pass": true,
+      "severity": "none",
+      "reason": "改写示范遵循规则重新组织信息，强调并非同义替换，有效纠正反例错误。"
+    },
+    {
+      "id": "knowledge:countermeasure:action:checklist",
+      "pass": true,
+      "severity": "none",
+      "reason": "规则明确，正反例匹配，适用边界清晰，不诱导脱离材料。"
+    },
+    {
+      "id": "knowledge:countermeasure:action:counterexample",
+      "pass": true,
+      "severity": "none",
+      "reason": "反例典型，修正指引具体，紧扣核心规则，无机械套用风险。"
+    },
+    {
+      "id": "knowledge:countermeasure:action:diagnostic",
+      "pass": true,
+      "severity": "none",
+      "reason": "诊断逻辑与修复动作一致，强调材料依据，避免空泛答题。"
+    },
+    {
+      "id": "knowledge:countermeasure:action:example",
+      "pass": true,
+      "severity": "none",
+      "reason": "示例符合规则，解释有效，强调保留题干和材料边界。"
+    },
+    {
+      "id": "knowledge:countermeasure:action:method",
+      "pass": true,
+      "severity": "none",
+      "reason": "步骤可操作，复核要求能够防止脱离任务边界。"
+    },
+    {
+      "id": "knowledge:countermeasure:action:rewrite",
+      "pass": true,
+      "severity": "none",
+      "reason": "改写展示从空泛到具体的转化，步骤说明紧扣材料重组。"
+    },
+    {
+      "id": "knowledge:document:audience:checklist",
+      "pass": true,
+      "severity": "none",
+      "reason": "规则正确，正反例匹配，边界清晰，且强调依据对象选择信息，未诱导脱离材料。"
+    },
+    {
+      "id": "knowledge:document:audience:counterexample",
+      "pass": true,
+      "severity": "none",
+      "reason": "反例明确，修正指向核心规则，与正例一致，适用条件无冲突。"
+    },
+    {
+      "id": "knowledge:document:audience:diagnostic",
+      "pass": true,
+      "severity": "none",
+      "reason": "诊断信号与反例匹配，修复动作直接对应方法步骤，无机械套用风险。"
+    },
+    {
+      "id": "knowledge:document:audience:example",
+      "pass": true,
+      "severity": "none",
+      "reason": "示例有效阐释了规则如何结合题干与材料，未脱离对象意识的核心。"
+    },
+    {
+      "id": "knowledge:document:audience:method",
+      "pass": true,
+      "severity": "none",
+      "reason": "方法步骤具体，要求回归题干确认边界，避免脱离材料或机械套用。"
+    },
+    {
+      "id": "knowledge:document:audience:rewrite",
+      "pass": true,
+      "severity": "none",
+      "reason": "改写示例准确体现信息重组原则，非简单同义替换，符合对象意识要求。"
+    },
+    {
+      "id": "knowledge:essay:analysis:checklist",
+      "pass": true,
+      "severity": "none",
+      "reason": "规则明确，正反例匹配准确，适用条件限定清晰，未发现诱导模板痕迹。"
+    },
+    {
+      "id": "knowledge:essay:analysis:counterexample",
+      "pass": true,
+      "severity": "none",
+      "reason": "错误示例与修正动作完全对应，遵循同一规则，边界感清晰，无机械套用风险。"
+    },
+    {
+      "id": "knowledge:essay:analysis:diagnostic",
+      "pass": true,
+      "severity": "none",
+      "reason": "诊断信号、依据和修复步骤一致，与规则环环相扣，适用条件合理。"
+    },
+    {
+      "id": "knowledge:essay:analysis:example",
+      "pass": true,
+      "severity": "none",
+      "reason": "示例有效展示因果分析，反例与正确做法对比鲜明，未脱离材料导向。"
+    },
+    {
+      "id": "knowledge:essay:analysis:method",
+      "pass": true,
+      "severity": "none",
+      "reason": "操作链条明确且辅以反面后果补充，边界复核机制防止机械演绎。"
+    },
+    {
+      "id": "knowledge:essay:analysis:rewrite",
+      "pass": true,
+      "severity": "none",
+      "reason": "改写严格遵循论证链条，体现从论据到分析的转化，无机械替换或套作倾向。"
+    },
+    {
+      "id": "knowledge:overview:evidence:checklist",
+      "pass": true,
+      "severity": "none",
+      "reason": "规则正确，正反例严格对应，边界清晰，以多次证据为前提，不会诱导机械套用。"
+    },
+    {
+      "id": "knowledge:overview:evidence:counterexample",
+      "pass": true,
+      "severity": "none",
+      "reason": "明确错误写法与修正路径，正反例匹配，无脱离材料风险。"
+    },
+    {
+      "id": "knowledge:overview:evidence:diagnostic",
+      "pass": true,
+      "severity": "none",
+      "reason": "诊断逻辑基于明确规则和触发信号，不依赖主观推断。"
+    },
+    {
+      "id": "knowledge:overview:evidence:example",
+      "pass": true,
+      "severity": "none",
+      "reason": "示例基于规则生成，有效展示保留材料依据的步骤。"
+    },
+    {
+      "id": "knowledge:overview:evidence:method",
+      "pass": true,
+      "severity": "none",
+      "reason": "操作步骤围绕证据展开，结尾强制回归题干，防止跑偏。"
+    },
+    {
+      "id": "knowledge:overview:evidence:rewrite",
+      "pass": true,
+      "severity": "none",
+      "reason": "改写严格依据规则重组信息，并非模板替换，保留材料证据。"
+    },
+    {
+      "id": "knowledge:summary:abstraction:checklist",
+      "pass": true,
+      "severity": "none",
+      "reason": "规则、步骤、复核均正确，正反例匹配，边界清晰，无诱导模板化。"
+    },
+    {
+      "id": "knowledge:summary:abstraction:counterexample",
+      "pass": true,
+      "severity": "none",
+      "reason": "反例与规则一致，修正步骤明确，适用条件与技能卡统一，无错误。"
+    },
+    {
+      "id": "knowledge:summary:abstraction:diagnostic",
+      "pass": true,
+      "severity": "none",
+      "reason": "诊断触发与修复动作准确，依据清晰，未发现脱离材料或机械套用风险。"
+    },
+    {
+      "id": "knowledge:summary:abstraction:example",
+      "pass": true,
+      "severity": "none",
+      "reason": "示例有效，解释与规则吻合，无拔高或边界模糊问题。"
+    },
+    {
+      "id": "knowledge:summary:abstraction:method",
+      "pass": true,
+      "severity": "none",
+      "reason": "步骤紧扣核心规则，回扣题干检查边界，无诱导性问题。"
+    },
+    {
+      "id": "knowledge:summary:abstraction:rewrite",
+      "pass": true,
+      "severity": "none",
+      "reason": "改写示范准确，符合“覆盖细节不拔高”原则，不依赖模板。"
+    }
+  ]
+}

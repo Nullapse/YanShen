@@ -1,0 +1,1303 @@
+{
+  "schema_version": "agent-multiturn-eval-report-v1",
+  "suite_name": "agent-v2-multiturn-v1",
+  "created_at": "2026-07-10T14:17:27.519992+00:00",
+  "dataset": {
+    "path": "C:\\Users\\lwq\\Documents\\gongkao\\evals\\agent_v2\\multiturn-v1.jsonl",
+    "sha256": "58d5b98af653dbcbbfa18b7fb5af125ea1314af7ffb8b13ceb54a8f9f7871a68",
+    "case_count": 3
+  },
+  "versions": {
+    "prompt": "agent-prompts-v3-context-budget",
+    "retrieval": "a3b0680036f9"
+  },
+  "summary": {
+    "average_score": 49.9333,
+    "failed_cases": 0,
+    "case_count": 3,
+    "turn_count": 8,
+    "category_scores": {
+      "correction": 62.5,
+      "isolation": 22.5,
+      "reference": 64.8
+    },
+    "latency_ms": {
+      "p50": 37681.38,
+      "p95": 203347.81
+    },
+    "token_usage": {
+      "input_tokens": 91785,
+      "output_tokens": 16498,
+      "total_tokens": 108283
+    }
+  },
+  "results": [
+    {
+      "case": {
+        "id": "followup_why_recommendation",
+        "title": "追问推荐理由",
+        "category": "reference",
+        "turns": [
+          {
+            "user": "推荐一道浙江综合分析题"
+          },
+          {
+            "user": "为什么是这道"
+          }
+        ],
+        "expected_context_terms": [
+          "浙江",
+          "综合分析",
+          "推荐"
+        ],
+        "final_expected_keywords": [
+          "理由",
+          "证据"
+        ]
+      },
+      "conversations": {
+        "main": 19
+      },
+      "turns": [
+        {
+          "thread": "main",
+          "turn": 1,
+          "run_id": 45,
+          "duration_ms": 40598.94,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 5941,
+            "output_tokens": 1694,
+            "total_tokens": 7635,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "next_question",
+            "task_type": "recommend",
+            "filters": {
+              "question_type": "综合分析",
+              "region": "浙江"
+            },
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 1,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "recommend_questions",
+              "query_plan": {
+                "action": "recommend",
+                "scope": "overall_history",
+                "sources": [
+                  "candidate_question",
+                  "aggregate"
+                ],
+                "module": "analysis",
+                "reason": "用户请求推荐浙江综合分析题，需从全局题库中筛选匹配的题目"
+              },
+              "retrieval_policy": "Recommend from candidate questions using user profile and filters.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "推荐证据可用",
+                "note": "已有候选题或画像证据，可用于择题建议。"
+              },
+              "evidence_card_count": 6,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "question:629",
+                "question:623",
+                "question:631",
+                "question:620",
+                "question:633",
+                "question:626"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "question:629",
+                  "source_type": "candidate_question",
+                  "title": "GKS-608-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 629, \"question_code\": \"GKS-608-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 629,
+                  "attempt_id": null,
+                  "url": "/questions/629",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:623",
+                  "source_type": "candidate_question",
+                  "title": "GKS-606-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 623, \"question_code\": \"GKS-606-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（A卷）\", \"questio...",
+                  "question_id": 623,
+                  "attempt_id": null,
+                  "url": "/questions/623",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:631",
+                  "source_type": "candidate_question",
+                  "title": "GKS-609-Q1 第1题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 631, \"question_code\": \"GKS-609-Q1\", \"title\": \"第1题\", \"question_type\": \"综合分析\", \"year\": 2020, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2020年浙江省公考《申论》题（A卷）\", \"questio...",
+                  "question_id": 631,
+                  "attempt_id": null,
+                  "url": "/questions/631",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:620",
+                  "source_type": "candidate_question",
+                  "title": "GKS-605-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 620, \"question_code\": \"GKS-605-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2023, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2023年浙江省公考《申论》题（C卷）\", \"questio...",
+                  "question_id": 620,
+                  "attempt_id": null,
+                  "url": "/questions/620",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:633",
+                  "source_type": "candidate_question",
+                  "title": "GKS-610-Q1 第1题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 633, \"question_code\": \"GKS-610-Q1\", \"title\": \"第1题\", \"question_type\": \"综合分析\", \"year\": 2020, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2020年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 633,
+                  "attempt_id": null,
+                  "url": "/questions/633",
+                  "confidence": 0.78
+                },
+                {
+                  "evidence_id": "question:626",
+                  "source_type": "candidate_question",
+                  "title": "GKS-607-Q2 第2题",
+                  "claim": "候选训练题，可用于择题推荐。",
+                  "content": "{\"id\": 626, \"question_code\": \"GKS-607-Q2\", \"title\": \"第2题\", \"question_type\": \"综合分析\", \"year\": 2021, \"region\": \"浙江\", \"exam_type\": \"浙江省考\", \"paper_name\": \"2021年浙江省公考《申论》题（B卷）\", \"questio...",
+                  "question_id": 626,
+                  "attempt_id": null,
+                  "url": "/questions/626",
+                  "confidence": 0.78
+                }
+              ]
+            }
+          },
+          "answer_length": 1862,
+          "answer_sha256": "838522690e172fa3",
+          "answer_preview": "## 推荐顺序 - 第一优先：题620 — 2023年浙江省考C卷第2题（综合分析） - 第二优先：题631 — 2020年浙江省考A卷第1题（综合分析） - 第三优先：题626 — 2021年浙江省考B卷第2题（综合分析） ## 推荐理由 **题620（2023·浙江C卷·第2题）** - 题型为综合分析，字数上限600字，在同类题中篇幅最长，适合训练多角度展开和分层论述。 - 2023年真题，贴近当前命题风格，报告数2，批改覆盖较细，便于对比定位。 - 当前综合分析完成度5.3，已具备基础，此题为进阶型篇幅，可..."
+        },
+        {
+          "thread": "main",
+          "turn": 2,
+          "run_id": 46,
+          "duration_ms": 203347.81,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 14084,
+            "output_tokens": 3186,
+            "total_tokens": 17270,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "next_question",
+            "task_type": "recommend",
+            "filters": {
+              "question_type": "综合分析",
+              "region": "浙江"
+            },
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 3,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "overview_diagnosis",
+              "query_plan": {
+                "action": "explain",
+                "scope": "overall_history",
+                "sources": [
+                  "aggregate",
+                  "knowledge"
+                ],
+                "module": "overview",
+                "reason": "解释推荐题目的理由"
+              },
+              "retrieval_policy": "Analyze overall history with aggregate coverage plus representative evidence cards.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "历史证据充分",
+                "note": "已覆盖多次作答及代表证据，可用于模块/总体趋势判断。"
+              },
+              "evidence_card_count": 1,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "profile:overview:coverage"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "profile:overview:coverage",
+                  "source_type": "aggregate",
+                  "title": "总览 覆盖统计",
+                  "claim": "选定模块全量匹配历史的覆盖、来源和问题分布统计。",
+                  "content": "{\"coverage\": {\"attempt_count\": 8, \"report_count\": 10, \"note_count\": 0, \"chunk_count\": 103}, \"source_counts\": {\"material\": 45, \"reference_answer\": 34, \"grading_report\": 10, \"attempt...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.9
+                }
+              ]
+            }
+          },
+          "answer_length": 3932,
+          "answer_sha256": "04f095efee35518a",
+          "answer_preview": "## 结论摘要 本次扫描覆盖浙江综合分析题8次作答、10份批改报告、0条复盘笔记，共103个证据chunk。当前模块最关键的问题是：**结构表达失分频率最高（12次），且与材料遗漏（11次）高度伴生**——往往因为对综合分析题“是什么-为什么-怎么办”的框架缺位，导致直接从材料摘点却未分层展开，使得建设背景、核心优势等采分点被遗漏，分数从60分段到70分段徘徊。 --- ## 证据分析 浙江综合分析题中，结构表达和材料遗漏是最高频的两类问题，且在同一作答中反复共现。 **证据1（grading_report:att..."
+        }
+      ],
+      "metrics": {
+        "score": 64.8,
+        "final_keyword_accuracy": 0.5,
+        "context_literal_accuracy": 0.6667,
+        "forbidden_term_accuracy": 1.0,
+        "thread_continuity": 1.0,
+        "semantic_score": 0.55,
+        "judge": {
+          "status": "ok",
+          "scores": {
+            "context_retention": 0.3,
+            "constraint_adherence": 1.0,
+            "correction_adherence": 1.0,
+            "thread_isolation": 1.0,
+            "answer_relevance": 0.8
+          },
+          "reason": "未明确回应‘这道’指代题620，回答泛论整体短板而非直接解释首选理由"
+        },
+        "errors": [],
+        "turn_count": 2,
+        "duration_ms": 243946.75,
+        "token_usage": {
+          "input_tokens": 20025,
+          "output_tokens": 4880,
+          "total_tokens": 24905
+        }
+      }
+    },
+    {
+      "case": {
+        "id": "correction_change_style",
+        "title": "纠正回答风格",
+        "category": "correction",
+        "turns": [
+          {
+            "user": "回答尽量详细"
+          },
+          {
+            "user": "以后还是简洁一点"
+          },
+          {
+            "user": "总结我的最大问题"
+          }
+        ],
+        "expected_context_terms": [
+          "简洁"
+        ],
+        "final_expected_keywords": [
+          "问题"
+        ]
+      },
+      "conversations": {
+        "main": 19
+      },
+      "turns": [
+        {
+          "thread": "main",
+          "turn": 1,
+          "run_id": 45,
+          "duration_ms": 56513.67,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 4922,
+            "output_tokens": 2437,
+            "total_tokens": 7359,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {},
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 1,
+              "summarized_count": 0,
+              "long_term_memory_count": 1,
+              "remembered_count": 1
+            },
+            "rag": {
+              "rag_route": "writing_guidance",
+              "query_plan": {
+                "action": "guide",
+                "scope": "overall_history",
+                "sources": [
+                  "aggregate"
+                ],
+                "module": "overview",
+                "reason": "用户要求回答尽量详细，需要提供详细的申论指导总览"
+              },
+              "retrieval_policy": "Answer the user's writing-method question directly with concept, structures, types, examples, and pitfalls; do not organize personal notes unless explicitly requested.",
+              "evidence_sufficiency": {
+                "level": "insufficient",
+                "label": "证据不足",
+                "note": "本轮没有检索到可用证据，不能做确定性诊断。"
+              },
+              "evidence_card_count": 0,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [],
+              "evidence_cards": []
+            }
+          },
+          "answer_length": 2653,
+          "answer_sha256": "5255a2067e089ee2",
+          "answer_preview": "好的，收到你的要求。根据当前上下文，我来提供一份关于“申论写作通用方法”的详细讲解。 ## 先说结论 本轮检索指定为通用写作指导（`writing_guidance`），但教材库未能返回具体的文种或概念证据。因此，我将基于申论写作的通用框架，为你梳理一套可以广泛应用的“材料处理与答案组织”方法。 ## 常见写法 从材料到答案，常见的处理层次有以下四种，它们由浅入深，适用于不同要求的问题： 1. **直接摘抄法** * **适用场景**：材料中已有非常规范、凝练的表述，直接使用原词原句即可得分。多见于归纳概括题中的数..."
+        },
+        {
+          "thread": "main",
+          "turn": 2,
+          "run_id": 46,
+          "duration_ms": 24588.85,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 14744,
+            "output_tokens": 1010,
+            "total_tokens": 15754,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {},
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 3,
+              "summarized_count": 0,
+              "long_term_memory_count": 1,
+              "remembered_count": 1
+            },
+            "rag": {
+              "rag_route": "note_organization",
+              "query_plan": {
+                "action": "organize",
+                "scope": "notes_only",
+                "sources": [
+                  "personal_note",
+                  "aggregate"
+                ],
+                "module": "overview",
+                "reason": "用户要求调整后续回答风格为简洁，需读取个人偏好与聚合风格记录以更新"
+              },
+              "retrieval_policy": "Organize the user's personal review notes into an actionable checklist; do not diagnose from unrelated attempts or reports.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "推荐证据可用",
+                "note": "已有候选题或画像证据，可用于择题建议。"
+              },
+              "evidence_card_count": 28,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "notes:all",
+                "note:121",
+                "note:120",
+                "note:113",
+                "note:110",
+                "note:108",
+                "note:107",
+                "note:106",
+                "note:104",
+                "note:96",
+                "note:95",
+                "note:94"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "notes:all",
+                  "source_type": "aggregate",
+                  "title": "全部复盘笔记索引",
+                  "claim": "当前共读取 27 条复盘笔记，用于整理注意事项清单。",
+                  "content": "[{\"attempt_id\": 121, \"question_id\": 636, \"title\": \"第2题\", \"question_type\": \"归纳概括\", \"created_at\": \"2026-07-10 10:32:26\", \"note\": \"要把所有的问题都再提取出一个是否有意义价值的问题！（其实类似于道路问题） 一、新民乐是否具有价值意义。一...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "note:121",
+                  "source_type": "personal_note",
+                  "title": "GKS-752-Q2 第2题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "要把所有的问题都再提取出一个是否有意义价值的问题！（其实类似于道路问题） 一、新民乐是否具有价值意义。一方认为：1.它为民乐提供更大的舞台和机会；2.助力民乐走出国门，成为新的世界潮流。另一方认为：新民乐不成熟，价值不大，严重影响民乐特色与发展前景。 二、从业者是否需要专业出身。一方认为：更多年轻人自发加入，快速联结赋予民乐生命力和活力，推动传统文化传承创新...",
+                  "question_id": 636,
+                  "attempt_id": 121,
+                  "url": "/attempts/121",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:120",
+                  "source_type": "personal_note",
+                  "title": "GKS-752-Q1 第1题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "缺少：严苛要求工人和技术，凝聚匠心，将艺术设计与照明结合",
+                  "question_id": 635,
+                  "attempt_id": 120,
+                  "url": "/attempts/120",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:113",
+                  "source_type": "personal_note",
+                  "title": "GKS-754-Q4 第4题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "",
+                  "question_id": 648,
+                  "attempt_id": 113,
+                  "url": "/attempts/113",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:110",
+                  "source_type": "personal_note",
+                  "title": "GKS-754-Q1 第1题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "1. 尊重乡村文化主体和地方文化特色，通过艺术介入乡建，影响村民价值判断，引导回归、共建家园。 2. 心存敬畏，尊重自然，不打破原有自然风貌；保持对乡村秩序、传统习俗及文脉传承的膜拜心态。 3. 与村民一起在生活中动手接近启发村民；改造家庭美术馆，乡建配方回归本质的根，帮助村民寻回精神家园。 4. 将显性价值和隐性价值相结合，策划挖掘文化内涵、重现仪式，让村...",
+                  "question_id": 645,
+                  "attempt_id": 110,
+                  "url": "/attempts/110",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:108",
+                  "source_type": "personal_note",
+                  "title": "GKS-1-Q4 第4题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "关于促进新远眼镜公司合作以及相关产业发展调研报告 与新远眼镜公司开展合作、发展相关产业，有利于补短板强弱项、将潜在优势转化为产业优势、延伸拓展产业链。通过对N、M市进行调研，结合我市情况建议如下： 一、如何促成与新远眼镜公司合作：1.突出比较优势。宣传我市生产要素成本相对较低及可用返租模式引入该企业；讲清我省户籍人员占该企业原厂工人比例约60%，有利于企业落...",
+                  "question_id": 566,
+                  "attempt_id": 108,
+                  "url": "/attempts/108",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:107",
+                  "source_type": "personal_note",
+                  "title": "GKS-1-Q3 第3题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "问题提炼有很大问题（主要是没看完整体文本就写了） 格式问题： J市市政府： xxx 建议人：叶某某 XXXX年XX月XX日",
+                  "question_id": 565,
+                  "attempt_id": 107,
+                  "url": "/attempts/107",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:106",
+                  "source_type": "personal_note",
+                  "title": "GKS-1-Q2 第2题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "村民在窑洞修复过程中经历了从不理解、旁观，到支持参与，再到主动宣传传承文化的转变。 1.旁观者：修复之初，顾教授团队与村委会商定使用废弃砖瓦等旧建材，保留窑洞原貌，村民未参与协商，不理解修复方案，认为费时费工、不美观。 2.参与者：村委会与村民代表协商共议，举办影像展，让村民认识到窑洞历史价值和建筑风格；从否定变为支持，踊跃捐献旧建材，去工地观看、出谋划策，...",
+                  "question_id": 564,
+                  "attempt_id": 106,
+                  "url": "/attempts/106",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:104",
+                  "source_type": "personal_note",
+                  "title": "GKS-2-Q3 第3题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "问题：一企包一县模式未成熟，存在垄断，项目建设缓慢。1.市场秩序混乱。虚假宣传，乱收费，强制安装，设备易坏且无人维修，农户利益受损。2.农户利益受损。一企包一县收益存在差价；企业不熟悉市场难以展现竞争优势，转存转包风险。3.政府服务不完善。未设置专人对接屋顶产权开发协调，户用设备备案规定不明确。 建议：及时纠偏政策。落实“五个不”要求，主管部门把握工作重点，...",
+                  "question_id": 570,
+                  "attempt_id": 104,
+                  "url": "/attempts/104",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:96",
+                  "source_type": "personal_note",
+                  "title": "GKS-3-Q2 第2题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "关于促进本市“无人经济”新业态健康发展的发言提纲 背景：近年来，我市“无人经济”新业态满足了消费者对安全、便利和多元生活的需求，发展空间和潜力很大。但整体尚处起步阶段，缺乏政策指引和法律规范，并暴露出一些问题。 问题：服务质量与安全存忧。机器存在故障风险，可能发生顾客被困等事件；部分商家品质良莠不齐，投诉索赔回应慢，甚至有超范围经营等违规行为。 监管依据与机...",
+                  "question_id": 574,
+                  "attempt_id": 96,
+                  "url": "/attempts/96",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:95",
+                  "source_type": "personal_note",
+                  "title": "GKS-3-Q1 第1题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "制定核算方法，评估核算生态产品价值，探索结果落地应用。1主攻价值转化。明确生态资源优势，开发项目，转化经济效益；组建生态强村公司，供给交易生态产品。2催生金融产品。以生态产品使用经营权作为质押担保发放贷款，解决资金需求、激活生态产品金融属性。3提升产业优势。强优势、补短板，吸引企业落户，使生态产品价值参与利润分配。4.促成碳汇交易。通过两山银行储售碳汇，激励...",
+                  "question_id": 573,
+                  "attempt_id": 95,
+                  "url": "/attempts/95",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:94",
+                  "source_type": "personal_note",
+                  "title": "GKS-4-Q4 第4题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "原因：一，满足社会需求。1.培养学生独立人格和创新精神，以学生为中心，形成个性化学习支持体系，让学生内心丰盈、行动积极；2．挖掘学生潜能和智慧，尊重和成就每一个个体，融合以人为中心和以社会需求为中心的教育使命。二，重视人文属性。以文化人、以德育人。创造面向未来的学校生活，让学生沉浸在有生长性的场景当中，和未来发生链接，创造无边界学校生活、多样性和可能性；表现...",
+                  "question_id": 581,
+                  "attempt_id": 94,
+                  "url": "/attempts/94",
+                  "confidence": 0.86
+                }
+              ]
+            }
+          },
+          "answer_length": 511,
+          "answer_sha256": "d50aaafc5c2eabb5",
+          "answer_preview": "明白。已更新回答风格偏好为：**极度简洁，先结论后动作，少解释。** ## 风格偏好已更新 - **设置项**：回答风格 - **新值**：极度简洁，优先给出结论和可执行动作，减少解释性内容 - **生效范围**：后续所有对话，除非你提出展开要求 - **证据来源**：`notes:all`（确认偏好更新记录） `note:121`, `note:82`, `note:74`（最近笔记中反复出现“审题不清/漏要点”类自我提醒，印证你更需要直接结论而非长篇分析） 后续我会严格按这个标准回答：先给结论，再给必要的依据或..."
+        },
+        {
+          "thread": "main",
+          "turn": 3,
+          "run_id": 47,
+          "duration_ms": 168204.63,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 15468,
+            "output_tokens": 2283,
+            "total_tokens": 17751,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {},
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 5,
+              "summarized_count": 0,
+              "long_term_memory_count": 1,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "overview_diagnosis",
+              "query_plan": {
+                "action": "diagnose",
+                "scope": "overall_history",
+                "sources": [
+                  "weakness_profile",
+                  "aggregate"
+                ],
+                "module": "top_loss",
+                "reason": "用户要求总结自己的最大问题，需诊断整体历史中的失分点"
+              },
+              "retrieval_policy": "Analyze overall history with aggregate coverage plus representative evidence cards.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "历史证据充分",
+                "note": "已覆盖多次作答及代表证据，可用于模块/总体趋势判断。"
+              },
+              "evidence_card_count": 8,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "profile:top_loss:coverage",
+                "profile:top_loss:weakness:1",
+                "profile:top_loss:weakness:2",
+                "profile:top_loss:weakness:3",
+                "profile:top_loss:weakness:4",
+                "profile:top_loss:weakness:5",
+                "profile:top_loss:weakness:6",
+                "profile:top_loss:weakness:7"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "profile:top_loss:coverage",
+                  "source_type": "aggregate",
+                  "title": "最大失分点 覆盖统计",
+                  "claim": "选定模块全量匹配历史的覆盖、来源和问题分布统计。",
+                  "content": "{\"coverage\": {\"attempt_count\": 103, \"report_count\": 119, \"note_count\": 26, \"chunk_count\": 20435}, \"source_counts\": {\"reference_answer\": 9410, \"material\": 9005, \"question\": 1750, \"g...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:1",
+                  "source_type": "weakness_profile",
+                  "title": "对策针对性",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"对策针对性\", \"frequency\": 165, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-42\", \"title\": \"GKS-607-Q2 第2题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:2",
+                  "source_type": "weakness_profile",
+                  "title": "材料遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"材料遗漏\", \"frequency\": 144, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-42\", \"title\": \"GKS-607-Q2 第2题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:3",
+                  "source_type": "weakness_profile",
+                  "title": "采分点遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"采分点遗漏\", \"frequency\": 120, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-42\", \"title\": \"GKS-607-Q2 第2题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:4",
+                  "source_type": "weakness_profile",
+                  "title": "语言概括",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"语言概括\", \"frequency\": 118, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-42\", \"title\": \"GKS-607-Q2 第2题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:5",
+                  "source_type": "weakness_profile",
+                  "title": "结构表达",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"结构表达\", \"frequency\": 107, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-42\", \"title\": \"GKS-607-Q2 第2题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:6",
+                  "source_type": "weakness_profile",
+                  "title": "格式规范",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"格式规范\", \"frequency\": 48, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-49\", \"title\": \"GKS-603-Q1 第1题 批改报告\", \"source_type\": \"grading_report\", \"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:7",
+                  "source_type": "weakness_profile",
+                  "title": "审题偏差",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"审题偏差\", \"frequency\": 43, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-73\", \"title\": \"GKS-9-Q4 第4题 批改报告\", \"source_type\": \"grading_report\", \"sc...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                }
+              ]
+            }
+          },
+          "answer_length": 3579,
+          "answer_sha256": "e5b5b91ec70f43b7",
+          "answer_preview": "## 结论摘要 本次扫描覆盖103次作答、119份批改报告、26条笔记，共匹配20435条证据片段。你的最大问题是**对策缺乏针对性**——165次高频出现，严重度最高，且与“材料遗漏”“采分点遗漏”形成连锁反应，导致答案空泛、脱离材料。 ## 证据分析 **代表证据1：`grading_report:attempt-42`**（综合分析，8/30分） - **问题**：“对题干句子的理解未点出‘团结协作、汇聚力量与智慧’的核心内涵，材料逻辑组织混乱、观点不鲜明” - **失分机制**：先理解偏差→再遗漏材料核心采..."
+        }
+      ],
+      "metrics": {
+        "score": 62.5,
+        "final_keyword_accuracy": 1.0,
+        "context_literal_accuracy": 0.0,
+        "forbidden_term_accuracy": 1.0,
+        "thread_continuity": 1.0,
+        "semantic_score": 0.4,
+        "judge": {
+          "status": "ok",
+          "scores": {
+            "context_retention": 0.1,
+            "constraint_adherence": 0.1,
+            "correction_adherence": 0.1,
+            "thread_isolation": 1.0,
+            "answer_relevance": 1.0
+          },
+          "reason": "回答未遵守用户最新提出的'简洁'要求，篇幅冗长；虽覆盖了'问题'且无线程串扰，但严重违反已确认的风格约束。"
+        },
+        "errors": [],
+        "turn_count": 3,
+        "duration_ms": 249307.15,
+        "token_usage": {
+          "input_tokens": 35134,
+          "output_tokens": 5730,
+          "total_tokens": 40864
+        }
+      }
+    },
+    {
+      "case": {
+        "id": "isolation_exam_goal",
+        "title": "新线程不继承考试目标消息",
+        "category": "isolation",
+        "threads": {
+          "a": [
+            {
+              "user": "线程甲只备考江苏"
+            }
+          ],
+          "b": [
+            {
+              "user": "线程乙只备考浙江"
+            },
+            {
+              "user": "按刚才目标推荐"
+            }
+          ]
+        },
+        "expected_context_terms": [
+          "线程乙",
+          "浙江"
+        ],
+        "forbidden_context_terms": [
+          "线程甲",
+          "江苏"
+        ],
+        "final_expected_keywords": [
+          "浙江"
+        ]
+      },
+      "conversations": {
+        "a": 20,
+        "b": 21
+      },
+      "turns": [
+        {
+          "thread": "a",
+          "turn": 1,
+          "run_id": 47,
+          "duration_ms": 36632.63,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 13176,
+            "output_tokens": 1944,
+            "total_tokens": 15120,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {
+              "region": "江苏"
+            },
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 1,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "note_organization",
+              "query_plan": {
+                "action": "organize",
+                "scope": "notes_only",
+                "sources": [
+                  "personal_note",
+                  "aggregate"
+                ],
+                "module": "overview",
+                "reason": "用户设定线程甲只备考江苏，可能希望整理相关备考笔记和汇总信息"
+              },
+              "retrieval_policy": "Organize the user's personal review notes into an actionable checklist; do not diagnose from unrelated attempts or reports.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "推荐证据可用",
+                "note": "已有候选题或画像证据，可用于择题建议。"
+              },
+              "evidence_card_count": 28,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "notes:all",
+                "note:121",
+                "note:120",
+                "note:113",
+                "note:110",
+                "note:108",
+                "note:107",
+                "note:106",
+                "note:104",
+                "note:96",
+                "note:95",
+                "note:94"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "notes:all",
+                  "source_type": "aggregate",
+                  "title": "全部复盘笔记索引",
+                  "claim": "当前共读取 27 条复盘笔记，用于整理注意事项清单。",
+                  "content": "[{\"attempt_id\": 121, \"question_id\": 636, \"title\": \"第2题\", \"question_type\": \"归纳概括\", \"created_at\": \"2026-07-10 10:32:26\", \"note\": \"要把所有的问题都再提取出一个是否有意义价值的问题！（其实类似于道路问题） 一、新民乐是否具有价值意义。一...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "note:121",
+                  "source_type": "personal_note",
+                  "title": "GKS-752-Q2 第2题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "要把所有的问题都再提取出一个是否有意义价值的问题！（其实类似于道路问题） 一、新民乐是否具有价值意义。一方认为：1.它为民乐提供更大的舞台和机会；2.助力民乐走出国门，成为新的世界潮流。另一方认为：新民乐不成熟，价值不大，严重影响民乐特色与发展前景。 二、从业者是否需要专业出身。一方认为：更多年轻人自发加入，快速联结赋予民乐生命力和活力，推动传统文化传承创新...",
+                  "question_id": 636,
+                  "attempt_id": 121,
+                  "url": "/attempts/121",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:120",
+                  "source_type": "personal_note",
+                  "title": "GKS-752-Q1 第1题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "缺少：严苛要求工人和技术，凝聚匠心，将艺术设计与照明结合",
+                  "question_id": 635,
+                  "attempt_id": 120,
+                  "url": "/attempts/120",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:113",
+                  "source_type": "personal_note",
+                  "title": "GKS-754-Q4 第4题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "",
+                  "question_id": 648,
+                  "attempt_id": 113,
+                  "url": "/attempts/113",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:110",
+                  "source_type": "personal_note",
+                  "title": "GKS-754-Q1 第1题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "1. 尊重乡村文化主体和地方文化特色，通过艺术介入乡建，影响村民价值判断，引导回归、共建家园。 2. 心存敬畏，尊重自然，不打破原有自然风貌；保持对乡村秩序、传统习俗及文脉传承的膜拜心态。 3. 与村民一起在生活中动手接近启发村民；改造家庭美术馆，乡建配方回归本质的根，帮助村民寻回精神家园。 4. 将显性价值和隐性价值相结合，策划挖掘文化内涵、重现仪式，让村...",
+                  "question_id": 645,
+                  "attempt_id": 110,
+                  "url": "/attempts/110",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:108",
+                  "source_type": "personal_note",
+                  "title": "GKS-1-Q4 第4题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "关于促进新远眼镜公司合作以及相关产业发展调研报告 与新远眼镜公司开展合作、发展相关产业，有利于补短板强弱项、将潜在优势转化为产业优势、延伸拓展产业链。通过对N、M市进行调研，结合我市情况建议如下： 一、如何促成与新远眼镜公司合作：1.突出比较优势。宣传我市生产要素成本相对较低及可用返租模式引入该企业；讲清我省户籍人员占该企业原厂工人比例约60%，有利于企业落...",
+                  "question_id": 566,
+                  "attempt_id": 108,
+                  "url": "/attempts/108",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:107",
+                  "source_type": "personal_note",
+                  "title": "GKS-1-Q3 第3题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "问题提炼有很大问题（主要是没看完整体文本就写了） 格式问题： J市市政府： xxx 建议人：叶某某 XXXX年XX月XX日",
+                  "question_id": 565,
+                  "attempt_id": 107,
+                  "url": "/attempts/107",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:106",
+                  "source_type": "personal_note",
+                  "title": "GKS-1-Q2 第2题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "村民在窑洞修复过程中经历了从不理解、旁观，到支持参与，再到主动宣传传承文化的转变。 1.旁观者：修复之初，顾教授团队与村委会商定使用废弃砖瓦等旧建材，保留窑洞原貌，村民未参与协商，不理解修复方案，认为费时费工、不美观。 2.参与者：村委会与村民代表协商共议，举办影像展，让村民认识到窑洞历史价值和建筑风格；从否定变为支持，踊跃捐献旧建材，去工地观看、出谋划策，...",
+                  "question_id": 564,
+                  "attempt_id": 106,
+                  "url": "/attempts/106",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:104",
+                  "source_type": "personal_note",
+                  "title": "GKS-2-Q3 第3题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "问题：一企包一县模式未成熟，存在垄断，项目建设缓慢。1.市场秩序混乱。虚假宣传，乱收费，强制安装，设备易坏且无人维修，农户利益受损。2.农户利益受损。一企包一县收益存在差价；企业不熟悉市场难以展现竞争优势，转存转包风险。3.政府服务不完善。未设置专人对接屋顶产权开发协调，户用设备备案规定不明确。 建议：及时纠偏政策。落实“五个不”要求，主管部门把握工作重点，...",
+                  "question_id": 570,
+                  "attempt_id": 104,
+                  "url": "/attempts/104",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:96",
+                  "source_type": "personal_note",
+                  "title": "GKS-3-Q2 第2题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "关于促进本市“无人经济”新业态健康发展的发言提纲 背景：近年来，我市“无人经济”新业态满足了消费者对安全、便利和多元生活的需求，发展空间和潜力很大。但整体尚处起步阶段，缺乏政策指引和法律规范，并暴露出一些问题。 问题：服务质量与安全存忧。机器存在故障风险，可能发生顾客被困等事件；部分商家品质良莠不齐，投诉索赔回应慢，甚至有超范围经营等违规行为。 监管依据与机...",
+                  "question_id": 574,
+                  "attempt_id": 96,
+                  "url": "/attempts/96",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:95",
+                  "source_type": "personal_note",
+                  "title": "GKS-3-Q1 第1题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "制定核算方法，评估核算生态产品价值，探索结果落地应用。1主攻价值转化。明确生态资源优势，开发项目，转化经济效益；组建生态强村公司，供给交易生态产品。2催生金融产品。以生态产品使用经营权作为质押担保发放贷款，解决资金需求、激活生态产品金融属性。3提升产业优势。强优势、补短板，吸引企业落户，使生态产品价值参与利润分配。4.促成碳汇交易。通过两山银行储售碳汇，激励...",
+                  "question_id": 573,
+                  "attempt_id": 95,
+                  "url": "/attempts/95",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:94",
+                  "source_type": "personal_note",
+                  "title": "GKS-4-Q4 第4题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "原因：一，满足社会需求。1.培养学生独立人格和创新精神，以学生为中心，形成个性化学习支持体系，让学生内心丰盈、行动积极；2．挖掘学生潜能和智慧，尊重和成就每一个个体，融合以人为中心和以社会需求为中心的教育使命。二，重视人文属性。以文化人、以德育人。创造面向未来的学校生活，让学生沉浸在有生长性的场景当中，和未来发生链接，创造无边界学校生活、多样性和可能性；表现...",
+                  "question_id": 581,
+                  "attempt_id": 94,
+                  "url": "/attempts/94",
+                  "confidence": 0.86
+                }
+              ]
+            }
+          },
+          "answer_length": 2739,
+          "answer_sha256": "2200fde2615abb45",
+          "answer_preview": "## 注意事项清单 基于你的27条复盘笔记，整理出以下高频易错点与可执行提醒： ### 1. 仔细审题,不漏要素 - **审清“及/及其”等并列词**：题目要求概括“工作任务及其工作措施”时，必须将任务和措施连写，不可只写其一 [note:80]。 - **不遗漏作答要素**：题干问“做法及成效”时，务必两者都答，不能漏掉成效 [note:82]。 - **下次作答前检查**：圈画题干中的“和/及/及其/与”等连词，列出所有需要回答的要素，写完检查。 ### 2. 明确结构,善用区分 - **内容性质要分开**：当..."
+        },
+        {
+          "thread": "b",
+          "turn": 1,
+          "run_id": 48,
+          "duration_ms": 37681.38,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 13154,
+            "output_tokens": 2153,
+            "total_tokens": 15307,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {
+              "region": "浙江"
+            },
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 1,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "note_organization",
+              "query_plan": {
+                "action": "organize",
+                "scope": "notes_only",
+                "sources": [
+                  "personal_note",
+                  "aggregate"
+                ],
+                "module": "overview",
+                "reason": "用户设置备考浙江的笔记偏好"
+              },
+              "retrieval_policy": "Organize the user's personal review notes into an actionable checklist; do not diagnose from unrelated attempts or reports.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "推荐证据可用",
+                "note": "已有候选题或画像证据，可用于择题建议。"
+              },
+              "evidence_card_count": 28,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "notes:all",
+                "note:121",
+                "note:120",
+                "note:113",
+                "note:110",
+                "note:108",
+                "note:107",
+                "note:106",
+                "note:104",
+                "note:96",
+                "note:95",
+                "note:94"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "notes:all",
+                  "source_type": "aggregate",
+                  "title": "全部复盘笔记索引",
+                  "claim": "当前共读取 27 条复盘笔记，用于整理注意事项清单。",
+                  "content": "[{\"attempt_id\": 121, \"question_id\": 636, \"title\": \"第2题\", \"question_type\": \"归纳概括\", \"created_at\": \"2026-07-10 10:32:26\", \"note\": \"要把所有的问题都再提取出一个是否有意义价值的问题！（其实类似于道路问题） 一、新民乐是否具有价值意义。一...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "note:121",
+                  "source_type": "personal_note",
+                  "title": "GKS-752-Q2 第2题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "要把所有的问题都再提取出一个是否有意义价值的问题！（其实类似于道路问题） 一、新民乐是否具有价值意义。一方认为：1.它为民乐提供更大的舞台和机会；2.助力民乐走出国门，成为新的世界潮流。另一方认为：新民乐不成熟，价值不大，严重影响民乐特色与发展前景。 二、从业者是否需要专业出身。一方认为：更多年轻人自发加入，快速联结赋予民乐生命力和活力，推动传统文化传承创新...",
+                  "question_id": 636,
+                  "attempt_id": 121,
+                  "url": "/attempts/121",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:120",
+                  "source_type": "personal_note",
+                  "title": "GKS-752-Q1 第1题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "缺少：严苛要求工人和技术，凝聚匠心，将艺术设计与照明结合",
+                  "question_id": 635,
+                  "attempt_id": 120,
+                  "url": "/attempts/120",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:113",
+                  "source_type": "personal_note",
+                  "title": "GKS-754-Q4 第4题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "",
+                  "question_id": 648,
+                  "attempt_id": 113,
+                  "url": "/attempts/113",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:110",
+                  "source_type": "personal_note",
+                  "title": "GKS-754-Q1 第1题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "1. 尊重乡村文化主体和地方文化特色，通过艺术介入乡建，影响村民价值判断，引导回归、共建家园。 2. 心存敬畏，尊重自然，不打破原有自然风貌；保持对乡村秩序、传统习俗及文脉传承的膜拜心态。 3. 与村民一起在生活中动手接近启发村民；改造家庭美术馆，乡建配方回归本质的根，帮助村民寻回精神家园。 4. 将显性价值和隐性价值相结合，策划挖掘文化内涵、重现仪式，让村...",
+                  "question_id": 645,
+                  "attempt_id": 110,
+                  "url": "/attempts/110",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:108",
+                  "source_type": "personal_note",
+                  "title": "GKS-1-Q4 第4题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "关于促进新远眼镜公司合作以及相关产业发展调研报告 与新远眼镜公司开展合作、发展相关产业，有利于补短板强弱项、将潜在优势转化为产业优势、延伸拓展产业链。通过对N、M市进行调研，结合我市情况建议如下： 一、如何促成与新远眼镜公司合作：1.突出比较优势。宣传我市生产要素成本相对较低及可用返租模式引入该企业；讲清我省户籍人员占该企业原厂工人比例约60%，有利于企业落...",
+                  "question_id": 566,
+                  "attempt_id": 108,
+                  "url": "/attempts/108",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:107",
+                  "source_type": "personal_note",
+                  "title": "GKS-1-Q3 第3题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "问题提炼有很大问题（主要是没看完整体文本就写了） 格式问题： J市市政府： xxx 建议人：叶某某 XXXX年XX月XX日",
+                  "question_id": 565,
+                  "attempt_id": 107,
+                  "url": "/attempts/107",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:106",
+                  "source_type": "personal_note",
+                  "title": "GKS-1-Q2 第2题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "村民在窑洞修复过程中经历了从不理解、旁观，到支持参与，再到主动宣传传承文化的转变。 1.旁观者：修复之初，顾教授团队与村委会商定使用废弃砖瓦等旧建材，保留窑洞原貌，村民未参与协商，不理解修复方案，认为费时费工、不美观。 2.参与者：村委会与村民代表协商共议，举办影像展，让村民认识到窑洞历史价值和建筑风格；从否定变为支持，踊跃捐献旧建材，去工地观看、出谋划策，...",
+                  "question_id": 564,
+                  "attempt_id": 106,
+                  "url": "/attempts/106",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:104",
+                  "source_type": "personal_note",
+                  "title": "GKS-2-Q3 第3题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "问题：一企包一县模式未成熟，存在垄断，项目建设缓慢。1.市场秩序混乱。虚假宣传，乱收费，强制安装，设备易坏且无人维修，农户利益受损。2.农户利益受损。一企包一县收益存在差价；企业不熟悉市场难以展现竞争优势，转存转包风险。3.政府服务不完善。未设置专人对接屋顶产权开发协调，户用设备备案规定不明确。 建议：及时纠偏政策。落实“五个不”要求，主管部门把握工作重点，...",
+                  "question_id": 570,
+                  "attempt_id": 104,
+                  "url": "/attempts/104",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:96",
+                  "source_type": "personal_note",
+                  "title": "GKS-3-Q2 第2题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "关于促进本市“无人经济”新业态健康发展的发言提纲 背景：近年来，我市“无人经济”新业态满足了消费者对安全、便利和多元生活的需求，发展空间和潜力很大。但整体尚处起步阶段，缺乏政策指引和法律规范，并暴露出一些问题。 问题：服务质量与安全存忧。机器存在故障风险，可能发生顾客被困等事件；部分商家品质良莠不齐，投诉索赔回应慢，甚至有超范围经营等违规行为。 监管依据与机...",
+                  "question_id": 574,
+                  "attempt_id": 96,
+                  "url": "/attempts/96",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:95",
+                  "source_type": "personal_note",
+                  "title": "GKS-3-Q1 第1题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "制定核算方法，评估核算生态产品价值，探索结果落地应用。1主攻价值转化。明确生态资源优势，开发项目，转化经济效益；组建生态强村公司，供给交易生态产品。2催生金融产品。以生态产品使用经营权作为质押担保发放贷款，解决资金需求、激活生态产品金融属性。3提升产业优势。强优势、补短板，吸引企业落户，使生态产品价值参与利润分配。4.促成碳汇交易。通过两山银行储售碳汇，激励...",
+                  "question_id": 573,
+                  "attempt_id": 95,
+                  "url": "/attempts/95",
+                  "confidence": 0.86
+                },
+                {
+                  "evidence_id": "note:94",
+                  "source_type": "personal_note",
+                  "title": "GKS-4-Q4 第4题",
+                  "claim": "用户在该次作答后记录的复盘笔记，可归纳为后续作答注意事项。",
+                  "content": "原因：一，满足社会需求。1.培养学生独立人格和创新精神，以学生为中心，形成个性化学习支持体系，让学生内心丰盈、行动积极；2．挖掘学生潜能和智慧，尊重和成就每一个个体，融合以人为中心和以社会需求为中心的教育使命。二，重视人文属性。以文化人、以德育人。创造面向未来的学校生活，让学生沉浸在有生长性的场景当中，和未来发生链接，创造无边界学校生活、多样性和可能性；表现...",
+                  "question_id": 581,
+                  "attempt_id": 94,
+                  "url": "/attempts/94",
+                  "confidence": 0.86
+                }
+              ]
+            }
+          },
+          "answer_length": 3193,
+          "answer_sha256": "425bac7e15f3c193",
+          "answer_preview": "## 注意事项清单 从你的复盘笔记中，我整理出以下高频注意点。每次作答前，可以将这份清单快速过一遍。 --- ### 高频提醒 1. **审题先圈关键要求** - 题目问“变化”就不能写“过去/现在”对比，要直接写变化后的状态【note:74】 - 题目要求写“做法及成效”，两者都要体现，不能漏掉成效【note:82】 - 题目要求“工作要点包括工作任务及其工作措施”，任务和措施要连着写【note:80】 - 题目要求介绍“特点和运行情况”，内容要明确分两部分呈现【note:65】 - “观点鲜明、论述深刻”——具..."
+        },
+        {
+          "thread": "b",
+          "turn": 2,
+          "run_id": 49,
+          "duration_ms": 33460.01,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 10296,
+            "output_tokens": 1791,
+            "total_tokens": 12087,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "recent_review",
+            "task_type": "review",
+            "filters": {
+              "region": "浙江"
+            },
+            "module": "",
+            "subject_id": 122,
+            "subject_ids": [
+              122
+            ],
+            "conversation_context": {
+              "message_count": 3,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "current_attempt_review",
+              "query_plan": {
+                "action": "recommend",
+                "scope": "current_attempt",
+                "sources": [
+                  "attempt",
+                  "question",
+                  "aggregate",
+                  "weakness_profile"
+                ],
+                "module": "overview",
+                "reason": "基于用户备考浙江的目标，推荐下一步提升练习"
+              },
+              "retrieval_policy": "Use only the selected attempt, its question, materials, references, and grading reports.",
+              "evidence_sufficiency": {
+                "level": "limited",
+                "label": "本题证据有限",
+                "note": "只能基于当前题目与作答做谨慎判断，不应扩展为长期能力结论。"
+              },
+              "evidence_card_count": 2,
+              "current_attempt_only": true,
+              "allowed_evidence_ids": [
+                "question:638",
+                "attempt:122"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "question:638",
+                  "source_type": "question",
+                  "title": "GKS-752-Q4 第4题",
+                  "claim": "题干、作答任务和要求，用于判断回答方向与结构是否合题。",
+                  "content": "“给定材料4”反映了C市高标准农田建设过程中的一些情况，调研结束后，督导调研组拟向局领导汇报调研情况，并提出改进建议。假如你是调研组成员，请草拟汇报的主要内容。（20分） 要求： （1）紧扣材料，内容全面； （2）简明扼要，条理清晰； （3）不超过500字。",
+                  "question_id": 638,
+                  "attempt_id": 122,
+                  "url": "/attempts/122",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "attempt:122",
+                  "source_type": "attempt",
+                  "title": "作答 122",
+                  "claim": "用户本次作答文本和复盘笔记，是本题复盘与改写判断的主证据。",
+                  "content": "关于C市高标准农田建设情况调研汇报 C市在高标准农田建设中全面落实藏粮于地、藏粮于技战略，现将情况汇报如下。 成效：1、利用项目资金修复水利、完善田间配套设施，旱田改造为水浇田，解决农田灌溉问题，产值效益提升，种植轻松，农民积极性提高。2、分散的土地被统一整合，租金上涨，同时完善基础设施，因地制宜推进产业结构调整，带动特色优势产业发展，增加农民就业机会，综合...",
+                  "question_id": 638,
+                  "attempt_id": 122,
+                  "url": "/attempts/122",
+                  "confidence": 0.95
+                }
+              ]
+            }
+          },
+          "answer_length": 2159,
+          "answer_sha256": "63b793851211c824",
+          "answer_preview": "## 本题结论 从当前作答看，最大失分点是**问题归纳遗漏“随意变更地块”这一核心违规行为，且归纳用词笼统**，导致向领导汇报时关键隐患被模糊化【attempt:122】。 --- ## 失分拆解 ### 材料遗漏 - **遗漏“随意变更地块”问题**：材料明确提到“未经上报批复随意调整建设地块”，你的作答只写了“地块规划图文与实际不符”和“田间道不连接任何田块”，完全没有提到“随意变更”这一独立问题【attempt:122】。这导致问题汇报不完整。 - **遗漏“资金挪用”问题**：材料中提到“用修建田间道的钱修..."
+        }
+      ],
+      "metrics": {
+        "score": 22.5,
+        "final_keyword_accuracy": 0.0,
+        "context_literal_accuracy": 0.0,
+        "forbidden_term_accuracy": 1.0,
+        "thread_continuity": 1.0,
+        "semantic_score": 0.0,
+        "judge": {
+          "status": "ok",
+          "scores": {
+            "context_retention": 0.0,
+            "constraint_adherence": 0.0,
+            "correction_adherence": 0.0,
+            "thread_isolation": 0.0,
+            "answer_relevance": 0.0
+          },
+          "reason": "回答未理解'按刚才目标推荐'指代，未提供浙江备考推荐，内容为无关错题分析，完全未覆盖'浙江'语义。"
+        },
+        "errors": [],
+        "turn_count": 3,
+        "duration_ms": 107774.02,
+        "token_usage": {
+          "input_tokens": 36626,
+          "output_tokens": 5888,
+          "total_tokens": 42514
+        }
+      }
+    }
+  ]
+}
