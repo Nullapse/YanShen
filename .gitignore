@@ -38,6 +38,7 @@ tmp*/
 desktop_host/*.dll
 desktop_host/gongkao_desktop_host.exe
 
+
 # Local project notes and screenshots are kept in the workspace but are not published.
 DATA_NOTICE.md
 docs/agent-system-design.md
@@ -47,3 +48,12 @@ docs/screenshots/
 docs/interview-project-guide.md
 docs/interview/
 docs/releases/
+
+# Developer-only folders & specs (tracked locally in dev branch only)
+evals/
+tests/
+scripts/
+requirements-dev.txt
+requirements-build.txt
+requirements-eval.txt
+
