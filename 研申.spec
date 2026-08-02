@@ -1,5 +1,6 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import os
 from PyInstaller.utils.hooks import collect_submodules
 
 
@@ -43,27 +44,29 @@ AGENT_HIDDENIMPORTS = (
     + collect_submodules("openai")
 )
 
+datas = [
+    ("static", "static"),
+    ("gongkao/web/templates", "gongkao/web/templates"),
+    ("templates_data", "templates_data"),
+    ("knowledge/manifest.json", "knowledge"),
+    ("knowledge/knowledge_cards_v2.jsonl", "knowledge"),
+    ("knowledge/shenlun_methodology.jsonl", "knowledge"),
+    ("knowledge/saduck_methodology.jsonl", "knowledge"),
+    ("data/gongkao_seed.sqlite3", "data"),
+    ("assets/app-icon.ico", "assets"),
+    ("desktop_host/gongkao_desktop_host.exe", "."),
+    ("desktop_host/Microsoft.Web.WebView2.Core.dll", "."),
+    ("desktop_host/Microsoft.Web.WebView2.WinForms.dll", "."),
+    ("desktop_host/WebView2Loader.dll", "."),
+]
+if os.path.exists("evals"):
+    datas.append(("evals", "evals"))
 
 a = Analysis(
     ["launcher.py"],
     pathex=[],
     binaries=[],
-    datas=[
-        ("static", "static"),
-        ("gongkao/web/templates", "gongkao/web/templates"),
-        ("templates_data", "templates_data"),
-        ("knowledge/manifest.json", "knowledge"),
-        ("knowledge/knowledge_cards_v2.jsonl", "knowledge"),
-        ("knowledge/shenlun_methodology.jsonl", "knowledge"),
-        ("knowledge/saduck_methodology.jsonl", "knowledge"),
-        ("evals", "evals"),
-        ("data/gongkao_seed.sqlite3", "data"),
-        ("assets/app-icon.ico", "assets"),
-        ("desktop_host/gongkao_desktop_host.exe", "."),
-        ("desktop_host/Microsoft.Web.WebView2.Core.dll", "."),
-        ("desktop_host/Microsoft.Web.WebView2.WinForms.dll", "."),
-        ("desktop_host/WebView2Loader.dll", "."),
-    ],
+    datas=datas,
     hiddenimports=collect_submodules("tkinter") + collect_submodules("webview") + AGENT_HIDDENIMPORTS,
     hookspath=[],
     hooksconfig={},
