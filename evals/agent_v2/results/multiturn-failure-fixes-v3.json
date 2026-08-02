@@ -1,0 +1,1210 @@
+{
+  "schema_version": "agent-multiturn-eval-report-v1",
+  "suite_name": "agent-v2-multiturn-v1",
+  "created_at": "2026-07-10T15:00:54.705804+00:00",
+  "dataset": {
+    "path": "C:\\Users\\lwq\\Documents\\gongkao\\evals\\agent_v2\\multiturn-v1.jsonl",
+    "sha256": "58d5b98af653dbcbbfa18b7fb5af125ea1314af7ffb8b13ceb54a8f9f7871a68",
+    "case_count": 3
+  },
+  "versions": {
+    "prompt": "agent-prompts-v3-context-budget",
+    "retrieval": "90736988b149"
+  },
+  "summary": {
+    "average_score": 88.3333,
+    "failed_cases": 0,
+    "case_count": 3,
+    "turn_count": 7,
+    "category_scores": {
+      "constraint": 92.5,
+      "correction": 72.5,
+      "reference": 100.0
+    },
+    "semantic_average": 0.8889,
+    "semantic_success_rate": 0.6667,
+    "latency_ms": {
+      "p50": 27156.28,
+      "p95": 140980.45
+    },
+    "token_usage": {
+      "input_tokens": 56326,
+      "output_tokens": 8066,
+      "total_tokens": 64392
+    }
+  },
+  "results": [
+    {
+      "case": {
+        "id": "followup_previous_evidence",
+        "title": "追问上一轮证据",
+        "category": "reference",
+        "turns": [
+          {
+            "user": "分析我的归纳概括短板并给证据"
+          },
+          {
+            "user": "刚才那条证据具体说明什么"
+          }
+        ],
+        "expected_context_terms": [
+          "归纳概括",
+          "证据"
+        ],
+        "final_expected_keywords": [
+          "证据",
+          "说明"
+        ]
+      },
+      "conversations": {
+        "main": 19
+      },
+      "turns": [
+        {
+          "thread": "main",
+          "turn": 1,
+          "run_id": 45,
+          "duration_ms": 140980.45,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 13188,
+            "output_tokens": 1829,
+            "total_tokens": 15017,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {
+              "question_type": "归纳概括"
+            },
+            "module": "summary",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 1,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "module_diagnosis",
+              "query_plan": {
+                "action": "diagnose",
+                "scope": "module_history",
+                "sources": [
+                  "weakness_profile",
+                  "personal_note",
+                  "aggregate",
+                  "attempt",
+                  "grading_report"
+                ],
+                "module": "summary",
+                "reason": "分析归纳概括模块短板并引用证据"
+              },
+              "retrieval_policy": "Analyze module-wide history with aggregate coverage plus representative evidence cards.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "历史证据充分",
+                "note": "已覆盖多次作答及代表证据，可用于模块/总体趋势判断。"
+              },
+              "evidence_card_count": 32,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "profile:summary:coverage",
+                "profile:summary:weakness:1",
+                "profile:summary:weakness:2",
+                "profile:summary:weakness:3",
+                "profile:summary:weakness:4",
+                "profile:summary:weakness:5",
+                "profile:summary:weakness:6",
+                "attempt:102",
+                "attempt:57",
+                "attempt:91",
+                "attempt:40",
+                "attempt:95"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "profile:summary:coverage",
+                  "source_type": "aggregate",
+                  "title": "归纳概括 覆盖统计",
+                  "claim": "选定模块全量匹配历史的覆盖、来源和问题分布统计。",
+                  "content": "{\"coverage\": {\"attempt_count\": 23, \"report_count\": 27, \"note_count\": 11, \"chunk_count\": 5904}, \"source_counts\": {\"reference_answer\": 2998, \"material\": 2378, \"question\": 466, \"gradi...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "profile:summary:weakness:1",
+                  "source_type": "weakness_profile",
+                  "title": "材料遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"材料遗漏\", \"frequency\": 34, \"severity\": 0.85, \"evidence_refs\": [{\"ref\": \"knowledge:summary:method\", \"title\": \"归纳概括题方法\", \"source_type\": \"knowledge\", \"score\": null}, {\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:summary:weakness:2",
+                  "source_type": "weakness_profile",
+                  "title": "对策针对性",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"对策针对性\", \"frequency\": 30, \"severity\": 0.75, \"evidence_refs\": [{\"ref\": \"knowledge:summary:method\", \"title\": \"归纳概括题方法\", \"source_type\": \"knowledge\", \"score\": null}, {...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:summary:weakness:3",
+                  "source_type": "weakness_profile",
+                  "title": "语言概括",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"语言概括\", \"frequency\": 28, \"severity\": 0.7, \"evidence_refs\": [{\"ref\": \"knowledge:summary:method\", \"title\": \"归纳概括题方法\", \"source_type\": \"knowledge\", \"score\": null}, {\"r...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:summary:weakness:4",
+                  "source_type": "weakness_profile",
+                  "title": "采分点遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"采分点遗漏\", \"frequency\": 27, \"severity\": 0.675, \"evidence_refs\": [{\"ref\": \"knowledge:summary:method\", \"title\": \"归纳概括题方法\", \"source_type\": \"knowledge\", \"score\": null},...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:summary:weakness:5",
+                  "source_type": "weakness_profile",
+                  "title": "结构表达",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"结构表达\", \"frequency\": 22, \"severity\": 0.55, \"evidence_refs\": [{\"ref\": \"knowledge:summary:method\", \"title\": \"归纳概括题方法\", \"source_type\": \"knowledge\", \"score\": null}, {\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:summary:weakness:6",
+                  "source_type": "weakness_profile",
+                  "title": "审题偏差",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"审题偏差\", \"frequency\": 5, \"severity\": 0.125, \"evidence_refs\": [{\"ref\": \"knowledge:summary:method\", \"title\": \"归纳概括题方法\", \"source_type\": \"knowledge\", \"score\": null}, {\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "attempt:102",
+                  "source_type": "grading_report",
+                  "title": "GKS-2-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：7/10 - 等级：良好 - 核心判断：最大得分点是基本覆盖了“组建公司、金融产品、产业转化、碳汇交易”四个核心做法，最大失分点是“强优势、补短板”等表达来自材料原句但不够具体，缺少了“明确生态资源优势、指导项目开发”这一前置动作。 ## 得分点清单 - 题型分类：归纳概括（做法类） - 参考答案融合说明：共性核心点提炼自20多份参...",
+                  "question_id": 568,
+                  "attempt_id": 102,
+                  "url": "/attempts/102",
+                  "confidence": 0.781
+                },
+                {
+                  "evidence_id": "attempt:57",
+                  "source_type": "grading_report",
+                  "title": "GKS-765-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：14/20 - 等级：良好 - 核心判断：四个核心采分点均命中，但概括程度参差不齐，部分表达与材料微观细节略有偏差，结构“点线面”逻辑层次感稍弱。 ## 得分点清单 - 题型分类：归纳概括 - 标准采分点（综合多份参考答案提炼）： 1. **数智化亲情监测**：材料第1段“通过物联网感知设备，家属可实时监测老人身体健康数据等情况”-...",
+                  "question_id": 653,
+                  "attempt_id": 57,
+                  "url": "/attempts/57",
+                  "confidence": 0.7489
+                },
+                {
+                  "evidence_id": "attempt:91",
+                  "source_type": "grading_report",
+                  "title": "GKS-4-Q2 第2题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：11/15分 - 等级：良好 - 核心判断：最大得分点是产业链和种业问题的整体框架抓得较准；最大失分点是第一问遗漏了“从源头严控质量”“向上游延伸产业链”“严格质检”等关键细节，第二问对“谁来种地”问题的表述不够规范、漏了“土地入股与托管”的现实选择差异。 ## 得分点清单 - 题型分类：归纳概括（问题+对策一一对应） - 标准采分...",
+                  "question_id": 579,
+                  "attempt_id": 91,
+                  "url": "/attempts/91",
+                  "confidence": 0.6862
+                },
+                {
+                  "evidence_id": "attempt:40",
+                  "source_type": "grading_report",
+                  "title": "GKS-608-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：12/20分 - 等级：一般 - 核心判断：最大得分点在于基本覆盖了材料中的主要做法维度，最大失分点在于第1条回答的是“是什么”而非“做法”，且整体缺少归纳提炼的概括句，表述偏啰嗦。 ## 得分点清单 - 题型分类：归纳概括（做法） - 标准采分点： 1. 加强组织领导/形成工作合力：党委政府领导，多部门协同推进，整合分散的科技创新...",
+                  "question_id": 628,
+                  "attempt_id": 40,
+                  "url": "/attempts/40",
+                  "confidence": 0.6857
+                },
+                {
+                  "evidence_id": "attempt:95",
+                  "source_type": "grading_report",
+                  "title": "GKS-3-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：6.5/10 - 等级：一般 - 核心判断：最大得分点是抓住了“组建公司”和“催生金融产品”等核心做法；最大失分点是对“生态产品使用经营权质押担保”和“碳汇交易具体操作”的表述模糊或缺失。 ## 得分点清单 - 题型分类：归纳概括（具体做法） - 标准采分点： 1. **制定核算方法，探索结果应用**：材料依据“我们制定了一套GEP...",
+                  "question_id": 573,
+                  "attempt_id": 95,
+                  "url": "/attempts/95",
+                  "confidence": 0.6844
+                }
+              ]
+            }
+          },
+          "answer_length": 2795,
+          "answer_sha256": "b25249dd17b71112",
+          "answer_preview": "## 结论摘要 本次扫描覆盖归纳概括模块全部23次作答、27份批改报告、11条个人笔记及5904个证据片段。当前模块最关键的问题是**材料信息提取不完整**，导致高频遗漏关键采分点，直接拉低了得分上限。 ## 证据分析 从多份批改报告看，材料遗漏问题反复出现。例如在 attempt-102 中，作答漏掉了“利用GEP核算报告明确生态资源优势，指导乡镇因地制宜开发项目”这一前置动作。attempt-95 同样在概括“生态产品使用经营权质押担保”和“碳汇交易具体操作”时出现模糊或缺失。attempt-120 在总结经验..."
+        },
+        {
+          "thread": "main",
+          "turn": 2,
+          "run_id": 46,
+          "duration_ms": 19589.47,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 10448,
+            "output_tokens": 969,
+            "total_tokens": 11417,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {
+              "question_type": "归纳概括"
+            },
+            "module": "summary",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 3,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "module_diagnosis",
+              "query_plan": {
+                "action": "explain",
+                "scope": "module_history",
+                "sources": [
+                  "aggregate",
+                  "weakness_profile",
+                  "attempt",
+                  "grading_report",
+                  "personal_note"
+                ],
+                "module": "summary",
+                "reason": "fallback_history"
+              },
+              "retrieval_policy": "Analyze module-wide history with aggregate coverage plus representative evidence cards.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "历史证据充分",
+                "note": "已覆盖多次作答及代表证据，可用于模块/总体趋势判断。"
+              },
+              "evidence_card_count": 32,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "profile:summary:coverage",
+                "profile:summary:weakness:1",
+                "profile:summary:weakness:2",
+                "profile:summary:weakness:3",
+                "profile:summary:weakness:4",
+                "profile:summary:weakness:5",
+                "profile:summary:weakness:6",
+                "attempt:102",
+                "attempt:91",
+                "attempt:95",
+                "attempt:40",
+                "attempt:120"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "profile:summary:coverage",
+                  "source_type": "aggregate",
+                  "title": "归纳概括 覆盖统计",
+                  "claim": "选定模块全量匹配历史的覆盖、来源和问题分布统计。",
+                  "content": "{\"coverage\": {\"attempt_count\": 23, \"report_count\": 27, \"note_count\": 11, \"chunk_count\": 5904}, \"source_counts\": {\"reference_answer\": 2998, \"material\": 2378, \"question\": 466, \"gradi...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "profile:summary:weakness:1",
+                  "source_type": "weakness_profile",
+                  "title": "材料遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"材料遗漏\", \"frequency\": 34, \"severity\": 0.85, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-102\", \"title\": \"GKS-2-Q1 第1题 批改报告\", \"source_type\": \"grading_report\", \"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:summary:weakness:2",
+                  "source_type": "weakness_profile",
+                  "title": "对策针对性",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"对策针对性\", \"frequency\": 30, \"severity\": 0.75, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-102\", \"title\": \"GKS-2-Q1 第1题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:summary:weakness:3",
+                  "source_type": "weakness_profile",
+                  "title": "语言概括",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"语言概括\", \"frequency\": 28, \"severity\": 0.7, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-102\", \"title\": \"GKS-2-Q1 第1题 批改报告\", \"source_type\": \"grading_report\", \"s...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:summary:weakness:4",
+                  "source_type": "weakness_profile",
+                  "title": "采分点遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"采分点遗漏\", \"frequency\": 27, \"severity\": 0.675, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-102\", \"title\": \"GKS-2-Q1 第1题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:summary:weakness:5",
+                  "source_type": "weakness_profile",
+                  "title": "结构表达",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"结构表达\", \"frequency\": 22, \"severity\": 0.55, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-102\", \"title\": \"GKS-2-Q1 第1题 批改报告\", \"source_type\": \"grading_report\", \"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:summary:weakness:6",
+                  "source_type": "weakness_profile",
+                  "title": "审题偏差",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"审题偏差\", \"frequency\": 5, \"severity\": 0.125, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-57\", \"title\": \"GKS-765-Q1 第1题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "attempt:102",
+                  "source_type": "grading_report",
+                  "title": "GKS-2-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：7/10 - 等级：良好 - 核心判断：最大得分点是基本覆盖了“组建公司、金融产品、产业转化、碳汇交易”四个核心做法，最大失分点是“强优势、补短板”等表达来自材料原句但不够具体，缺少了“明确生态资源优势、指导项目开发”这一前置动作。 ## 得分点清单 - 题型分类：归纳概括（做法类） - 参考答案融合说明：共性核心点提炼自20多份参...",
+                  "question_id": 568,
+                  "attempt_id": 102,
+                  "url": "/attempts/102",
+                  "confidence": 0.7733
+                },
+                {
+                  "evidence_id": "attempt:91",
+                  "source_type": "grading_report",
+                  "title": "GKS-4-Q2 第2题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：11/15分 - 等级：良好 - 核心判断：最大得分点是产业链和种业问题的整体框架抓得较准；最大失分点是第一问遗漏了“从源头严控质量”“向上游延伸产业链”“严格质检”等关键细节，第二问对“谁来种地”问题的表述不够规范、漏了“土地入股与托管”的现实选择差异。 ## 得分点清单 - 题型分类：归纳概括（问题+对策一一对应） - 标准采分...",
+                  "question_id": 579,
+                  "attempt_id": 91,
+                  "url": "/attempts/91",
+                  "confidence": 0.6881
+                },
+                {
+                  "evidence_id": "attempt:95",
+                  "source_type": "grading_report",
+                  "title": "GKS-3-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：6.5/10 - 等级：一般 - 核心判断：最大得分点是抓住了“组建公司”和“催生金融产品”等核心做法；最大失分点是对“生态产品使用经营权质押担保”和“碳汇交易具体操作”的表述模糊或缺失。 ## 得分点清单 - 题型分类：归纳概括（具体做法） - 标准采分点： 1. **制定核算方法，探索结果应用**：材料依据“我们制定了一套GEP...",
+                  "question_id": 573,
+                  "attempt_id": 95,
+                  "url": "/attempts/95",
+                  "confidence": 0.6781
+                },
+                {
+                  "evidence_id": "attempt:40",
+                  "source_type": "grading_report",
+                  "title": "GKS-608-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：12/20分 - 等级：一般 - 核心判断：最大得分点在于基本覆盖了材料中的主要做法维度，最大失分点在于第1条回答的是“是什么”而非“做法”，且整体缺少归纳提炼的概括句，表述偏啰嗦。 ## 得分点清单 - 题型分类：归纳概括（做法） - 标准采分点： 1. 加强组织领导/形成工作合力：党委政府领导，多部门协同推进，整合分散的科技创新...",
+                  "question_id": 628,
+                  "attempt_id": 40,
+                  "url": "/attempts/40",
+                  "confidence": 0.6775
+                },
+                {
+                  "evidence_id": "attempt:120",
+                  "source_type": "grading_report",
+                  "title": "GKS-752-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：8/10 - 等级：良好 - 核心判断：最大得分点是较完整抓住了原创、科技、品牌定位、渠道创新四条核心主线；最大失分点在于科技研发部分缺少“校企合作/建立研究中心”的具体表述，且“有自己对原创的理解”后未强调匠人匠心、严苛工艺等材料关键支撑。 ## 得分点清单 - 题型分类：归纳概括（经验总结） - 参考答案融合说明： **共性核心...",
+                  "question_id": 635,
+                  "attempt_id": 120,
+                  "url": "/attempts/120",
+                  "confidence": 0.6769
+                }
+              ]
+            }
+          },
+          "answer_length": 1313,
+          "answer_sha256": "d13bde5ea31273ad",
+          "answer_preview": "你追问的“刚才那条证据”，应该是指上一条结论里引用的核心证据，具体暴露了你在归纳概括时材料提取不完整的实际表现。 以 attempt-102 这份批改报告为例（`grading_report:attempt-102`），这份材料清楚说明了： 1. **遗漏的不是主干，而是前置动作和条件限定**。报告明确指出，作答时缺少了“利用 GEP 核算报告明确生态资源优势，指导乡镇因地制宜开发项目”这一环节。这恰恰是材料中 F 局长原话里，生态资源转变为经济效益的关键前置条件。 2. **材料里的铺垫句、逻辑链条容易被跳过**..."
+        }
+      ],
+      "metrics": {
+        "score": 100.0,
+        "final_keyword_accuracy": 1.0,
+        "context_literal_accuracy": 1.0,
+        "forbidden_term_accuracy": 1.0,
+        "thread_continuity": 1.0,
+        "semantic_score": 1.0,
+        "semantic_success": true,
+        "deterministic_score": 1.0,
+        "judge": {
+          "status": "ok",
+          "scores": {
+            "context_retention": 1.0,
+            "constraint_adherence": 1.0,
+            "correction_adherence": 1.0,
+            "thread_isolation": 1.0,
+            "answer_relevance": 1.0
+          },
+          "reason": "准确理解指代，继承分析语境，引用证据说明短板，未串入其他信息。"
+        },
+        "errors": [],
+        "turn_count": 2,
+        "duration_ms": 160569.92,
+        "token_usage": {
+          "input_tokens": 23636,
+          "output_tokens": 2798,
+          "total_tokens": 26434
+        },
+        "runtime": {
+          "prompt_version": "agent-prompts-v3-context-budget",
+          "retrieval_version": "90736988b149",
+          "dataset_version": "agent-v2-multiturn-v1",
+          "case_sha256": "d6e439df39be74bc"
+        }
+      }
+    },
+    {
+      "case": {
+        "id": "constraint_use_all_history",
+        "title": "扩大到全部历史",
+        "category": "constraint",
+        "turns": [
+          {
+            "user": "复盘这道题"
+          },
+          {
+            "user": "再结合我的全部历史看"
+          }
+        ],
+        "expected_context_terms": [
+          "这道题",
+          "全部历史"
+        ],
+        "final_expected_keywords": [
+          "历史",
+          "共同"
+        ]
+      },
+      "conversations": {
+        "main": 19
+      },
+      "turns": [
+        {
+          "thread": "main",
+          "turn": 1,
+          "run_id": 45,
+          "duration_ms": 36228.72,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 10205,
+            "output_tokens": 1793,
+            "total_tokens": 11998,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "recent_review",
+            "task_type": "review",
+            "filters": {},
+            "module": "analysis",
+            "subject_id": 122,
+            "subject_ids": [
+              122
+            ],
+            "conversation_context": {
+              "message_count": 1,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "current_attempt_review",
+              "query_plan": {
+                "action": "review",
+                "scope": "current_attempt",
+                "sources": [
+                  "question",
+                  "attempt",
+                  "personal_note",
+                  "grading_report",
+                  "weakness_profile"
+                ],
+                "module": "analysis",
+                "reason": "用户要求复盘当前这道题，需要综合分析题目、作答、个人笔记、评分报告及薄弱点，以全面回顾和诊断"
+              },
+              "retrieval_policy": "Use only the selected attempt, its question, materials, references, and grading reports.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "本题证据充分",
+                "note": "已包含题干、作答和至少一种材料/批改/参考答案证据，可用于本题判断。"
+              },
+              "evidence_card_count": 4,
+              "current_attempt_only": true,
+              "allowed_evidence_ids": [
+                "question:638",
+                "attempt:122",
+                "report:122:1",
+                "report:122:2"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "question:638",
+                  "source_type": "question",
+                  "title": "GKS-752-Q4 第4题",
+                  "claim": "题干、作答任务和要求，用于判断回答方向与结构是否合题。",
+                  "content": "“给定材料4”反映了C市高标准农田建设过程中的一些情况，调研结束后，督导调研组拟向局领导汇报调研情况，并提出改进建议。假如你是调研组成员，请草拟汇报的主要内容。（20分） 要求： （1）紧扣材料，内容全面； （2）简明扼要，条理清晰； （3）不超过500字。",
+                  "question_id": 638,
+                  "attempt_id": 122,
+                  "url": "/attempts/122",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "attempt:122",
+                  "source_type": "attempt",
+                  "title": "作答 122",
+                  "claim": "用户本次作答文本和复盘笔记，是本题复盘与改写判断的主证据。",
+                  "content": "关于C市高标准农田建设情况调研汇报 C市在高标准农田建设中全面落实藏粮于地、藏粮于技战略，现将情况汇报如下。 成效：1、利用项目资金修复水利、完善田间配套设施，旱田改造为水浇田，解决农田灌溉问题，产值效益提升，种植轻松，农民积极性提高。2、分散的土地被统一整合，租金上涨，同时完善基础设施，因地制宜推进产业结构调整，带动特色优势产业发展，增加农民就业机会，综合...",
+                  "question_id": 638,
+                  "attempt_id": 122,
+                  "url": "/attempts/122",
+                  "confidence": 0.95
+                },
+                {
+                  "evidence_id": "report:122:1",
+                  "source_type": "grading_report",
+                  "title": "批改报告 1",
+                  "claim": "批改报告中的命中点、失分点和修改建议。",
+                  "content": "## 总体评分 - 总分：14/20分 - 等级：良好 - 核心判断：成效概括完整准确，问题与建议方向正确；主要失分在于遗漏“随意变更地块”这一关键问题及对应建议，部分表达不够精练。 ## 得分点清单 - 题型分类：公文写作（汇报材料） - 参考答案融合说明：结合多份参考答案，提炼共性核心点作为评分依据，差异补充点仅作提醒不强制采分。 - 标准采分点： 1....",
+                  "question_id": 638,
+                  "attempt_id": 122,
+                  "url": "/attempts/122",
+                  "confidence": 0.88
+                },
+                {
+                  "evidence_id": "report:122:2",
+                  "source_type": "grading_report",
+                  "title": "批改报告 2",
+                  "claim": "批改报告中的命中点、失分点和修改建议。",
+                  "content": "## 总体评分 - 总分：12/20分 - 等级：一般 - 核心判断：最大得分点是成效概括完整；主要失分在“问题”遗漏“随意变更地块”和“县级验收不严”两个核心点，且建议篇幅失衡。 ## 得分点清单 - 题型分类：公文写作（汇报材料），归纳概括+提出对策复合题型 - 参考答案融合说明：共性核心点来自材料直接依据的、多份答案均采信的要点；以下标准采分点中标记“...",
+                  "question_id": 638,
+                  "attempt_id": 122,
+                  "url": "/attempts/122",
+                  "confidence": 0.88
+                }
+              ]
+            }
+          },
+          "answer_length": 1554,
+          "answer_sha256": "3c13dfb731675cff",
+          "answer_preview": "从本题复盘来看，你最大的失分点是**问题未拆解出“随意变更地块”这一核心采分点，导致“问题-建议”未形成闭环**。 ### 1. 本题弱点 | 弱点 | 严重度 | 证据 | |---|---|---| | 遗漏关键采分点 | 高 | 报告中均指出遗漏“未按批复设计施工，随意调整变更建设地块”。[report:122:1][report:122:2] | | 问题归类含糊 | 中 | 你将“田间道不连接田块”和“图文不符”打包成“违反建设通则”，冲淡了“随意变更”这一独立违规行为。[attempt:122] | |..."
+        },
+        {
+          "thread": "main",
+          "turn": 2,
+          "run_id": 46,
+          "duration_ms": 133602.31,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 12754,
+            "output_tokens": 2141,
+            "total_tokens": 14895,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "recent_review",
+            "task_type": "review",
+            "filters": {},
+            "module": "analysis",
+            "subject_id": 122,
+            "subject_ids": [
+              122
+            ],
+            "conversation_context": {
+              "message_count": 3,
+              "summarized_count": 0,
+              "long_term_memory_count": 0,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "overview_diagnosis",
+              "query_plan": {
+                "action": "diagnose",
+                "scope": "overall_history",
+                "sources": [
+                  "aggregate",
+                  "weakness_profile",
+                  "attempt",
+                  "grading_report",
+                  "personal_note"
+                ],
+                "module": "analysis",
+                "reason": "explicit_history_expansion"
+              },
+              "retrieval_policy": "Analyze overall history with aggregate coverage plus representative evidence cards.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "历史证据充分",
+                "note": "已覆盖多次作答及代表证据，可用于模块/总体趋势判断。"
+              },
+              "evidence_card_count": 26,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "profile:analysis:coverage",
+                "profile:analysis:weakness:1",
+                "profile:analysis:weakness:2",
+                "profile:analysis:weakness:3",
+                "profile:analysis:weakness:4",
+                "profile:analysis:weakness:5",
+                "profile:analysis:weakness:6",
+                "attempt:111",
+                "attempt:46",
+                "attempt:90",
+                "attempt:42",
+                "attempt:43"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "profile:analysis:coverage",
+                  "source_type": "aggregate",
+                  "title": "综合分析 覆盖统计",
+                  "claim": "选定模块全量匹配历史的覆盖、来源和问题分布统计。",
+                  "content": "{\"coverage\": {\"attempt_count\": 20, \"report_count\": 22, \"note_count\": 3, \"chunk_count\": 4051}, \"source_counts\": {\"reference_answer\": 1984, \"material\": 1703, \"question\": 318, \"gradin...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "profile:analysis:weakness:1",
+                  "source_type": "weakness_profile",
+                  "title": "对策针对性",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"对策针对性\", \"frequency\": 29, \"severity\": 0.725, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-111\", \"title\": \"GKS-754-Q2 第2题 批改报告\", \"source_type\": \"grading_report...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:analysis:weakness:2",
+                  "source_type": "weakness_profile",
+                  "title": "材料遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"材料遗漏\", \"frequency\": 24, \"severity\": 0.6, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-111\", \"title\": \"GKS-754-Q2 第2题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:analysis:weakness:3",
+                  "source_type": "weakness_profile",
+                  "title": "结构表达",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"结构表达\", \"frequency\": 22, \"severity\": 0.55, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-111\", \"title\": \"GKS-754-Q2 第2题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:analysis:weakness:4",
+                  "source_type": "weakness_profile",
+                  "title": "采分点遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"采分点遗漏\", \"frequency\": 22, \"severity\": 0.55, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-111\", \"title\": \"GKS-754-Q2 第2题 批改报告\", \"source_type\": \"grading_report\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:analysis:weakness:5",
+                  "source_type": "weakness_profile",
+                  "title": "语言概括",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"语言概括\", \"frequency\": 20, \"severity\": 0.5, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-111\", \"title\": \"GKS-754-Q2 第2题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:analysis:weakness:6",
+                  "source_type": "weakness_profile",
+                  "title": "审题偏差",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"审题偏差\", \"frequency\": 7, \"severity\": 0.175, \"evidence_refs\": [{\"ref\": \"knowledge:analysis:method\", \"title\": \"综合分析题方法\", \"source_type\": \"knowledge\", \"score\": null}, {...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "attempt:111",
+                  "source_type": "grading_report",
+                  "title": "GKS-754-Q2 第2题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：12/15分 - 等级：良好 - 核心判断：最大得分点是“产品质量”“科技赋能”“政策支持”等核心要点覆盖较全；最大失分点是“保持专注、定位明确”这一深层理念缺失，以及部分要点表达不够精准、逻辑层次可进一步优化。 ## 得分点清单 - 题型分类：综合分析——原因分析 - 参考答案融合说明：多份参考答案的共性核心点可归纳为①严格的生产...",
+                  "question_id": 646,
+                  "attempt_id": 111,
+                  "url": "/attempts/111",
+                  "confidence": 0.7593
+                },
+                {
+                  "evidence_id": "attempt:46",
+                  "source_type": "grading_report",
+                  "title": "GKS-605-Q2 第2题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：27/30 - 等级：优秀 - 核心判断：最大得分点是结构清晰、要点覆盖全面，能将材料信息有效整合为三个论证维度；最大失分点是“为共同富裕示范区提供法治保障”这一重要政治定位在开头提及后，未在正文论证中充分展开和体现。 ## 得分点清单 - 题型分类：综合分析（理解类） - 标准采分点： 1. 概念阐释：材料“充分利用大数据、区块链...",
+                  "question_id": 620,
+                  "attempt_id": 46,
+                  "url": "/attempts/46",
+                  "confidence": 0.7551
+                },
+                {
+                  "evidence_id": "attempt:90",
+                  "source_type": "grading_report",
+                  "title": "GKS-4-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：7/10分 - 等级：良好 - 核心判断：要点覆盖较全面，但对关键信息提炼不够精准，部分表达笼统，遗漏了“允许科研失败”“遵守国际知识产权”等重要启示点。 ## 得分点清单 - 题型分类：启示类综合分析题 - 标准采分点： 1. **超前研发、敢为人先**：材料“我们就是要做别人没做过的”“通过超前研发，拥有强大的差异化竞争力” →...",
+                  "question_id": 578,
+                  "attempt_id": 90,
+                  "url": "/attempts/90",
+                  "confidence": 0.7185
+                },
+                {
+                  "evidence_id": "attempt:42",
+                  "source_type": "grading_report",
+                  "title": "GKS-607-Q2 第2题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：8/30分 - 等级：较弱 - 核心判断：最大得分点在于大致识别了新型举国体制的事例；最大失分点在于对题干句子的理解未点出“团结协作、汇聚力量与智慧”的核心内涵，且对材料逻辑的组织混乱、观点不鲜明。 ## 得分点清单 - 题型分类：综合分析（语句理解题） - 标准采分点： 1. 句子内涵解释：强调团结协作、汇聚力量智慧的重要性，是对...",
+                  "question_id": 626,
+                  "attempt_id": 42,
+                  "url": "/attempts/42",
+                  "confidence": 0.7079
+                },
+                {
+                  "evidence_id": "attempt:43",
+                  "source_type": "grading_report",
+                  "title": "GKS-607-Q2 第2题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "好的，我现在以一名严谨的申论批改老师的身份，对你的这份作答进行批改。 首先，我们来梳理一下题目要求和材料核心。这道“综合分析题”要求你对“积力之所举，则无不胜也；众智之所为，则无不成也”这句话谈谈理解，核心是“谈理解”，而不是简单的概括。这句话是结论，是论点。你的任务是通过结合材料7、8、9的具体事例，来解释这个论点为什么正确、体现在哪些方面、对我们有什么启...",
+                  "question_id": 626,
+                  "attempt_id": 43,
+                  "url": "/attempts/43",
+                  "confidence": 0.6873
+                }
+              ]
+            }
+          },
+          "answer_length": 3384,
+          "answer_sha256": "2af2a5aebad853fb",
+          "answer_preview": "好的，我们基于你全部综合分析题的历史，进行一次模块化诊断。 ## 结论摘要 本次扫描覆盖了你**20 次综合分析作答、22 份批改报告和 3 条复盘笔记**。当前模块最核心的问题是：**你对材料的分析常停留在“现象归类”，而非“关系拆解与深层含义解释”**，这导致“对策针对性”和“采分点遗漏”成为高频失分点，且已形成相对稳定的能力画像。 ## 证据分析 我从你的历史中选取了几个最具代表性的证据： 1. **深层“理念”或“原因”的遗漏** 在 GKS-754-Q2（2024 国考综合分析）中，你的答卷覆盖了“产品质..."
+        }
+      ],
+      "metrics": {
+        "score": 92.5,
+        "final_keyword_accuracy": 0.5,
+        "context_literal_accuracy": 0.0,
+        "forbidden_term_accuracy": 1.0,
+        "thread_continuity": 1.0,
+        "semantic_score": 1.0,
+        "semantic_success": true,
+        "deterministic_score": 0.7,
+        "judge": {
+          "status": "ok",
+          "scores": {
+            "context_retention": 1.0,
+            "constraint_adherence": 1.0,
+            "correction_adherence": 1.0,
+            "thread_isolation": 1.0,
+            "answer_relevance": 1.0
+          },
+          "reason": "正确理解“这道题”与“全部历史”的指代，结合历史数据给出共性弱点分析，无跨线程信息串入。"
+        },
+        "errors": [],
+        "turn_count": 2,
+        "duration_ms": 169831.03,
+        "token_usage": {
+          "input_tokens": 22959,
+          "output_tokens": 3934,
+          "total_tokens": 26893
+        },
+        "runtime": {
+          "prompt_version": "agent-prompts-v3-context-budget",
+          "retrieval_version": "90736988b149",
+          "dataset_version": "agent-v2-multiturn-v1",
+          "case_sha256": "a2850512b350b156"
+        }
+      }
+    },
+    {
+      "case": {
+        "id": "correction_change_style",
+        "title": "纠正回答风格",
+        "category": "correction",
+        "turns": [
+          {
+            "user": "回答尽量详细"
+          },
+          {
+            "user": "以后还是简洁一点"
+          },
+          {
+            "user": "总结我的最大问题"
+          }
+        ],
+        "expected_context_terms": [
+          "简洁"
+        ],
+        "final_expected_keywords": [
+          "问题"
+        ]
+      },
+      "conversations": {
+        "main": 20
+      },
+      "turns": [
+        {
+          "thread": "main",
+          "turn": 1,
+          "run_id": 47,
+          "duration_ms": 49.69,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "available": false
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {},
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 1,
+              "summarized_count": 0,
+              "long_term_memory_count": 1,
+              "remembered_count": 1
+            }
+          },
+          "answer_length": 182,
+          "answer_sha256": "b4c99ae8227fcb6e",
+          "answer_preview": "已记住：回答风格：偏好详细回答，需要展开依据和推理过程。后续回答会按这个约束执行，你也可以在“长期记忆”中查看或删除。 ```json {\"summary\": \"已记录：回答风格：偏好详细回答，需要展开依据和推理过程\", \"weaknesses\": [], \"next_actions\": [], \"recommended_questions\": []} ```"
+        },
+        {
+          "thread": "main",
+          "turn": 2,
+          "run_id": 48,
+          "duration_ms": 48.93,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+            "available": false
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {},
+            "module": "",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 3,
+              "summarized_count": 0,
+              "long_term_memory_count": 1,
+              "remembered_count": 1
+            }
+          },
+          "answer_length": 182,
+          "answer_sha256": "129a42bea3dba7c8",
+          "answer_preview": "已记住：回答风格：偏好简洁回答，优先给结论和可执行动作。后续回答会按这个约束执行，你也可以在“长期记忆”中查看或删除。 ```json {\"summary\": \"已记录：回答风格：偏好简洁回答，优先给结论和可执行动作\", \"weaknesses\": [], \"next_actions\": [], \"recommended_questions\": []} ```"
+        },
+        {
+          "thread": "main",
+          "turn": 3,
+          "run_id": 49,
+          "duration_ms": 27156.28,
+          "status": "completed",
+          "token_usage": {
+            "input_tokens": 9731,
+            "output_tokens": 1334,
+            "total_tokens": 11065,
+            "available": true
+          },
+          "metadata": {
+            "entrypoint": "today",
+            "task_type": "diagnosis",
+            "filters": {},
+            "module": "top_loss",
+            "subject_id": null,
+            "subject_ids": [],
+            "conversation_context": {
+              "message_count": 5,
+              "summarized_count": 0,
+              "long_term_memory_count": 1,
+              "remembered_count": 0
+            },
+            "rag": {
+              "rag_route": "overview_diagnosis",
+              "query_plan": {
+                "action": "diagnose",
+                "scope": "overall_history",
+                "sources": [
+                  "weakness_profile",
+                  "aggregate",
+                  "attempt",
+                  "grading_report",
+                  "personal_note"
+                ],
+                "module": "top_loss",
+                "reason": "总结用户最大问题即最大失分点，需基于整体历史诊断薄弱项"
+              },
+              "retrieval_policy": "Analyze overall history with aggregate coverage plus representative evidence cards.",
+              "evidence_sufficiency": {
+                "level": "sufficient",
+                "label": "历史证据充分",
+                "note": "已覆盖多次作答及代表证据，可用于模块/总体趋势判断。"
+              },
+              "evidence_card_count": 32,
+              "current_attempt_only": false,
+              "allowed_evidence_ids": [
+                "profile:top_loss:coverage",
+                "profile:top_loss:weakness:1",
+                "profile:top_loss:weakness:2",
+                "profile:top_loss:weakness:3",
+                "profile:top_loss:weakness:4",
+                "profile:top_loss:weakness:5",
+                "profile:top_loss:weakness:6",
+                "profile:top_loss:weakness:7",
+                "attempt:112",
+                "attempt:66",
+                "attempt:73",
+                "attempt:90"
+              ],
+              "evidence_cards": [
+                {
+                  "evidence_id": "profile:top_loss:coverage",
+                  "source_type": "aggregate",
+                  "title": "最大失分点 覆盖统计",
+                  "claim": "选定模块全量匹配历史的覆盖、来源和问题分布统计。",
+                  "content": "{\"coverage\": {\"attempt_count\": 103, \"report_count\": 119, \"note_count\": 26, \"chunk_count\": 20435}, \"source_counts\": {\"reference_answer\": 9410, \"material\": 9005, \"question\": 1750, \"g...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.9
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:1",
+                  "source_type": "weakness_profile",
+                  "title": "对策针对性",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"对策针对性\", \"frequency\": 165, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:2",
+                  "source_type": "weakness_profile",
+                  "title": "材料遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"材料遗漏\", \"frequency\": 144, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:3",
+                  "source_type": "weakness_profile",
+                  "title": "采分点遗漏",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"采分点遗漏\", \"frequency\": 120, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:4",
+                  "source_type": "weakness_profile",
+                  "title": "语言概括",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"语言概括\", \"frequency\": 118, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:5",
+                  "source_type": "weakness_profile",
+                  "title": "结构表达",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"结构表达\", \"frequency\": 107, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"knowledge:summary:method\", \"title\": \"归纳概括题方法\", \"source_type\": \"knowledge\", \"score\": null}, {\"...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:6",
+                  "source_type": "weakness_profile",
+                  "title": "格式规范",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"格式规范\", \"frequency\": 48, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "profile:top_loss:weakness:7",
+                  "source_type": "weakness_profile",
+                  "title": "审题偏差",
+                  "claim": "长期能力画像中的高频弱项。",
+                  "content": "{\"problem_type\": \"审题偏差\", \"frequency\": 43, \"severity\": 1.0, \"evidence_refs\": [{\"ref\": \"grading_report:attempt-112\", \"title\": \"GKS-754-Q3 第3题 批改报告\", \"source_type\": \"grading_report\",...",
+                  "question_id": null,
+                  "attempt_id": null,
+                  "url": "",
+                  "confidence": 0.84
+                },
+                {
+                  "evidence_id": "attempt:112",
+                  "source_type": "grading_report",
+                  "title": "GKS-754-Q3 第3题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：14/20分 - 等级：良好 - 核心判断：成效部分覆盖了主要产业亮点，但对“传承人获得政府支持”“民间文化价值认知提升”两个共性核心点遗漏或表达不足；改进建议中“多部门联合办事，严厉处罚”等超出材料，属于不基于材料的发挥。 ## 得分点清单 - 题型分类：公文写作（情况报告） - 参考答案融合说明：本题为综合分析类公文，需从12份...",
+                  "question_id": 647,
+                  "attempt_id": 112,
+                  "url": "/attempts/112",
+                  "confidence": 0.7368
+                },
+                {
+                  "evidence_id": "attempt:66",
+                  "source_type": "grading_report",
+                  "title": "GKS-10-Q4 第4题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：18/25分 - 等级：良好 - 核心判断：最大得分点在于三个市场均有问题梳理与措施对应；最大失分点在豹岭农贸早市遗漏“噪音扰民”关键问题，且部分措施不够具体（如“合理规划让原摊主重回老地方”表述模糊，未体现材料中“原则上回到原摊位”的确定性）。 ## 得分点清单 - 题型分类：提出对策题 - 标准采分点： 1. 莲池市场-问题-环...",
+                  "question_id": 611,
+                  "attempt_id": 66,
+                  "url": "/attempts/66",
+                  "confidence": 0.7231
+                },
+                {
+                  "evidence_id": "attempt:73",
+                  "source_type": "grading_report",
+                  "title": "GKS-9-Q4 第4题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：13/25分 - 等级：一般 - 核心判断：最大得分点在问题梳理基本覆盖了工时、合同等核心劳动权益问题，最大失分点在于遗漏了“以罚代管”引发的安全风险、公众缺乏尊重与认可等关键采分点，且建议部分缺乏具体性和可操作性，结构未分“问题”与“建议”两大块。 ## 得分点清单 - 题型分类：公文写作（调研报告提纲） - 标准采分点： **问...",
+                  "question_id": 606,
+                  "attempt_id": 73,
+                  "url": "/attempts/73",
+                  "confidence": 0.7204
+                },
+                {
+                  "evidence_id": "attempt:90",
+                  "source_type": "grading_report",
+                  "title": "GKS-4-Q1 第1题 批改报告",
+                  "claim": "模块代表证据：grading_report",
+                  "content": "## 总体评分 - 总分：7/10分 - 等级：良好 - 核心判断：要点覆盖较全面，但对关键信息提炼不够精准，部分表达笼统，遗漏了“允许科研失败”“遵守国际知识产权”等重要启示点。 ## 得分点清单 - 题型分类：启示类综合分析题 - 标准采分点： 1. **超前研发、敢为人先**：材料“我们就是要做别人没做过的”“通过超前研发，拥有强大的差异化竞争力” →...",
+                  "question_id": 578,
+                  "attempt_id": 90,
+                  "url": "/attempts/90",
+                  "confidence": 0.7104
+                }
+              ]
+            }
+          },
+          "answer_length": 1063,
+          "answer_sha256": "67b4d1ccdc5768a4",
+          "answer_preview": "结论：最大问题是对策不够具体、缺乏材料依据，即**“对策针对性”**问题最严重。 **依据：** - weakness_profile显示“对策针对性”出现频率最高（165次），超过“材料遗漏”（144次）和“采分点遗漏”（120次）。 - 代表证据：attempt-112（公文写作）得分70但“改进建议超出材料，属于不基于材料的发挥”（ref: grading_report:attempt-112）；attempt-66（提出对策）得分72但“部分措施不够具体”“表述模糊”（ref: grading_report..."
+        }
+      ],
+      "metrics": {
+        "score": 72.5,
+        "final_keyword_accuracy": 1.0,
+        "context_literal_accuracy": 0.0,
+        "forbidden_term_accuracy": 1.0,
+        "thread_continuity": 1.0,
+        "semantic_score": 0.6667,
+        "semantic_success": false,
+        "deterministic_score": 0.9,
+        "judge": {
+          "status": "ok",
+          "scores": {
+            "context_retention": 1.0,
+            "constraint_adherence": 0.0,
+            "correction_adherence": 0.0,
+            "thread_isolation": 1.0,
+            "answer_relevance": 1.0
+          },
+          "reason": "回答未遵“简洁”纠正，仍详细展开，与刚记录的偏好矛盾；其余继承、隔离和覆盖均满足。"
+        },
+        "errors": [],
+        "turn_count": 3,
+        "duration_ms": 27254.9,
+        "token_usage": {
+          "input_tokens": 9731,
+          "output_tokens": 1334,
+          "total_tokens": 11065
+        },
+        "runtime": {
+          "prompt_version": "agent-prompts-v3-context-budget",
+          "retrieval_version": "90736988b149",
+          "dataset_version": "agent-v2-multiturn-v1",
+          "case_sha256": "0803899134607b4b"
+        }
+      }
+    }
+  ]
+}

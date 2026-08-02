@@ -1,0 +1,1042 @@
+{
+  "schema_version": "agent-retrieval-eval-v1",
+  "created_at": "2026-07-10T19:23:42.229920+00:00",
+  "dataset": "C:\\Users\\lwq\\Documents\\gongkao\\evals\\agent_v2\\retrieval-gold-v1.jsonl",
+  "case_count": 30,
+  "requested_backend": "feature",
+  "active_embedding_model": "feature-hash-v1",
+  "active_dimensions": 128,
+  "summary": {
+    "recall_at_5": 0.4667,
+    "recall_at_10": 0.6167,
+    "mrr": 0.6567,
+    "ndcg_at_10": 0.5877,
+    "latency_ms_p50": 191.273,
+    "latency_ms_p95": 308.203
+  },
+  "results": [
+    {
+      "case": {
+        "id": "gold_summary_scope",
+        "module": "summary",
+        "query": "题目只问新变化，我还要不要写过去的背景",
+        "gold_evidence_ids": [
+          "knowledge:summary:scope:method",
+          "knowledge:summary:scope:checklist",
+          "knowledge:summary:scope:example",
+          "knowledge:summary:scope:counterexample",
+          "knowledge:summary:scope:rewrite",
+          "knowledge:summary:scope:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:summary:scope:example",
+        "knowledge:summary:method"
+      ],
+      "latency_ms": 238.182,
+      "metrics": {
+        "retrieved_count": 2,
+        "gold_count": 6,
+        "recall_at_5": 0.1667,
+        "recall_at_10": 0.1667,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.3026
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_summary_subject",
+        "module": "summary",
+        "query": "概括做法时总把政府企业群众混在一起怎么办",
+        "gold_evidence_ids": [
+          "knowledge:summary:subject:method",
+          "knowledge:summary:subject:checklist",
+          "knowledge:summary:subject:example",
+          "knowledge:summary:subject:counterexample",
+          "knowledge:summary:subject:rewrite",
+          "knowledge:summary:subject:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:summary:method",
+        "knowledge:summary:verbs:rewrite",
+        "knowledge:summary:verbs:counterexample",
+        "knowledge:summary:verbs:method",
+        "knowledge:summary:verbs:example"
+      ],
+      "latency_ms": 168.637,
+      "metrics": {
+        "retrieved_count": 5,
+        "gold_count": 6,
+        "recall_at_5": 0.0,
+        "recall_at_10": 0.0,
+        "mrr": 0.0,
+        "ndcg_at_10": 0.0
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_summary_merge",
+        "module": "summary",
+        "query": "材料要点很多又重复，怎样合并同类项",
+        "gold_evidence_ids": [
+          "knowledge:summary:merge:method",
+          "knowledge:summary:merge:checklist",
+          "knowledge:summary:merge:example",
+          "knowledge:summary:merge:counterexample",
+          "knowledge:summary:merge:rewrite",
+          "knowledge:summary:merge:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:summary:method",
+        "knowledge:summary:merge:example",
+        "knowledge:summary:merge:diagnostic",
+        "knowledge:summary:dimensions:checklist",
+        "knowledge:summary:evidence:checklist",
+        "knowledge:summary:causality:diagnostic",
+        "knowledge:summary:dimensions:diagnostic",
+        "knowledge:summary:dimensions:rewrite",
+        "knowledge:summary:evidence:diagnostic",
+        "knowledge:summary:evidence:rewrite"
+      ],
+      "latency_ms": 265.801,
+      "metrics": {
+        "retrieved_count": 10,
+        "gold_count": 6,
+        "recall_at_5": 0.3333,
+        "recall_at_10": 0.3333,
+        "mrr": 0.5,
+        "ndcg_at_10": 0.3422
+      },
+      "vector_backend": "python-recent-scan:feature-hash-v1"
+    },
+    {
+      "case": {
+        "id": "gold_summary_causality",
+        "module": "summary",
+        "query": "如何区分材料中的原因和结果，避免归类错误",
+        "gold_evidence_ids": [
+          "knowledge:summary:causality:method",
+          "knowledge:summary:causality:checklist",
+          "knowledge:summary:causality:example",
+          "knowledge:summary:causality:counterexample",
+          "knowledge:summary:causality:rewrite",
+          "knowledge:summary:causality:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:summary:causality:diagnostic",
+        "knowledge:summary:causality:example",
+        "knowledge:summary:method",
+        "knowledge:summary:causality:checklist",
+        "knowledge:summary:causality:counterexample",
+        "knowledge:summary:causality:method"
+      ],
+      "latency_ms": 177.094,
+      "metrics": {
+        "retrieved_count": 6,
+        "gold_count": 6,
+        "recall_at_5": 0.6667,
+        "recall_at_10": 0.8333,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.8487
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_summary_wordlimit",
+        "module": "summary",
+        "query": "字数不够时怎样压缩但不丢采分点",
+        "gold_evidence_ids": [
+          "knowledge:summary:wordlimit:method",
+          "knowledge:summary:wordlimit:checklist",
+          "knowledge:summary:wordlimit:example",
+          "knowledge:summary:wordlimit:counterexample",
+          "knowledge:summary:wordlimit:rewrite",
+          "knowledge:summary:wordlimit:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:summary:method",
+        "knowledge:summary:wordlimit:diagnostic",
+        "knowledge:summary:wordlimit:checklist",
+        "knowledge:summary:wordlimit:method",
+        "knowledge:summary:wordlimit:rewrite",
+        "knowledge:summary:wordlimit:counterexample",
+        "knowledge:summary:wordlimit:example",
+        "knowledge:summary:data:checklist",
+        "knowledge:summary:data:method",
+        "knowledge:summary:data:diagnostic"
+      ],
+      "latency_ms": 264.483,
+      "metrics": {
+        "retrieved_count": 10,
+        "gold_count": 6,
+        "recall_at_5": 0.6667,
+        "recall_at_10": 1.0,
+        "mrr": 0.5,
+        "ndcg_at_10": 0.7983
+      },
+      "vector_backend": "python-recent-scan:feature-hash-v1"
+    },
+    {
+      "case": {
+        "id": "gold_analysis_object",
+        "module": "analysis",
+        "query": "解释题干一句话时应该先做什么",
+        "gold_evidence_ids": [
+          "knowledge:analysis:object:method",
+          "knowledge:analysis:object:checklist",
+          "knowledge:analysis:object:example",
+          "knowledge:analysis:object:counterexample",
+          "knowledge:analysis:object:rewrite",
+          "knowledge:analysis:object:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:analysis:object:checklist",
+        "knowledge:analysis:structure:checklist",
+        "knowledge:analysis:method",
+        "knowledge:analysis:object:counterexample",
+        "knowledge:analysis:object:method",
+        "knowledge:analysis:object:example",
+        "knowledge:analysis:structure:example",
+        "knowledge:analysis:object:diagnostic",
+        "knowledge:analysis:structure:counterexample",
+        "knowledge:analysis:structure:method"
+      ],
+      "latency_ms": 170.924,
+      "metrics": {
+        "retrieved_count": 10,
+        "gold_count": 6,
+        "recall_at_5": 0.5,
+        "recall_at_10": 0.8333,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.7532
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_analysis_relation",
+        "module": "analysis",
+        "query": "综合分析怎样写清两个要素相互支撑的关系",
+        "gold_evidence_ids": [
+          "knowledge:analysis:relation:method",
+          "knowledge:analysis:relation:checklist",
+          "knowledge:analysis:relation:example",
+          "knowledge:analysis:relation:counterexample",
+          "knowledge:analysis:relation:rewrite",
+          "knowledge:analysis:relation:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:analysis:method",
+        "knowledge:analysis:relation:example",
+        "knowledge:analysis:relation:method",
+        "knowledge:analysis:relation:checklist",
+        "knowledge:analysis:relation:counterexample",
+        "knowledge:analysis:relation:rewrite"
+      ],
+      "latency_ms": 169.502,
+      "metrics": {
+        "retrieved_count": 6,
+        "gold_count": 6,
+        "recall_at_5": 0.6667,
+        "recall_at_10": 0.8333,
+        "mrr": 0.5,
+        "ndcg_at_10": 0.6974
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_analysis_cause",
+        "module": "analysis",
+        "query": "原因分析只复述现象，怎么往深层找原因",
+        "gold_evidence_ids": [
+          "knowledge:analysis:cause:method",
+          "knowledge:analysis:cause:checklist",
+          "knowledge:analysis:cause:example",
+          "knowledge:analysis:cause:counterexample",
+          "knowledge:analysis:cause:rewrite",
+          "knowledge:analysis:cause:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:analysis:cause:rewrite",
+        "knowledge:analysis:cause:example",
+        "knowledge:analysis:cause:method",
+        "knowledge:analysis:cause:checklist",
+        "knowledge:analysis:cause:counterexample",
+        "knowledge:analysis:method",
+        "knowledge:analysis:cause:diagnostic"
+      ],
+      "latency_ms": 171.92,
+      "metrics": {
+        "retrieved_count": 7,
+        "gold_count": 6,
+        "recall_at_5": 0.8333,
+        "recall_at_10": 1.0,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.9931
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_analysis_viewpoint",
+        "module": "analysis",
+        "query": "谈对一句观点的理解，不能只表态赞同该怎么写",
+        "gold_evidence_ids": [
+          "knowledge:analysis:viewpoint:method",
+          "knowledge:analysis:viewpoint:checklist",
+          "knowledge:analysis:viewpoint:example",
+          "knowledge:analysis:viewpoint:counterexample",
+          "knowledge:analysis:viewpoint:rewrite",
+          "knowledge:analysis:viewpoint:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:analysis:method",
+        "knowledge:analysis:viewpoint:checklist",
+        "knowledge:analysis:viewpoint:diagnostic",
+        "knowledge:analysis:viewpoint:method",
+        "knowledge:analysis:viewpoint:counterexample",
+        "knowledge:analysis:viewpoint:example"
+      ],
+      "latency_ms": 185.115,
+      "metrics": {
+        "retrieved_count": 6,
+        "gold_count": 6,
+        "recall_at_5": 0.6667,
+        "recall_at_10": 0.8333,
+        "mrr": 0.5,
+        "ndcg_at_10": 0.6974
+      },
+      "vector_backend": "none"
+    },
+    {
+      "case": {
+        "id": "gold_analysis_evaluation",
+        "module": "analysis",
+        "query": "评价一个做法时如何既给判断又写局限",
+        "gold_evidence_ids": [
+          "knowledge:analysis:evaluation:method",
+          "knowledge:analysis:evaluation:checklist",
+          "knowledge:analysis:evaluation:example",
+          "knowledge:analysis:evaluation:counterexample",
+          "knowledge:analysis:evaluation:rewrite",
+          "knowledge:analysis:evaluation:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:analysis:evaluation:method",
+        "knowledge:analysis:evaluation:checklist",
+        "knowledge:analysis:evaluation:rewrite",
+        "knowledge:analysis:evaluation:counterexample",
+        "knowledge:analysis:evaluation:diagnostic",
+        "knowledge:analysis:evaluation:example",
+        "knowledge:analysis:method"
+      ],
+      "latency_ms": 181.168,
+      "metrics": {
+        "retrieved_count": 7,
+        "gold_count": 6,
+        "recall_at_5": 0.8333,
+        "recall_at_10": 1.0,
+        "mrr": 1.0,
+        "ndcg_at_10": 1.0
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_counter_match",
+        "module": "countermeasure",
+        "query": "为什么我的对策像万能模板，怎样对应具体问题",
+        "gold_evidence_ids": [
+          "knowledge:countermeasure:match:method",
+          "knowledge:countermeasure:match:checklist",
+          "knowledge:countermeasure:match:example",
+          "knowledge:countermeasure:match:counterexample",
+          "knowledge:countermeasure:match:rewrite",
+          "knowledge:countermeasure:match:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:countermeasure:method"
+      ],
+      "latency_ms": 178.179,
+      "metrics": {
+        "retrieved_count": 1,
+        "gold_count": 6,
+        "recall_at_5": 0.0,
+        "recall_at_10": 0.0,
+        "mrr": 0.0,
+        "ndcg_at_10": 0.0
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_counter_cause",
+        "module": "countermeasure",
+        "query": "措施只治表面不治根本，如何针对根因提出方案",
+        "gold_evidence_ids": [
+          "knowledge:countermeasure:cause:method",
+          "knowledge:countermeasure:cause:checklist",
+          "knowledge:countermeasure:cause:example",
+          "knowledge:countermeasure:cause:counterexample",
+          "knowledge:countermeasure:cause:rewrite",
+          "knowledge:countermeasure:cause:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:countermeasure:cause:method",
+        "knowledge:countermeasure:method"
+      ],
+      "latency_ms": 197.825,
+      "metrics": {
+        "retrieved_count": 2,
+        "gold_count": 6,
+        "recall_at_5": 0.1667,
+        "recall_at_10": 0.1667,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.3026
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_counter_actor",
+        "module": "countermeasure",
+        "query": "对策里有关部门太模糊，怎样写责任主体",
+        "gold_evidence_ids": [
+          "knowledge:countermeasure:actor:method",
+          "knowledge:countermeasure:actor:checklist",
+          "knowledge:countermeasure:actor:example",
+          "knowledge:countermeasure:actor:counterexample",
+          "knowledge:countermeasure:actor:rewrite",
+          "knowledge:countermeasure:actor:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:countermeasure:actor:counterexample",
+        "knowledge:countermeasure:actor:example",
+        "knowledge:countermeasure:actor:diagnostic",
+        "knowledge:countermeasure:actor:rewrite",
+        "knowledge:countermeasure:actor:checklist",
+        "knowledge:countermeasure:actor:method",
+        "knowledge:countermeasure:method"
+      ],
+      "latency_ms": 169.255,
+      "metrics": {
+        "retrieved_count": 7,
+        "gold_count": 6,
+        "recall_at_5": 0.8333,
+        "recall_at_10": 1.0,
+        "mrr": 1.0,
+        "ndcg_at_10": 1.0
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_counter_action",
+        "module": "countermeasure",
+        "query": "加强监管这种空话怎样改成可执行措施",
+        "gold_evidence_ids": [
+          "knowledge:countermeasure:action:method",
+          "knowledge:countermeasure:action:checklist",
+          "knowledge:countermeasure:action:example",
+          "knowledge:countermeasure:action:counterexample",
+          "knowledge:countermeasure:action:rewrite",
+          "knowledge:countermeasure:action:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:countermeasure:method",
+        "knowledge:countermeasure:action:counterexample",
+        "knowledge:countermeasure:action:method",
+        "knowledge:countermeasure:action:checklist",
+        "knowledge:countermeasure:action:rewrite",
+        "knowledge:countermeasure:action:example",
+        "knowledge:countermeasure:action:diagnostic",
+        "knowledge:countermeasure:cause:counterexample",
+        "knowledge:countermeasure:cause:method",
+        "knowledge:countermeasure:safeguard:counterexample"
+      ],
+      "latency_ms": 272.323,
+      "metrics": {
+        "retrieved_count": 10,
+        "gold_count": 6,
+        "recall_at_5": 0.6667,
+        "recall_at_10": 1.0,
+        "mrr": 0.5,
+        "ndcg_at_10": 0.7983
+      },
+      "vector_backend": "python-recent-scan:feature-hash-v1"
+    },
+    {
+      "case": {
+        "id": "gold_counter_feasible",
+        "module": "countermeasure",
+        "query": "如何判断建议是否超出身份权限或者成本太高",
+        "gold_evidence_ids": [
+          "knowledge:countermeasure:feasible:method",
+          "knowledge:countermeasure:feasible:checklist",
+          "knowledge:countermeasure:feasible:example",
+          "knowledge:countermeasure:feasible:counterexample",
+          "knowledge:countermeasure:feasible:rewrite",
+          "knowledge:countermeasure:feasible:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:countermeasure:method",
+        "knowledge:countermeasure:mechanism:diagnostic",
+        "knowledge:countermeasure:match:diagnostic",
+        "knowledge:countermeasure:action:diagnostic",
+        "knowledge:countermeasure:action:example",
+        "knowledge:countermeasure:feasible:diagnostic",
+        "knowledge:countermeasure:action:rewrite",
+        "knowledge:countermeasure:safeguard:diagnostic",
+        "knowledge:countermeasure:mechanism:example",
+        "knowledge:countermeasure:mechanism:checklist"
+      ],
+      "latency_ms": 283.295,
+      "metrics": {
+        "retrieved_count": 10,
+        "gold_count": 6,
+        "recall_at_5": 0.0,
+        "recall_at_10": 0.1667,
+        "mrr": 0.1667,
+        "ndcg_at_10": 0.1078
+      },
+      "vector_backend": "python-recent-scan:feature-hash-v1"
+    },
+    {
+      "case": {
+        "id": "gold_document_genre",
+        "module": "document",
+        "query": "申论公文先怎么判断应该写通知倡议还是报告",
+        "gold_evidence_ids": [
+          "knowledge:document:genre:method",
+          "knowledge:document:genre:checklist",
+          "knowledge:document:genre:example",
+          "knowledge:document:genre:counterexample",
+          "knowledge:document:genre:rewrite",
+          "knowledge:document:genre:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:document:course:types",
+        "knowledge:document:method",
+        "knowledge:document:body:example",
+        "knowledge:document:body:diagnostic",
+        "knowledge:document:course:title",
+        "knowledge:document:genre:example",
+        "knowledge:document:genre:counterexample",
+        "knowledge:document:course:signature",
+        "knowledge:document:purpose:diagnostic",
+        "knowledge:document:body:rewrite"
+      ],
+      "latency_ms": 308.203,
+      "metrics": {
+        "retrieved_count": 10,
+        "gold_count": 6,
+        "recall_at_5": 0.0,
+        "recall_at_10": 0.3333,
+        "mrr": 0.1667,
+        "ndcg_at_10": 0.2087
+      },
+      "vector_backend": "python-recent-scan:feature-hash-v1"
+    },
+    {
+      "case": {
+        "id": "gold_document_identity",
+        "module": "document",
+        "query": "社区工作人员写建议时怎样避免越权承诺",
+        "gold_evidence_ids": [
+          "knowledge:document:identity:method",
+          "knowledge:document:identity:checklist",
+          "knowledge:document:identity:example",
+          "knowledge:document:identity:counterexample",
+          "knowledge:document:identity:rewrite",
+          "knowledge:document:identity:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:document:identity:rewrite",
+        "knowledge:document:identity:counterexample",
+        "knowledge:document:identity:diagnostic",
+        "knowledge:document:identity:method",
+        "knowledge:document:identity:checklist",
+        "knowledge:document:identity:example",
+        "knowledge:document:method",
+        "knowledge:document:course:types"
+      ],
+      "latency_ms": 210.76,
+      "metrics": {
+        "retrieved_count": 8,
+        "gold_count": 6,
+        "recall_at_5": 0.8333,
+        "recall_at_10": 1.0,
+        "mrr": 1.0,
+        "ndcg_at_10": 1.0
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_document_audience",
+        "module": "document",
+        "query": "给领导和给群众写材料，内容和表达有什么区别",
+        "gold_evidence_ids": [
+          "knowledge:document:audience:method",
+          "knowledge:document:audience:checklist",
+          "knowledge:document:audience:example",
+          "knowledge:document:audience:counterexample",
+          "knowledge:document:audience:rewrite",
+          "knowledge:document:audience:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:document:audience:counterexample",
+        "knowledge:document:audience:example",
+        "knowledge:document:audience:method",
+        "knowledge:document:audience:rewrite",
+        "knowledge:document:audience:checklist",
+        "knowledge:document:audience:diagnostic",
+        "knowledge:document:method",
+        "knowledge:document:course:types"
+      ],
+      "latency_ms": 194.128,
+      "metrics": {
+        "retrieved_count": 8,
+        "gold_count": 6,
+        "recall_at_5": 0.8333,
+        "recall_at_10": 1.0,
+        "mrr": 1.0,
+        "ndcg_at_10": 1.0
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_document_format",
+        "module": "document",
+        "query": "哪些公文需要标题称谓和落款，提纲也要全套格式吗",
+        "gold_evidence_ids": [
+          "knowledge:document:format:method",
+          "knowledge:document:format:checklist",
+          "knowledge:document:format:example",
+          "knowledge:document:format:counterexample",
+          "knowledge:document:format:rewrite",
+          "knowledge:document:format:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:document:course:format",
+        "knowledge:document:format:example",
+        "knowledge:document:course:title",
+        "knowledge:document:format:checklist",
+        "knowledge:document:format:rewrite",
+        "knowledge:document:format:counterexample",
+        "knowledge:document:format:method",
+        "knowledge:document:format:diagnostic",
+        "knowledge:document:course:signature",
+        "knowledge:document:method"
+      ],
+      "latency_ms": 213.326,
+      "metrics": {
+        "retrieved_count": 10,
+        "gold_count": 6,
+        "recall_at_5": 0.5,
+        "recall_at_10": 1.0,
+        "mrr": 0.5,
+        "ndcg_at_10": 0.7424
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_document_tone",
+        "module": "document",
+        "query": "函和倡议书的语气怎么区分，不能对平级下命令",
+        "gold_evidence_ids": [
+          "knowledge:document:tone:method",
+          "knowledge:document:tone:checklist",
+          "knowledge:document:tone:example",
+          "knowledge:document:tone:counterexample",
+          "knowledge:document:tone:rewrite",
+          "knowledge:document:tone:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:document:tone:counterexample",
+        "knowledge:document:course:types",
+        "knowledge:document:method"
+      ],
+      "latency_ms": 196.11,
+      "metrics": {
+        "retrieved_count": 3,
+        "gold_count": 6,
+        "recall_at_5": 0.1667,
+        "recall_at_10": 0.1667,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.3026
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_essay_thesis",
+        "module": "essay",
+        "query": "大作文中心论点怎样既回应题目又统摄材料",
+        "gold_evidence_ids": [
+          "knowledge:essay:thesis:method",
+          "knowledge:essay:thesis:checklist",
+          "knowledge:essay:thesis:example",
+          "knowledge:essay:thesis:counterexample",
+          "knowledge:essay:thesis:rewrite",
+          "knowledge:essay:thesis:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:essay:method",
+        "knowledge:essay:thesis:checklist",
+        "knowledge:essay:thesis:method",
+        "knowledge:essay:thesis:diagnostic",
+        "knowledge:essay:ending:checklist",
+        "knowledge:essay:opening:checklist",
+        "knowledge:essay:opening:method",
+        "knowledge:essay:evidence:checklist",
+        "knowledge:essay:evidence:method",
+        "knowledge:essay:subpoints:method"
+      ],
+      "latency_ms": 273.989,
+      "metrics": {
+        "retrieved_count": 10,
+        "gold_count": 6,
+        "recall_at_5": 0.5,
+        "recall_at_10": 0.5,
+        "mrr": 0.5,
+        "ndcg_at_10": 0.4725
+      },
+      "vector_backend": "python-recent-scan:feature-hash-v1"
+    },
+    {
+      "case": {
+        "id": "gold_essay_title",
+        "module": "essay",
+        "query": "文章标题只有话题没有观点，怎么改得更明确",
+        "gold_evidence_ids": [
+          "knowledge:essay:title:method",
+          "knowledge:essay:title:checklist",
+          "knowledge:essay:title:example",
+          "knowledge:essay:title:counterexample",
+          "knowledge:essay:title:rewrite",
+          "knowledge:essay:title:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:essay:method",
+        "knowledge:essay:title:checklist",
+        "knowledge:essay:title:rewrite",
+        "knowledge:essay:title:diagnostic",
+        "knowledge:essay:title:counterexample",
+        "knowledge:essay:title:method",
+        "knowledge:essay:title:example",
+        "knowledge:essay:ending:counterexample",
+        "knowledge:essay:transition:counterexample",
+        "knowledge:essay:opening:counterexample"
+      ],
+      "latency_ms": 328.844,
+      "metrics": {
+        "retrieved_count": 10,
+        "gold_count": 6,
+        "recall_at_5": 0.6667,
+        "recall_at_10": 1.0,
+        "mrr": 0.5,
+        "ndcg_at_10": 0.7983
+      },
+      "vector_backend": "python-recent-scan:feature-hash-v1"
+    },
+    {
+      "case": {
+        "id": "gold_essay_subpoints",
+        "module": "essay",
+        "query": "分论点互相交叉且层级不一致，应该如何设计",
+        "gold_evidence_ids": [
+          "knowledge:essay:subpoints:method",
+          "knowledge:essay:subpoints:checklist",
+          "knowledge:essay:subpoints:example",
+          "knowledge:essay:subpoints:counterexample",
+          "knowledge:essay:subpoints:rewrite",
+          "knowledge:essay:subpoints:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:essay:method",
+        "knowledge:essay:evidence:counterexample",
+        "knowledge:essay:evidence:method",
+        "knowledge:essay:thesis:counterexample",
+        "knowledge:essay:evidence:checklist",
+        "knowledge:essay:thesis:rewrite",
+        "knowledge:essay:thesis:checklist"
+      ],
+      "latency_ms": 213.936,
+      "metrics": {
+        "retrieved_count": 7,
+        "gold_count": 6,
+        "recall_at_5": 0.0,
+        "recall_at_10": 0.0,
+        "mrr": 0.0,
+        "ndcg_at_10": 0.0
+      },
+      "vector_backend": "none"
+    },
+    {
+      "case": {
+        "id": "gold_essay_evidence",
+        "module": "essay",
+        "query": "文章案例写得太长像复述，怎样让论据服务观点",
+        "gold_evidence_ids": [
+          "knowledge:essay:evidence:method",
+          "knowledge:essay:evidence:checklist",
+          "knowledge:essay:evidence:example",
+          "knowledge:essay:evidence:counterexample",
+          "knowledge:essay:evidence:rewrite",
+          "knowledge:essay:evidence:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:essay:evidence:example",
+        "knowledge:essay:evidence:checklist",
+        "knowledge:essay:evidence:counterexample",
+        "knowledge:essay:evidence:rewrite",
+        "knowledge:essay:method"
+      ],
+      "latency_ms": 188.874,
+      "metrics": {
+        "retrieved_count": 5,
+        "gold_count": 6,
+        "recall_at_5": 0.6667,
+        "recall_at_10": 0.6667,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.7751
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_essay_analysis",
+        "module": "essay",
+        "query": "列完案例不会分析，如何写机制和因果论证",
+        "gold_evidence_ids": [
+          "knowledge:essay:analysis:method",
+          "knowledge:essay:analysis:checklist",
+          "knowledge:essay:analysis:example",
+          "knowledge:essay:analysis:counterexample",
+          "knowledge:essay:analysis:rewrite",
+          "knowledge:essay:analysis:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:essay:analysis:checklist",
+        "knowledge:essay:analysis:method",
+        "knowledge:essay:analysis:counterexample",
+        "knowledge:essay:analysis:example",
+        "knowledge:essay:method"
+      ],
+      "latency_ms": 179.168,
+      "metrics": {
+        "retrieved_count": 5,
+        "gold_count": 6,
+        "recall_at_5": 0.6667,
+        "recall_at_10": 0.6667,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.7751
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_overview_review",
+        "module": "overview",
+        "query": "复盘只写粗心没用，怎样把失分变成下次动作",
+        "gold_evidence_ids": [
+          "knowledge:overview:review:method",
+          "knowledge:overview:review:checklist",
+          "knowledge:overview:review:example",
+          "knowledge:overview:review:counterexample",
+          "knowledge:overview:review:rewrite",
+          "knowledge:overview:review:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:overview:review:checklist",
+        "knowledge:overview:review:method"
+      ],
+      "latency_ms": 185.24,
+      "metrics": {
+        "retrieved_count": 2,
+        "gold_count": 6,
+        "recall_at_5": 0.3333,
+        "recall_at_10": 0.3333,
+        "mrr": 1.0,
+        "ndcg_at_10": 0.4935
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_overview_taxonomy",
+        "module": "overview",
+        "query": "材料遗漏、采分点遗漏和表达问题如何分开记录",
+        "gold_evidence_ids": [
+          "knowledge:overview:taxonomy:method",
+          "knowledge:overview:taxonomy:checklist",
+          "knowledge:overview:taxonomy:example",
+          "knowledge:overview:taxonomy:counterexample",
+          "knowledge:overview:taxonomy:rewrite",
+          "knowledge:overview:taxonomy:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:overview:taxonomy:method",
+        "knowledge:overview:taxonomy:checklist",
+        "knowledge:overview:taxonomy:example",
+        "knowledge:overview:taxonomy:rewrite",
+        "knowledge:overview:taxonomy:counterexample",
+        "knowledge:overview:taxonomy:diagnostic",
+        "knowledge:training:expression_bank",
+        "knowledge:summary:dimensions:method"
+      ],
+      "latency_ms": 187.994,
+      "metrics": {
+        "retrieved_count": 8,
+        "gold_count": 6,
+        "recall_at_5": 0.8333,
+        "recall_at_10": 1.0,
+        "mrr": 1.0,
+        "ndcg_at_10": 1.0
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_overview_evidence",
+        "module": "overview",
+        "query": "一次低分能不能判断为长期短板，需要多少证据",
+        "gold_evidence_ids": [
+          "knowledge:overview:evidence:method",
+          "knowledge:overview:evidence:checklist",
+          "knowledge:overview:evidence:example",
+          "knowledge:overview:evidence:counterexample",
+          "knowledge:overview:evidence:rewrite",
+          "knowledge:overview:evidence:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:overview:taxonomy:counterexample",
+        "knowledge:overview:taxonomy:rewrite",
+        "knowledge:overview:taxonomy:diagnostic",
+        "knowledge:overview:taxonomy:example",
+        "knowledge:overview:evidence:counterexample",
+        "knowledge:overview:taxonomy:checklist",
+        "knowledge:overview:taxonomy:method",
+        "knowledge:overview:evidence:rewrite"
+      ],
+      "latency_ms": 179.849,
+      "metrics": {
+        "retrieved_count": 8,
+        "gold_count": 6,
+        "recall_at_5": 0.1667,
+        "recall_at_10": 0.3333,
+        "mrr": 0.2,
+        "ndcg_at_10": 0.2125
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_overview_timing",
+        "module": "overview",
+        "query": "二十分钟概括题怎么分配审题找点成文和检查时间",
+        "gold_evidence_ids": [
+          "knowledge:overview:timing:method",
+          "knowledge:overview:timing:checklist",
+          "knowledge:overview:timing:example",
+          "knowledge:overview:timing:counterexample",
+          "knowledge:overview:timing:rewrite",
+          "knowledge:overview:timing:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:overview:timing:checklist",
+        "knowledge:overview:timing:example",
+        "knowledge:overview:timing:rewrite",
+        "knowledge:overview:timing:method",
+        "knowledge:overview:timing:counterexample",
+        "knowledge:overview:timing:diagnostic",
+        "knowledge:document:body:checklist",
+        "knowledge:summary:verbs:checklist",
+        "knowledge:overview:rewrite:checklist",
+        "knowledge:document:genre:checklist"
+      ],
+      "latency_ms": 191.273,
+      "metrics": {
+        "retrieved_count": 10,
+        "gold_count": 6,
+        "recall_at_5": 0.8333,
+        "recall_at_10": 1.0,
+        "mrr": 1.0,
+        "ndcg_at_10": 1.0
+      },
+      "vector_backend": "sqlite-vec"
+    },
+    {
+      "case": {
+        "id": "gold_overview_transfer",
+        "module": "overview",
+        "query": "怎样从一道题复盘出以后也能识别的触发信号",
+        "gold_evidence_ids": [
+          "knowledge:overview:transfer:method",
+          "knowledge:overview:transfer:checklist",
+          "knowledge:overview:transfer:example",
+          "knowledge:overview:transfer:counterexample",
+          "knowledge:overview:transfer:rewrite",
+          "knowledge:overview:transfer:diagnostic"
+        ]
+      },
+      "retrieved_ids": [
+        "knowledge:essay:analysis:diagnostic",
+        "knowledge:summary:causality:diagnostic",
+        "knowledge:analysis:viewpoint:diagnostic",
+        "knowledge:document:body:diagnostic",
+        "knowledge:countermeasure:actor:diagnostic",
+        "knowledge:overview:transfer:method",
+        "knowledge:overview:transfer:checklist",
+        "knowledge:overview:review:method",
+        "knowledge:overview:review:diagnostic",
+        "knowledge:essay:transition:diagnostic"
+      ],
+      "latency_ms": 248.92,
+      "metrics": {
+        "retrieved_count": 10,
+        "gold_count": 6,
+        "recall_at_5": 0.0,
+        "recall_at_10": 0.3333,
+        "mrr": 0.1667,
+        "ndcg_at_10": 0.2087
+      },
+      "vector_backend": "python-recent-scan:feature-hash-v1"
+    }
+  ]
+}

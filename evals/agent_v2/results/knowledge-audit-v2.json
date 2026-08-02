@@ -1,0 +1,28 @@
+{
+  "schema_version": "knowledge-card-v2",
+  "public_cards": 316,
+  "module_counts": {
+    "analysis": 55,
+    "countermeasure": 49,
+    "document": 62,
+    "essay": 49,
+    "overview": 40,
+    "summary": 61
+  },
+  "kind_counts": {
+    "checklist": 50,
+    "counterexample": 50,
+    "diagnostic": 50,
+    "example": 50,
+    "genre_format": 7,
+    "method": 50,
+    "question_type_method": 5,
+    "rewrite": 50,
+    "training_checklist": 4
+  },
+  "reviewed_rate": 1.0,
+  "source_complete_rate": 1.0,
+  "near_duplicate_pairs": 0,
+  "near_duplicate_ratio": 0.0,
+  "errors": []
+}
