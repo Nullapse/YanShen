@@ -35,10 +35,13 @@ python app.py
 
 打开 `http://127.0.0.1:5000`。可用 `GONGKAO_DATA_DIR` 指定个人数据目录，或用 `GONGKAO_DB_PATH` 指定测试数据库。
 
-构建 Windows 可执行程序：
+测试与构建：
 
 ```powershell
-pip install pyinstaller jinja2
+python -m unittest discover -s tests
+python scripts/audit_release.py
+pip install -r requirements-build.txt
+./scripts/build_desktop_host.ps1
 pyinstaller --clean --noconfirm "研申.spec"
 ```
 
