@@ -26,7 +26,7 @@
 
 配置方法见 [DeepSeek API 配置教程](docs/deepseek-api-setup.md)。检索、参考答案聚类和证据筛选在本地完成；只有主动使用智能批改或 AI 功能时，当前题必要数据和少量命中证据才会发送给所配置的模型服务。API Key 不应提交到仓库。
 
-## 源码运行
+## 源码运行与本地构建
 
 ```powershell
 pip install -r requirements.txt
@@ -35,13 +35,10 @@ python app.py
 
 打开 `http://127.0.0.1:5000`。可用 `GONGKAO_DATA_DIR` 指定个人数据目录，或用 `GONGKAO_DB_PATH` 指定测试数据库。
 
-测试与构建：
+构建 Windows 可执行程序：
 
 ```powershell
-python -m unittest discover -s tests
-python scripts/audit_release.py
-pip install -r requirements-build.txt
-./scripts/build_desktop_host.ps1
+pip install pyinstaller jinja2
 pyinstaller --clean --noconfirm "研申.spec"
 ```
 
