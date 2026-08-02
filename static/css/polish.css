@@ -1,0 +1,1052 @@
+/* ==========================================================================
+   2026-07 UI Fixes & Aesthetic Refinement
+   ========================================================================== */
+
+/* 1. Brand Title Font Consistency */
+.brand strong,
+.sidebar-brand-row .brand strong,
+.shell.sidebar-top .brand strong {
+  font-family: "Songti SC", "STSong", serif !important;
+  font-weight: 700 !important;
+  letter-spacing: -.01em !important;
+}
+
+/* 2. Institution Name Vertical Centering */
+.sidebar-brand-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+.brand {
+  display: grid !important;
+  grid-template-columns: 38px 1fr !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.brand > span {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+}
+
+/* 3. Redesigned Horizontal/Vertical Tab Toggle Button */
+.sidebar-toggle {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-radius: 8px !important;
+  background: rgba(255, 255, 255, 0.7) !important;
+  color: var(--muted) !important;
+  cursor: pointer !important;
+  transition: all .16s ease !important;
+  flex-shrink: 0 !important;
+}
+.sidebar-toggle:hover {
+  border-color: rgba(61, 109, 97, .3) !important;
+  background: rgba(61, 109, 97, .08) !important;
+  color: var(--green) !important;
+}
+.sidebar-toggle::before {
+  display: none !important;
+}
+.sidebar-toggle-icon {
+  display: block !important;
+  width: 18px !important;
+  height: 18px !important;
+  fill: none !important;
+  stroke: currentColor !important;
+  stroke-width: 1.6 !important;
+  stroke-linecap: round !important;
+  stroke-linejoin: round !important;
+}
+.shell:not(.sidebar-top) .sidebar-toggle .icon-side-nav { display: none !important; }
+.shell:not(.sidebar-top) .sidebar-toggle .icon-top-nav { display: block !important; }
+.shell.sidebar-top .sidebar-toggle .icon-side-nav { display: block !important; }
+.shell.sidebar-top .sidebar-toggle .icon-top-nav { display: none !important; }
+
+/* 4. Remove Answer Textarea Thin Green Border */
+.focused-attempt-form {
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-radius: 12px !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03) !important;
+}
+.focused-attempt-form textarea,
+.answer-compose textarea,
+.answer-editor textarea {
+  border: 1px solid #dce2de !important;
+  outline: none !important;
+}
+.focused-attempt-form textarea:focus-visible,
+.answer-compose textarea:focus-visible,
+.answer-editor textarea:focus-visible {
+  border-color: rgba(61, 109, 97, .45) !important;
+  box-shadow: 0 0 0 3px rgba(61, 109, 97, .08) !important;
+}
+
+/* 5. Paper Question Navigation Alignment Fix */
+.paper-workspace .paper-tab,
+.paper-workspace .paper-tab:hover,
+.paper-workspace .paper-tab.active-tab {
+  display: grid !important;
+  grid-template-columns: 36px minmax(0, 1fr) 72px !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 9px 10px !important;
+  text-align: left !important;
+}
+.paper-tab-copy {
+  min-width: 0 !important;
+}
+.paper-tab-copy strong {
+  display: block !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.paper-tab-state {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 5px !important;
+  width: 72px !important;
+  color: #7d8882 !important;
+  white-space: nowrap !important;
+}
+
+/* 6. Main Container Side Margins & Horizontal Mode Width Limit */
+.main {
+  padding-left: 32px !important;
+  padding-right: 32px !important;
+}
+.shell.sidebar-top .main {
+  max-width: 1440px !important;
+  width: 100% !important;
+  margin: 0 auto !important;
+  padding-left: 32px !important;
+  padding-right: 32px !important;
+}
+.shell.sidebar-top .sidebar {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 100 !important;
+  min-height: 64px !important;
+  padding: 10px 28px !important;
+  border-bottom: 1px solid var(--line) !important;
+  background: rgba(244, 247, 245, .96) !important;
+  backdrop-filter: blur(22px) saturate(115%) !important;
+}
+.shell.sidebar-top .workflow-header {
+  margin-top: 8px !important;
+}
+
+
+/* ==========================================================================
+   2026-07 User Feedback Refinement Fixes
+   ========================================================================== */
+
+/* Remove manual sidebar toggle button entirely */
+.sidebar-toggle,
+[data-sidebar-toggle] {
+  display: none !important;
+}
+
+/* Default vertical sidebar layout, automatic top bar below 1024px */
+@media (max-width: 1024px) {
+  .shell {
+    display: block !important;
+  }
+  .sidebar {
+    position: sticky !important;
+    top: 0 !important;
+    height: auto !important;
+    min-height: 56px !important;
+    padding: 10px 20px !important;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--line) !important;
+    z-index: 100 !important;
+    background: rgba(244, 247, 245, .96) !important;
+    backdrop-filter: blur(20px) !important;
+  }
+  .sidebar .nav {
+    display: flex !important;
+    flex-direction: row !important;
+    overflow-x: auto !important;
+    padding: 0 !important;
+  }
+}
+
+/* Homepage scale & bottom gap re-balance */
+.home-dashboard {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 24px !important;
+  min-height: calc(100vh - 80px) !important;
+  padding-bottom: 36px !important;
+}
+.home-focus-grid,
+.home-lower-grid {
+  align-items: stretch !important;
+}
+.home-recent-card,
+.home-insight-card,
+.home-continue-card,
+.home-plan-card {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  min-height: 280px !important;
+  padding: 24px !important;
+  border-radius: 12px !important;
+}
+.home-recent-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  flex: 1 !important;
+}
+
+/* Remove thin line on left side of answer pane (Image 2) */
+.answer-compose,
+.focused-attempt-form,
+.answer-workspace,
+.answer-reading {
+  border-left: 0 !important;
+  box-shadow: none !important;
+}
+.focused-attempt-form {
+  border: 0 !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+.answer-compose {
+  border: 0 !important;
+}
+
+/* Reference Answer Organization Tabs Vertical Centering (Image 3) */
+.reference-disclosure-body .content-tabs,
+.tabbed-content .content-tabs,
+.content-tabs {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  overflow-x: auto !important;
+  margin: 16px 0 !important;
+  padding: 8px 4px !important;
+  scrollbar-width: thin !important;
+}
+
+.reference-disclosure-body .content-tab,
+.tabbed-content .content-tab,
+.content-tab {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-height: 36px !important;
+  padding: 6px 14px !important;
+  border-radius: 8px !important;
+  line-height: 1 !important;
+}
+
+
+/* ==========================================================================
+   Homepage Proportional Desktop Filling (3 Rows, Scaled Cards & Typography)
+   ========================================================================== */
+
+@media (min-width: 1121px) {
+  body[data-active-section="home"] .main {
+    height: auto !important;
+    min-height: calc(100vh - 40px) !important;
+    overflow: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 20px 32px 32px !important;
+  }
+
+  .home-dashboard {
+    display: grid !important;
+    grid-template-rows: auto minmax(290px, 1fr) auto minmax(310px, 1.15fr) !important;
+    gap: 18px !important;
+    flex: 1 !important;
+    height: 100% !important;
+  }
+
+  .home-welcome {
+    margin: 0 0 4px !important;
+    padding: 0 !important;
+  }
+  .home-welcome .eyebrow {
+    margin-bottom: 4px !important;
+    font-size: 11px !important;
+  }
+  .home-welcome h1 {
+    font-size: clamp(26px, 2.1vw, 34px) !important;
+    line-height: 1.2 !important;
+  }
+  .home-welcome > div:first-child > p:last-child {
+    margin-top: 6px !important;
+    font-size: 12px !important;
+  }
+  .home-welcome-side {
+    gap: 6px !important;
+  }
+  .home-welcome-side > time {
+    font-size: 13px !important;
+  }
+
+  .home-focus-grid {
+    grid-template-columns: minmax(0, 1.48fr) minmax(350px, .78fr) !important;
+    gap: 18px !important;
+    min-height: 290px !important;
+  }
+  .home-lower-grid {
+    grid-template-columns: minmax(0, 1.48fr) minmax(350px, .78fr) !important;
+    gap: 18px !important;
+    min-height: 320px !important;
+  }
+
+  .home-continue-card {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    padding: 20px 24px !important;
+    border-radius: 12px !important;
+  }
+  .home-continue-body {
+    max-width: 100% !important;
+    margin-top: 10px !important;
+  }
+  .home-continue-body > p {
+    margin: 0 0 6px !important;
+    font-size: 12px !important;
+  }
+  .home-continue-body h2 {
+    font-size: clamp(20px, 1.6vw, 25px) !important;
+    line-height: 1.35 !important;
+    margin: 0 0 10px !important;
+  }
+  .home-continue-body > div span {
+    padding: 4px 9px !important;
+    font-size: 11px !important;
+  }
+  .home-draft-progress {
+    max-width: 100% !important;
+    margin-top: 12px !important;
+  }
+  .home-draft-progress > i {
+    height: 7px !important;
+    margin: 6px 0 !important;
+  }
+  .home-draft-progress p {
+    font-size: 11px !important;
+  }
+  .home-continue-actions {
+    margin-top: 14px !important;
+    gap: 12px !important;
+  }
+  .home-primary-action,
+  .home-secondary-action {
+    min-height: 40px !important;
+    font-size: 14px !important;
+  }
+
+  .home-plan-card {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    padding: 20px 22px !important;
+    border-radius: 12px !important;
+  }
+  .home-card-heading h2,
+  .home-section-title h2 {
+    font-size: 20px !important;
+  }
+  .home-plan-list {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-evenly !important;
+    gap: 10px !important;
+    flex: 1 !important;
+    margin: 10px 0 !important;
+  }
+  .home-plan-item {
+    min-height: 56px !important;
+    padding: 8px 12px !important;
+  }
+  .home-plan-item > span strong {
+    font-size: 13px !important;
+    margin-bottom: 3px !important;
+  }
+  .home-plan-item > span small {
+    font-size: 11px !important;
+  }
+  .home-plan-item > i {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 12px !important;
+  }
+
+  .home-quick-section {
+    display: grid !important;
+    grid-template-columns: 125px minmax(0, 1fr) !important;
+    align-items: center !important;
+    gap: 14px !important;
+    margin: 4px 0 !important;
+  }
+  .home-section-title .eyebrow {
+    font-size: 10px !important;
+    margin-bottom: 4px !important;
+  }
+  .home-quick-grid {
+    gap: 12px !important;
+  }
+  .home-quick-card {
+    height: 66px !important;
+    padding: 10px 14px !important;
+    gap: 12px !important;
+    border-radius: 10px !important;
+  }
+  .home-quick-card > i {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 16px !important;
+  }
+  .home-quick-card strong {
+    font-size: 13px !important;
+    margin-bottom: 3px !important;
+  }
+  .home-quick-card small {
+    font-size: 11px !important;
+  }
+
+  .home-recent-card,
+  .home-insight-card {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    padding: 22px 24px !important;
+    border-radius: 12px !important;
+  }
+  .home-recent-card .home-card-heading h2,
+  .home-insight-card .home-card-heading h2 {
+    font-size: 22px !important;
+  }
+  .home-recent-card .home-card-heading a {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+  }
+  .home-recent-list {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    flex: 1 !important;
+    margin-top: 14px !important;
+  }
+  .home-recent-row {
+    min-height: 68px !important;
+    padding: 12px 16px !important;
+    gap: 14px !important;
+    border-radius: 10px !important;
+  }
+  .home-recent-row time strong {
+    font-size: 22px !important;
+    font-weight: 800 !important;
+  }
+  .home-recent-row time span,
+  .home-recent-copy small {
+    font-size: 13px !important;
+    color: var(--muted) !important;
+  }
+  .home-recent-copy strong {
+    font-size: 15px !important;
+    line-height: 1.4 !important;
+    margin-bottom: 4px !important;
+  }
+  .home-recent-row .home-score {
+    font-size: 24px !important;
+    font-weight: 800 !important;
+  }
+  .home-recent-row .home-score small {
+    font-size: 14px !important;
+  }
+  .home-row-status {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    padding: 5px 12px !important;
+  }
+
+  .home-insight-mode {
+    margin-top: 8px !important;
+    font-size: 13px !important;
+  }
+  .home-skill-bars {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-evenly !important;
+    gap: 10px !important;
+    flex: 1 !important;
+    margin-top: 14px !important;
+  }
+  .home-skill-bars > div {
+    grid-template-columns: 92px minmax(0, 1fr) 36px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+  }
+  .home-skill-bars > div span {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+  }
+  .home-skill-bars > div strong {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+  }
+  .home-coach-note {
+    margin: 12px 0 10px !important;
+    padding: 12px 14px !important;
+    border-radius: 9px !important;
+  }
+  .home-coach-note > i {
+    width: 28px !important;
+    height: 28px !important;
+  }
+  .home-coach-note p {
+    font-size: 13px !important;
+    line-height: 1.55 !important;
+  }
+  .home-coach-note strong {
+    font-size: 14px !important;
+  }
+  .home-insight-action {
+    min-height: 40px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    border-radius: 9px !important;
+  }
+}
+
+
+/* ==========================================================================
+   Enlarged Top Main Cards & Enhanced Today's Plan System
+   ========================================================================== */
+
+@media (min-width: 1121px) {
+  .home-focus-grid {
+    grid-template-columns: minmax(0, 1.48fr) minmax(360px, .78fr) !important;
+    gap: 20px !important;
+    min-height: 350px !important;
+  }
+
+  .home-continue-card,
+  .home-plan-card {
+    padding: 24px 28px !important;
+    border-radius: 14px !important;
+  }
+
+  .home-continue-head span {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+  }
+  .home-continue-body > p {
+    font-size: 13px !important;
+    margin-bottom: 6px !important;
+  }
+  .home-continue-body h2 {
+    font-size: clamp(22px, 1.8vw, 27px) !important;
+    line-height: 1.35 !important;
+    margin-bottom: 12px !important;
+  }
+  .home-continue-body > div span {
+    padding: 5px 11px !important;
+    font-size: 12px !important;
+  }
+  .home-draft-progress > i {
+    height: 8px !important;
+    margin: 8px 0 !important;
+  }
+  .home-draft-progress p {
+    font-size: 12px !important;
+  }
+  .home-continue-actions {
+    margin-top: 16px !important;
+  }
+  .home-primary-action,
+  .home-secondary-action {
+    min-height: 42px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    border-radius: 9px !important;
+  }
+  .home-plan-card [data-home-plan-total] {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    color: var(--green) !important;
+    background: var(--green-2) !important;
+    padding: 4px 10px !important;
+    border-radius: 999px !important;
+  }
+  .home-plan-list {
+    gap: 12px !important;
+    margin: 14px 0 !important;
+  }
+  .home-plan-item {
+    min-height: 62px !important;
+    padding: 10px 14px !important;
+    border-radius: 10px !important;
+  }
+  .home-plan-item > i {
+    width: 30px !important;
+    height: 30px !important;
+    font-size: 13px !important;
+  }
+  .home-plan-item > span strong {
+    font-size: 14px !important;
+    margin-bottom: 3px !important;
+  }
+  .home-plan-item > span small {
+    font-size: 12px !important;
+  }
+}
+
+.home-plan-templates {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0 16px;
+  flex-wrap: wrap;
+}
+.home-plan-templates span {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.home-preset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .16s ease;
+}
+.home-preset-btn:hover {
+  border-color: var(--green);
+  background: var(--green-2);
+  color: var(--green);
+}
+
+
+/* ==========================================================================
+   Candidate Task Pool & Dynamic Row Editing Styles
+   ========================================================================== */
+
+.home-plan-editor-row {
+  display: grid !important;
+  grid-template-columns: 48px minmax(0, 1fr) 34px 70px 32px 28px !important;
+  align-items: center !important;
+  gap: 8px !important;
+  font-size: 13px !important;
+  font-weight: 700 !important;
+}
+
+.home-task-del {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 26px !important;
+  height: 26px !important;
+  padding: 0 !important;
+  border: 1px solid rgba(0,0,0,0.1) !important;
+  border-radius: 6px !important;
+  background: #fff0f0 !important;
+  color: #c94a4a !important;
+  font-size: 16px !important;
+  cursor: pointer !important;
+}
+.home-task-del:hover {
+  background: #e83a3a !important;
+  color: #fff !important;
+}
+
+.home-plan-actions-row {
+  margin: 12px 0 16px !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+}
+
+.home-task-pool {
+  margin: 14px 0 !important;
+  padding: 12px 14px !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 10px !important;
+  background: #f8faf9 !important;
+}
+.home-task-pool .field-label {
+  display: block !important;
+  margin-bottom: 8px !important;
+  color: var(--green-deep) !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+.home-task-chips {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+.home-task-chip {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 6px 12px !important;
+  border: 1px solid #d4e3dd !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  color: var(--ink) !important;
+  font: inherit !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  transition: all .16s ease !important;
+}
+.home-task-chip:hover {
+  border-color: var(--green) !important;
+  background: var(--green-2) !important;
+  color: var(--green) !important;
+  transform: translateY(-1px) !important;
+}
+
+
+/* ==========================================================================
+   Top Cards Enlarged (370px) & Bottom Cards Compressed (260px) Pass
+   ========================================================================== */
+
+@media (min-width: 1121px) {
+  .home-dashboard {
+    grid-template-rows: auto minmax(370px, 1.4fr) auto minmax(260px, 0.85fr) !important;
+    gap: 16px !important;
+  }
+
+  /* Top Two Cards Taller & Spaced */
+  .home-focus-grid {
+    grid-template-columns: minmax(0, 1.48fr) minmax(360px, .78fr) !important;
+    gap: 20px !important;
+    min-height: 370px !important;
+  }
+  .home-continue-card,
+  .home-plan-card {
+    min-height: 370px !important;
+    padding: 26px 30px !important;
+    border-radius: 14px !important;
+  }
+  .home-continue-body {
+    margin-top: 14px !important;
+  }
+  .home-continue-body h2 {
+    font-size: clamp(23px, 1.9vw, 29px) !important;
+    line-height: 1.38 !important;
+    margin-bottom: 14px !important;
+  }
+  .home-continue-actions {
+    margin-top: 18px !important;
+  }
+  .home-primary-action,
+  .home-secondary-action {
+    min-height: 44px !important;
+    font-size: 15px !important;
+  }
+  .home-plan-card .home-card-heading h2 {
+    font-size: 22px !important;
+  }
+  .home-plan-list {
+    gap: 14px !important;
+    margin: 16px 0 !important;
+  }
+  .home-plan-item {
+    min-height: 66px !important;
+    padding: 12px 16px !important;
+  }
+
+  /* Bottom Two Cards Compressed */
+  .home-lower-grid {
+    grid-template-columns: minmax(0, 1.48fr) minmax(350px, .78fr) !important;
+    gap: 18px !important;
+    min-height: 260px !important;
+  }
+  .home-recent-card,
+  .home-insight-card {
+    min-height: 260px !important;
+    padding: 18px 22px !important;
+  }
+  .home-recent-list {
+    gap: 8px !important;
+    margin-top: 8px !important;
+  }
+  .home-recent-row {
+    min-height: 54px !important;
+    padding: 8px 14px !important;
+    gap: 12px !important;
+  }
+  .home-recent-row time strong {
+    font-size: 19px !important;
+  }
+  .home-recent-copy strong {
+    font-size: 14px !important;
+    line-height: 1.3 !important;
+    margin-bottom: 2px !important;
+  }
+  .home-recent-row .home-score {
+    font-size: 21px !important;
+  }
+  .home-skill-bars {
+    gap: 6px !important;
+    margin-top: 8px !important;
+  }
+  .home-skill-bars > div {
+    font-size: 13px !important;
+  }
+  .home-coach-note {
+    margin: 8px 0 6px !important;
+    padding: 8px 12px !important;
+  }
+  .home-coach-note p {
+    font-size: 12px !important;
+    line-height: 1.45 !important;
+  }
+  .home-insight-action {
+    min-height: 34px !important;
+    font-size: 13px !important;
+  }
+}
+
+
+/* ==========================================================================
+   Home Plan N-Item Support & Score Bars Font Spacing Optimization
+   ========================================================================== */
+
+/* Hide coach note box as requested */
+.home-coach-note {
+  display: none !important;
+}
+
+/* Allow home-plan-list to accommodate dynamic N items smoothly */
+.home-plan-list {
+  max-height: 280px !important;
+  overflow-y: auto !important;
+  scrollbar-width: thin !important;
+  padding-right: 4px !important;
+}
+
+@media (min-width: 1121px) {
+  .home-lower-grid {
+    min-height: 280px !important;
+  }
+  .home-recent-card,
+  .home-insight-card {
+    min-height: 280px !important;
+    padding: 22px 26px !important;
+  }
+
+  /* Score bars font & spacing expansion */
+  .home-insight-mode {
+    margin-top: 6px !important;
+    font-size: 13px !important;
+  }
+  .home-skill-bars {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-evenly !important;
+    gap: 12px !important;
+    flex: 1 !important;
+    margin: 14px 0 !important;
+  }
+  .home-skill-bars > div {
+    display: grid !important;
+    grid-template-columns: 96px minmax(0, 1fr) 40px !important;
+    align-items: center !important;
+    gap: 12px !important;
+    font-size: 15px !important;
+  }
+  .home-skill-bars > div span {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    color: var(--ink) !important;
+  }
+  .home-skill-bars > div i {
+    height: 8px !important;
+    border-radius: 999px !important;
+  }
+  .home-skill-bars > div strong {
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    color: var(--green) !important;
+    text-align: right !important;
+  }
+  .home-insight-action {
+    min-height: 38px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+  }
+}
+
+
+/* ==========================================================================
+   Home Page Polish & Plan Refactor Rules
+   ========================================================================== */
+
+/* Remove top green border line on left hero continue card */
+.home-continue-card {
+  border-top: 1px solid var(--line) !important;
+}
+
+/* Modal display override */
+.home-plan-modal {
+  position: fixed !important;
+  z-index: 10000 !important;
+  inset: 0 !important;
+  padding: 24px !important;
+  background: rgba(24, 33, 31, .45) !important;
+  backdrop-filter: blur(6px) !important;
+}
+.home-plan-modal[hidden] {
+  display: none !important;
+}
+.home-plan-modal.is-open,
+.home-plan-modal:not([hidden]) {
+  display: grid !important;
+  place-items: center !important;
+}
+
+/* Rich Plan Items with Destination Subtext & Generous Spacing */
+.home-plan-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  height: 325px !important;
+  max-height: 325px !important;
+  overflow-y: auto !important;
+  margin: 14px 0 !important;
+  padding-right: 4px !important;
+}
+
+.home-plan-item {
+  display: grid !important;
+  grid-template-columns: 28px minmax(0, 1fr) 14px !important;
+  align-items: center !important;
+  gap: 14px !important;
+  min-height: 52px !important;
+  padding: 10px 16px !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 10px !important;
+  background: #f8faf9 !important;
+  box-sizing: border-box !important;
+  transition: all .16s ease !important;
+  text-decoration: none !important;
+}
+.home-plan-item:hover {
+  border-color: var(--green) !important;
+  background: #f0f7f4 !important;
+  transform: translateX(3px) !important;
+}
+.home-plan-item > i {
+  display: grid !important;
+  place-items: center !important;
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 50% !important;
+  background: #e2ece7 !important;
+  color: var(--green-deep) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+}
+.home-plan-item-content {
+  min-width: 0 !important;
+}
+.home-plan-item-content strong {
+  display: block !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  color: var(--ink) !important;
+  margin-bottom: 5px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.home-plan-item-sub {
+  display: block !important;
+  font-size: 12px !important;
+  color: var(--green) !important;
+  font-weight: 600 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Centered '已批改' / '待批改' Pill Badge Alignment */
+.home-recent-row {
+  display: grid !important;
+  grid-template-columns: 46px minmax(0, 1fr) 52px 68px 14px !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+.home-row-status {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  height: 24px !important;
+  padding: 0 10px !important;
+  border-radius: 6px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+  justify-self: center !important;
+  margin: 0 !important;
+}
+
+/* Ensure '开始专项训练' button is fully visible inside ability card */
+@media (min-width: 1121px) {
+  .home-insight-card {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    padding: 20px 24px !important;
+    min-height: 290px !important;
+  }
+  .home-skill-bars {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 7px !important;
+    margin: 8px 0 !important;
+  }
+  .home-skill-bars > div {
+    grid-template-columns: 88px minmax(0, 1fr) 36px !important;
+    gap: 10px !important;
+    font-size: 14px !important;
+  }
+  .home-skill-bars > div span {
+    font-size: 14px !important;
+  }
+  .home-skill-bars > div strong {
+    font-size: 15px !important;
+  }
+  .home-insight-action {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-height: 38px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    margin-top: 6px !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+}

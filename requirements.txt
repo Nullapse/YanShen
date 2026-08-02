@@ -1,0 +1,9 @@
+langgraph==1.2.9
+langchain-core==1.4.9
+langchain-openai==1.3.4
+langgraph-checkpoint-sqlite==3.1.0
+Jinja2>=3.1,<4
+sqlite-vec==0.1.9
+fastembed==0.8.0
+pydantic>=2.7,<3
+pywebview==6.2.1

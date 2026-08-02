@@ -1,0 +1,115 @@
+name: Test and release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'assets/**'
+      - '.gitignore'
+  pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'assets/**'
+      - '.gitignore'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  quality:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Install frontend quality tools
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+      - name: Run static checks
+        shell: pwsh
+        run: ./scripts/check.ps1 -SkipPythonTests
+      - name: Build native WebView2 host for tests
+        shell: pwsh
+        run: ./scripts/build_desktop_host.ps1
+      - name: Run tests
+        run: python scripts/run_python_tests.py --workers 4
+
+  windows-build:
+    if: github.event_name != 'pull_request'
+    needs: quality
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies and build tools
+        run: pip install -r requirements.txt -r requirements-build.txt
+      - name: Build native WebView2 host
+        shell: pwsh
+        run: ./scripts/build_desktop_host.ps1
+      - name: Audit public database
+        run: python scripts/audit_release.py
+      - name: Build Windows app
+        run: pyinstaller --clean --noconfirm "研申.spec"
+      - name: Smoke test packaged files
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist/研申/研申.exe")) { throw "Executable missing" }
+          if (-not (Test-Path "dist/研申/_internal/data/gongkao_seed.sqlite3")) { throw "Seed database missing" }
+          if (-not (Test-Path "dist/研申/_internal/assets/app-icon.ico")) { throw "Desktop icon missing" }
+          if (-not (Test-Path "dist/研申/_internal/webview")) { throw "pywebview package missing" }
+          if (-not (Test-Path "dist/研申/_internal/gongkao_desktop_host.exe")) { throw "Desktop host missing" }
+          if (-not (Test-Path "dist/研申/_internal/WebView2Loader.dll")) { throw "WebView2 loader missing" }
+          $env:PYTHONUTF8 = "1"
+          $archive = (& pyi-archive_viewer -r -b "dist/研申/研申.exe") -join "`n"
+          foreach ($module in @("langgraph.graph", "langchain_openai", "langgraph.checkpoint.sqlite", "jinja2")) {
+            if ($archive -notmatch [regex]::Escape($module)) {
+              throw "Packaged AI coach dependency missing: $module"
+            }
+          }
+      - name: Create archive and checksum
+        shell: pwsh
+        run: |
+          $version = if ($env:GITHUB_REF_NAME -like "v*") { $env:GITHUB_REF_NAME } else { "dev" }
+          $zip = "gongkao-shenlun-$version-windows-x64.zip"
+          $sha = "gongkao-shenlun-$version-windows-x64.sha256"
+          Compress-Archive -Path "dist/研申/*" -DestinationPath $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          "$hash  $zip" | Set-Content -Encoding ascii $sha
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gongkao-shenlun-windows-x64
+          path: |
+            gongkao-shenlun-*-windows-x64.zip
+            gongkao-shenlun-*-windows-x64.sha256
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $files = @(
+            (Resolve-Path "gongkao-shenlun-*-windows-x64.zip").Path,
+            (Resolve-Path "gongkao-shenlun-*-windows-x64.sha256").Path
+          )
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $files --clobber
+          } else {
+            gh release create $tag $files --generate-notes --verify-tag
+          }

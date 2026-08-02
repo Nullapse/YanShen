@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title>研申应用图标</title>
+  <desc>象牙白方形底座承托紧凑的深绿色方块，以应用名称同款宋体书写申字，左上角点缀棕金方印。</desc>
+
+  <rect x="18" y="18" width="220" height="220" rx="34" fill="#f8f5ec"/>
+  <rect x="49" y="49" width="158" height="158" rx="13" fill="#35695c"/>
+  <text x="128" y="171" text-anchor="middle" fill="#f8f5ec" font-family="'Songti SC','STSong','SimSun',serif" font-size="126" font-weight="700">申</text>
+  <rect x="31" y="31" width="17" height="17" fill="#b58b4f"/>
+</svg>

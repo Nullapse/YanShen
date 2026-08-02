@@ -1,0 +1,30 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = [
+    ".release-*",
+    ".test-*",
+    ".venv",
+    ".visual-qa",
+    "build*",
+    "design",
+    "dist*",
+]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["gongkao"]
+
+[tool.ruff.lint.per-file-ignores]
+"gongkao/web/controllers/*.py" = ["F841"]
+"gongkao/web/runtime.py" = ["F401"]
+"scripts/*.py" = ["E402"]
+"tests/*.py" = ["F401", "F841"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"

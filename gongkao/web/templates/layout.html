@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {{ startup_bootstrap }}
+  {{ filter_bootstrap }}
+  <title>{{ title }}</title>
+  <link rel="icon" href="/static/app-icon.svg?v={{ asset_version }}" type="image/svg+xml">
+  <link rel="alternate icon" href="/static/app-icon.png?v={{ asset_version }}" type="image/png">
+  <link rel="stylesheet" href="/static/app.css?v={{ asset_version }}">
+  <script src="/static/app.js?v={{ asset_version }}" type="module"></script>
+</head>
+<body data-active-section="{{ active }}" data-view-state-version="2"{% if transient_route %} data-transient-route="1"{% endif %}>
+  <div class="shell">
+    <aside class="sidebar" data-sidebar>
+      <div class="sidebar-brand-row">
+        <a class="brand" href="/home">
+          <span class="brand-mark"><img src="/static/app-icon.svg?v={{ asset_version }}" alt=""></span>
+          <span><strong>研申</strong><small>申论训练台</small></span>
+        </a>
+        <button class="sidebar-toggle" style="display:none" type="button" data-sidebar-toggle aria-label="Switch navigation" title="Switch navigation">
+          <svg class="sidebar-toggle-icon icon-top-nav" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+          <svg class="sidebar-toggle-icon icon-side-nav" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></svg>
+        </button>
+      </div>
+      <nav class="nav">
+        <a href="/home" class="{{ 'active' if active == 'home' else '' }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 10 8-6 8 6v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1Z"></path></svg><span>主页</span></a>
+        <div class="nav-cluster{{ ' is-expanded' if library_active else '' }}">
+          <a href="/papers" class="nav-primary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5h6l2 2h8v9.5H4z"></path><path d="M4 6.5V5h6l2 2h8v1.5"></path></svg><span>题库</span></a>
+          {% if library_active %}
+          <nav class="nav-submenu" aria-label="题库二级导航">
+            <a href="/papers" class="{{ 'active' if active == 'papers' else '' }}">试卷题库</a>
+            <a href="/" class="{{ 'active' if active == 'index' else '' }}">全部题目</a>
+            <a href="/favorites" class="{{ 'active' if active == 'favorites' else '' }}">收藏夹</a>
+          </nav>
+          {% endif %}
+        </div>
+        <div class="nav-cluster{{ ' is-expanded' if learning_active else '' }}">
+          <a href="/attempts" class="nav-primary"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h10l4 4v12H5z"></path><path d="M15 4v4h4M8 13h8M8 17h6"></path></svg><span>学习记录</span></a>
+          {% if learning_active %}
+          <nav class="nav-submenu" aria-label="学习记录二级导航">
+            <a href="/attempts" class="{{ 'active' if active == 'attempts' else '' }}">作答记录</a>
+            <a href="/notes" class="{{ 'active' if active == 'notes' else '' }}">笔记</a>
+            <a href="/statistics" class="{{ 'active' if active == 'statistics' else '' }}">训练统计</a>
+          </nav>
+          {% endif %}
+        </div>
+        <a href="/agent" class="{{ 'active' if active == 'agent' else '' }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 1.2 3.8L17 8l-3.8 1.2L12 13l-1.2-3.8L7 8l3.8-1.2zM18 14l.8 2.2L21 17l-2.2.8L18 20l-.8-2.2L15 17l2.2-.8z"></path></svg><span>AI 教练</span></a>
+        {{ sidebar_extra }}
+        <a href="/settings" class="nav-settings {{ 'active' if active == 'settings' else '' }}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.4 1a8 8 0 0 0-1.7-1L14.5 3h-5L9 6.1a8 8 0 0 0-1.7 1l-2.4-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.4-1a8 8 0 0 0 1.7 1l.5 3.1h5l.5-3.1a8 8 0 0 0 1.7-1l2.4 1 2-3.4-2-1.5a7 7 0 0 0 .1-1Z"></path></svg><span>设置</span></a>
+      </nav>
+    </aside>
+    <main class="main">
+      {% if library_active %}
+      <nav class="section-tabs" aria-label="题库二级导航">
+        <a href="/papers" class="{{ 'active' if active == 'papers' else '' }}">试卷题库</a>
+        <a href="/" class="{{ 'active' if active == 'index' else '' }}">全部题目</a>
+        <a href="/favorites" class="{{ 'active' if active == 'favorites' else '' }}">收藏夹</a>
+      </nav>
+      {% elif learning_active %}
+      <nav class="section-tabs" aria-label="学习记录二级导航">
+        <a href="/attempts" class="{{ 'active' if active == 'attempts' else '' }}">作答记录</a>
+        <a href="/notes" class="{{ 'active' if active == 'notes' else '' }}">笔记</a>
+        <a href="/statistics" class="{{ 'active' if active == 'statistics' else '' }}">训练统计</a>
+      </nav>
+      {% endif %}
+      {% if flashes %}
+      <div class="flash-stack">
+        {% for kind, message in flashes %}
+        <div class="flash {{ kind }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {{ body }}
+    </main>
+  </div>
+</body>
+</html>

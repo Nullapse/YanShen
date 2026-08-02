@@ -1,0 +1,7 @@
+{
+  "schema_version": "knowledge-card-v2",
+  "public_files": ["knowledge_cards_v2.jsonl", "shenlun_methodology.jsonl", "saduck_methodology.jsonl"],
+  "private_files": ["document_theory_course.jsonl"],
+  "minimum_public_cards": 300,
+  "required_modules": ["overview", "summary", "analysis", "countermeasure", "document", "essay"]
+}
