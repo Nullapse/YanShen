@@ -86,8 +86,9 @@ DB_PATH = user_db_path()
 DEFAULT_APP_CONTEXT = ApplicationContext.create(DB_PATH, ROOT)
 AUTOSAVE_LOCK = DEFAULT_APP_CONTEXT.autosave.lock
 AUTOSAVE_REVISIONS = DEFAULT_APP_CONTEXT.autosave.revisions
-APP_BUILD = "1.3.9"
-ASSET_VERSION = f"gk-{APP_BUILD.rsplit('.', 1)[-1]}"
+APP_VERSION = "1.4.0"
+APP_BUILD = "1.4.0.5"
+ASSET_VERSION = f"gk-{APP_BUILD.replace('.', '-')}"
 
 FILTER_RESTORE_BOOTSTRAP = ""
 
@@ -134,7 +135,7 @@ def layout(title, body, active="index", flashes=None, *, transient_route=False, 
         flashes=flashes or [],
         transient_route=transient_route,
         sidebar_extra=sidebar_extra,
-        app_build=APP_BUILD,
+        app_build=APP_VERSION,
         asset_version=ASSET_VERSION,
         startup_bootstrap=STARTUP_RESTORE_BOOTSTRAP,
         filter_bootstrap=FILTER_RESTORE_BOOTSTRAP,
@@ -272,7 +273,7 @@ def settings_credits():
       <p><span>贡献者：</span><strong>Nullapse</strong></p>
       <p>GitHub：<a href="https://github.com/Nullapse/YanShen" target="_blank" rel="noopener noreferrer">https://github.com/Nullapse/YanShen</a></p>
       <p>声明：本应用完全免费，仅供个人学习与研究使用。</p>
-      <p><span>版本：</span><strong data-app-build>{APP_BUILD}</strong></p>
+      <p><span>版本：</span><strong data-app-build>{APP_VERSION}</strong></p>
     </aside>
     """
 
@@ -1454,6 +1455,16 @@ def markdownish(value, return_to="", source_text="", annotation_scope="grading-a
         index += 1
     close_lists()
     return "".join(output)
+
+
+def hide_internal_score_calibration(value):
+    """Hide implementation-only score calibration notes from grading reports."""
+    cleaned = re.sub(
+        r"\s*已按真实考场高分稀缺度校准总分：[^。\n]*。?",
+        "",
+        str(value or ""),
+    )
+    return re.sub(r"(?m)^-\s*整体调整理由：\s*(?:\r?\n|$)", "", cleaned)
 
 
 def split_agent_structured_json(value):

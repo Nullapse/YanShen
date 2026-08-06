@@ -91,6 +91,75 @@ test("an empty answer editor stays empty until the user types", async () => {
   dom.window.close();
 });
 
+test("record filters use regular partial navigation instead of the library list endpoint", async () => {
+  const dom = installDom(`
+    <main class="main">
+      <form class="auto-filter" action="/attempts" method="get">
+        <select name="status"><option value="graded" selected>已批改</option></select>
+        <input name="q" value="基层治理">
+      </form>
+    </main>
+  `, "http://localhost/attempts");
+  const { initializeFilters } = await import(`../../static/js/shell.js?record-filter=${Date.now()}`);
+  const navigations = [];
+  const form = document.querySelector("form");
+  initializeFilters(new AbortController().signal, (url) => navigations.push(url));
+
+  form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+
+  assert.equal(navigations.length, 1);
+  assert.equal(navigations[0].pathname, "/attempts");
+  assert.equal(navigations[0].searchParams.get("status"), "graded");
+  assert.equal(navigations[0].searchParams.get("q"), "基层治理");
+  dom.window.close();
+});
+
+test("highlighting paragraphs across a blank line keeps exactly one blank paragraph", async () => {
+  const dom = installDom(`
+    <div class="answer-editor-toolbar" data-editor-toolbar data-editor-target="#answer">
+      <button type="button" data-editor-align="left">左</button>
+    </div>
+    <div id="answer" contenteditable="true" data-text-annotation
+      data-annotation-type="answer" data-annotation-id="7" data-highlight-scope="attempt-7">甲\n\n乙文</div>
+  `);
+  dom.window.Range.prototype.getBoundingClientRect = () => ({
+    top: 100,
+    bottom: 120,
+    left: 50,
+    width: 100,
+    height: 20,
+    right: 150,
+  });
+  const practice = await import(`../../static/js/practice.js?blank-highlight=${Date.now()}`);
+  const annotations = await import(`../../static/js/annotations.js?blank-highlight=${Date.now()}`);
+  const controller = new AbortController();
+  practice.initializeEditorToolbars(controller.signal);
+  annotations.initializeAnnotations(controller.signal);
+
+  const editor = document.querySelector("#answer");
+  const lines = editor.querySelectorAll(":scope > [data-editor-line]");
+  const range = document.createRange();
+  range.setStart(lines[0].firstChild, 0);
+  range.setEnd(lines[2].firstChild, lines[2].firstChild.nodeValue.length);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+  document.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+  await new Promise((resolve) => window.setTimeout(resolve, 5));
+  document.querySelector('[data-highlight-color="yellow"]').click();
+
+  const renderedLines = editor.querySelectorAll(":scope > [data-editor-line]");
+  assert.equal(annotations.editableValue(editor), "甲\n\n乙文");
+  assert.equal(renderedLines.length, 3);
+  assert.equal(renderedLines[1].childNodes.length, 0);
+  assert.deepEqual(
+    Array.from(editor.querySelectorAll(".text-annotation-highlight")).map((mark) => mark.textContent),
+    ["甲", "乙文"],
+  );
+  controller.abort();
+  dom.window.close();
+});
+
 test("workflow more menu opens on click and its actions remain clickable", async () => {
   const dom = installDom(`
     <div data-workflow-menu>

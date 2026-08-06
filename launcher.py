@@ -5,7 +5,7 @@ import subprocess
 import threading
 import time
 import urllib.request
-from tkinter import Tk, messagebox
+from tkinter import BOTH, LEFT, Frame, Label, Tk, X, messagebox, ttk
 
 from gongkao.paths import log_path, resource_root, user_data_dir
 from gongkao.web.application import create_server
@@ -13,7 +13,8 @@ from gongkao.web.application import create_server
 APP_NAME = "研申"
 APP_USER_MODEL_ID = "GongkaoShenlun.Desktop"
 START_PATH = "/home"
-SERVER_READY_TIMEOUT_SECONDS = 20
+HEALTH_PATH = "/health"
+SERVER_READY_TIMEOUT_SECONDS = 90
 SERVER_PORT_FILE = "server-port.txt"
 WEBVIEW2_DOWNLOAD_URL = "https://go.microsoft.com/fwlink/p/?LinkId=2124703"
 WEBVIEW2_CLIENT_KEY = (
@@ -22,6 +23,92 @@ WEBVIEW2_CLIENT_KEY = (
 WEBVIEW2_USER_CLIENT_KEY = (
     r"Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}"
 )
+
+
+class StartupSplash:
+    """Small native progress window shown while the local service is prepared."""
+
+    def __init__(self):
+        self.root = None
+        self.progress = None
+        self.status = None
+        try:
+            root = Tk()
+            root.title(APP_NAME)
+            root.overrideredirect(True)
+            root.configure(bg="#f7faf8")
+            root.attributes("-topmost", True)
+            width, height = 460, 250
+            x = max(0, (root.winfo_screenwidth() - width) // 2)
+            y = max(0, (root.winfo_screenheight() - height) // 2)
+            root.geometry(f"{width}x{height}+{x}+{y}")
+            icon_path = app_icon_path()
+            if icon_path.is_file():
+                root.iconbitmap(default=str(icon_path))
+
+            accent = Frame(root, bg="#35695c", width=7)
+            accent.pack(side=LEFT, fill="y")
+            content = Frame(root, bg="#f7faf8", padx=38, pady=30)
+            content.pack(fill=BOTH, expand=True)
+            Label(content, text="研申", bg="#f7faf8", fg="#202622", font=("Microsoft YaHei UI", 26, "bold")).pack(anchor="w")
+            Label(
+                content,
+                text="把资料留在本地，把时间用在作答上。",
+                bg="#f7faf8",
+                fg="#6a746f",
+                font=("Microsoft YaHei UI", 10),
+            ).pack(anchor="w", pady=(4, 28))
+            style = ttk.Style(root)
+            style.theme_use("clam")
+            style.configure(
+                "Startup.Horizontal.TProgressbar",
+                troughcolor="#dbeae4",
+                background="#35695c",
+                bordercolor="#dbeae4",
+                lightcolor="#35695c",
+                darkcolor="#35695c",
+                thickness=7,
+            )
+            self.progress = ttk.Progressbar(
+                content,
+                orient="horizontal",
+                mode="determinate",
+                maximum=100,
+                style="Startup.Horizontal.TProgressbar",
+            )
+            self.progress.pack(fill=X)
+            self.status = Label(
+                content,
+                text="正在准备本地数据…",
+                bg="#f7faf8",
+                fg="#33433d",
+                font=("Microsoft YaHei UI", 9),
+            )
+            self.status.pack(anchor="w", pady=(12, 0))
+            self.root = root
+            self.update(5, "正在准备本地数据…")
+        except Exception:
+            logging.exception("Startup splash could not be created")
+            self.close()
+
+    def update(self, value, message):
+        if not self.root:
+            return
+        try:
+            self.progress["value"] = max(0, min(100, value))
+            self.status.configure(text=message)
+            self.root.update_idletasks()
+            self.root.update()
+        except Exception:
+            self.close()
+
+    def close(self):
+        root, self.root = self.root, None
+        if root:
+            try:
+                root.destroy()
+            except Exception:
+                pass
 
 
 def app_icon_path():
@@ -112,8 +199,10 @@ class Launcher:
         except OSError:
             logging.warning("Could not persist local server port %s", port)
 
-    def start_server(self):
+    def start_server(self, splash=None):
         preferred_port = self.preferred_server_port()
+        if splash:
+            splash.update(38, "正在检查并升级本地题库，首次启动可能稍久…")
         try:
             self.server = create_server(port=preferred_port)
         except OSError:
@@ -130,33 +219,50 @@ class Launcher:
             daemon=True,
         )
         self.server_thread.start()
-        self.wait_for_server_ready()
+        if splash:
+            self.wait_for_server_ready(splash)
+        else:
+            self.wait_for_server_ready()
         logging.info("Gongkao Shenlun local service started at %s", self.url)
 
-    def wait_for_server_ready(self):
+    def wait_for_server_ready(self, splash=None):
+        started_at = time.monotonic()
         deadline = time.monotonic() + SERVER_READY_TIMEOUT_SECONDS
         last_error = None
+        health_url = f"{self.url}{HEALTH_PATH}"
         while time.monotonic() < deadline:
             try:
-                with urllib.request.urlopen(self.start_url, timeout=0.8) as response:
+                with urllib.request.urlopen(health_url, timeout=2.0) as response:
                     if 200 <= response.status < 500:
+                        if splash:
+                            splash.update(88, "本地服务已就绪，正在打开工作台…")
                         return
             except OSError as exc:
                 last_error = exc
+            if splash:
+                elapsed_ratio = min(1, (time.monotonic() - started_at) / SERVER_READY_TIMEOUT_SECONDS)
+                splash.update(55 + elapsed_ratio * 30, "正在载入题库与训练记录…")
             time.sleep(0.2)
         raise RuntimeError(f"本地服务未能在规定时间内启动：{last_error}")
 
     def start(self):
+        splash = StartupSplash()
         try:
+            splash.update(12, "正在初始化应用环境…")
             self.configure_logging()
             set_windows_app_user_model_id()
+            splash.update(24, "正在检查桌面运行组件…")
             ensure_webview2_runtime()
-            self.start_server()
+            self.start_server(splash)
+            splash.update(96, "准备完成，正在打开研申…")
+            splash.close()
             self.run_app_window()
         except Exception as exc:
             logging.exception("Failed to start")
+            splash.close()
             self.show_error(exc)
         finally:
+            splash.close()
             self.stop()
 
     def run_app_window(self):

@@ -545,6 +545,10 @@ textarea { padding: 12px; line-height: 1.7; resize: vertical; }
   outline: none;
 }
 
+.direct-text-editor > [data-editor-line] {
+  min-height: 1.7em;
+}
+
 .answer-compose-editor {
   height: auto;
   overflow-y: visible;

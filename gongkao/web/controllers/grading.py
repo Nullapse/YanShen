@@ -23,6 +23,7 @@ from ..runtime import (
     grading_job_payload,
     grading_references_from_form,
     grading_report_return_path,
+    hide_internal_score_calibration,
     invalidate_question_rubrics,
     json,
     layout,
@@ -239,6 +240,7 @@ class GradingController:
                 report["report_text"],
                 question["word_limit"] or "",
             )
+            display_report_text = hide_internal_score_calibration(display_report_text)
             report_word_status = revised_answer_word_count_status(
                 display_report_text,
                 question["word_limit"] or "",
@@ -379,6 +381,7 @@ class GradingController:
                 failed_preview.get("report_text") or "",
                 question["word_limit"] or "",
             )
+            preview_report_text = hide_internal_score_calibration(preview_report_text)
             over_by = nonnegative_int(preview_status.get("over_by"))
             actual_chars = nonnegative_int(preview_status.get("actual_chars"))
             hard_limit = nonnegative_int(preview_status.get("max_chars"))

@@ -20,6 +20,11 @@ namespace GongkaoShenlun.DesktopHost
         private static string logFile;
         private static int exitCode;
         private static Rectangle windowedBounds;
+        private static Panel startupPanel;
+        private static Panel startupProgressTrack;
+        private static Panel startupProgressFill;
+        private static Label startupStatus;
+        private static bool startupNavigationPending = true;
 
         [DllImport("shell32.dll", SetLastError = true)]
         private static extern int SetCurrentProcessExplicitAppUserModelID(
@@ -65,7 +70,7 @@ namespace GongkaoShenlun.DesktopHost
                     window.StartPosition = FormStartPosition.CenterScreen;
                     window.Size = new Size(1220, 820);
                     window.MinimumSize = new Size(900, 620);
-                    window.BackColor = Color.FromArgb(244, 241, 232);
+                    window.BackColor = Color.FromArgb(247, 250, 248);
                     window.AutoScaleMode = AutoScaleMode.Dpi;
                     windowedBounds = window.Bounds;
 
@@ -75,8 +80,9 @@ namespace GongkaoShenlun.DesktopHost
                         IsInPrivateModeEnabled = false
                     };
                     browser.Dock = DockStyle.Fill;
-                    browser.DefaultBackgroundColor = Color.FromArgb(244, 241, 232);
+                    browser.DefaultBackgroundColor = Color.FromArgb(247, 250, 248);
                     window.Controls.Add(browser);
+                    CreateStartupPanel();
                     window.Shown += InitializeBrowser;
 
                     Log("Native C# WebView2 window shown");
@@ -97,6 +103,93 @@ namespace GongkaoShenlun.DesktopHost
                 );
                 return 1;
             }
+        }
+
+        private static void CreateStartupPanel()
+        {
+            startupPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(247, 250, 248)
+            };
+            Panel card = new Panel
+            {
+                Size = new Size(500, 230),
+                BackColor = Color.White
+            };
+            card.Paint += (sender, args) =>
+            {
+                using (Pen pen = new Pen(Color.FromArgb(220, 232, 227)))
+                {
+                    args.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
+                }
+                using (SolidBrush brush = new SolidBrush(Color.FromArgb(53, 105, 92)))
+                {
+                    args.Graphics.FillRectangle(brush, 0, 0, 7, card.Height);
+                }
+            };
+            Label title = new Label
+            {
+                AutoSize = true,
+                Text = "研申",
+                Font = new Font("Microsoft YaHei UI", 25, FontStyle.Bold),
+                ForeColor = Color.FromArgb(32, 38, 34),
+                Location = new Point(40, 34)
+            };
+            Label subtitle = new Label
+            {
+                AutoSize = true,
+                Text = "正在打开你的本地申论工作台",
+                Font = new Font("Microsoft YaHei UI", 10),
+                ForeColor = Color.FromArgb(106, 116, 111),
+                Location = new Point(43, 82)
+            };
+            startupProgressTrack = new Panel
+            {
+                BackColor = Color.FromArgb(219, 234, 228),
+                Location = new Point(44, 130),
+                Size = new Size(412, 8)
+            };
+            startupProgressFill = new Panel
+            {
+                BackColor = Color.FromArgb(53, 105, 92),
+                Dock = DockStyle.Left,
+                Width = 0
+            };
+            startupProgressTrack.Controls.Add(startupProgressFill);
+            startupStatus = new Label
+            {
+                AutoSize = true,
+                Text = "正在初始化桌面组件…",
+                Font = new Font("Microsoft YaHei UI", 9),
+                ForeColor = Color.FromArgb(51, 67, 61),
+                Location = new Point(42, 154)
+            };
+            card.Controls.Add(title);
+            card.Controls.Add(subtitle);
+            card.Controls.Add(startupProgressTrack);
+            card.Controls.Add(startupStatus);
+            startupPanel.Controls.Add(card);
+            startupPanel.Resize += (sender, args) =>
+            {
+                card.Left = Math.Max(0, (startupPanel.ClientSize.Width - card.Width) / 2);
+                card.Top = Math.Max(0, (startupPanel.ClientSize.Height - card.Height) / 2);
+            };
+            window.Controls.Add(startupPanel);
+            startupPanel.BringToFront();
+            card.Left = (startupPanel.ClientSize.Width - card.Width) / 2;
+            card.Top = (startupPanel.ClientSize.Height - card.Height) / 2;
+            SetStartupProgress(35);
+        }
+
+        private static void SetStartupProgress(int value)
+        {
+            if (startupProgressTrack == null || startupProgressFill == null)
+            {
+                return;
+            }
+            int bounded = Math.Max(0, Math.Min(100, value));
+            startupProgressFill.Width = (int)Math.Round(startupProgressTrack.ClientSize.Width * bounded / 100.0);
         }
 
         private static Icon LoadAppIcon(string iconPath)
@@ -129,8 +222,35 @@ namespace GongkaoShenlun.DesktopHost
             try
             {
                 await browser.EnsureCoreWebView2Async(null);
+                SetStartupProgress(68);
+                startupStatus.Text = "桌面组件已就绪，正在载入界面…";
                 browser.CoreWebView2.Settings.IsStatusBarEnabled = false;
                 browser.CoreWebView2.WebMessageReceived += HandleWebMessage;
+                browser.CoreWebView2.NavigationStarting += (navigationSender, navigationArgs) =>
+                {
+                    if (!startupNavigationPending) return;
+                    SetStartupProgress(84);
+                    startupStatus.Text = "正在恢复上次的工作位置…";
+                };
+                browser.CoreWebView2.NavigationCompleted += (navigationSender, navigationArgs) =>
+                {
+                    if (!startupNavigationPending) return;
+                    startupNavigationPending = false;
+                    if (navigationArgs.IsSuccess)
+                    {
+                        SetStartupProgress(100);
+                        startupStatus.Text = "准备完成";
+                        startupPanel.Hide();
+                        browser.Focus();
+                        Log("Initial page navigation completed");
+                    }
+                    else
+                    {
+                        SetStartupProgress(100);
+                        startupStatus.Text = "界面载入失败，请关闭应用后重试";
+                        Log("Initial page navigation failed: " + navigationArgs.WebErrorStatus);
+                    }
+                };
                 browser.CoreWebView2.Navigate(startUrl);
                 Log("WebView2 initialized and navigating to " + startUrl);
             }

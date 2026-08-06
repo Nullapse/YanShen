@@ -29,6 +29,16 @@ def _coverage_factor(candidate, status):
     return round(value * 20) / 20
 
 
+def _exam_score_ceiling(score):
+    """Compress unusually high AI totals to a realistic closed-book exam scale."""
+    score = float(score or 0)
+    if score <= 70:
+        return round(score, 1)
+    # A raw model total above 70 still distinguishes strong answers, but the
+    # top range is deliberately harder to enter: even a raw 100 maps to 88.
+    return round(70 + (score - 70) * 0.6, 1)
+
+
 def _consistent_point_reason(status, reason, point):
     """Keep the displayed judgement about the user's answer aligned with status."""
     reason = _clean(reason, 300)
@@ -269,9 +279,24 @@ def validate_grading_result(
             }
         )
 
-    score = round(sum(item["score"] for item in normalized_dimensions), 1)
+    raw_score = round(sum(item["score"] for item in normalized_dimensions), 1)
+    score = _exam_score_ceiling(raw_score)
     if blank_answer:
         score = 0.0
+    exam_calibration_note = ""
+    if raw_score > 0 and score != raw_score:
+        factor = score / raw_score
+        for dimension in normalized_dimensions:
+            dimension["score"] = round(dimension["score"] * factor, 1)
+        # Rounding individual dimensions can move the displayed sum by 0.1.
+        difference = round(score - sum(item["score"] for item in normalized_dimensions), 1)
+        if difference:
+            normalized_dimensions[0]["score"] = round(normalized_dimensions[0]["score"] + difference, 1)
+        content_score = next(
+            (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
+            0.0,
+        )
+        exam_calibration_note = f"已按真实考场高分稀缺度校准总分：{raw_score:g}→{score:g}。"
     display_max_score = float(rubric.get("display_max_score") or 100)
     display_score = _round_half(score * display_max_score / 100)
     display_scale = display_max_score / 100
@@ -312,5 +337,5 @@ def validate_grading_result(
         "display_max_score": int(display_max_score) if display_max_score.is_integer() else display_max_score,
         "score_is_estimated": bool(rubric.get("score_is_estimated")),
         "content_score": round(content_score, 1),
-        "validation_errors": [calibration_note] if calibration_note else [],
+        "validation_errors": [value for value in (calibration_note, exam_calibration_note) if value],
     }

@@ -69,6 +69,9 @@ class Handler(
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
         query = parse_qs(parsed.query)
+        if path == "/health":
+            self.send_text("ok")
+            return
         if dispatch_get(self, path, query):
             return
         if path.startswith("/templates/"):

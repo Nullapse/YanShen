@@ -193,7 +193,7 @@ export function initializeShellControls(signal) {
 
 
 
-export function initializeFilters(_signal) {
+export function initializeFilters(_signal, navigatePartial) {
   document.querySelectorAll("form.auto-filter").forEach((form) => {
     form.querySelector("[data-filter-reset]")?.addEventListener("click", () => {
       viewState.clearFilterState(form);
@@ -202,8 +202,13 @@ export function initializeFilters(_signal) {
       rememberFilterState(form);
       const url = new URL(form.action || window.location.href, window.location.href);
       url.search = new URLSearchParams(new FormData(form)).toString();
-      if (url.pathname === window.location.pathname) {
+      if (
+        url.pathname === window.location.pathname
+        && (url.pathname === "/" || url.pathname === "/papers")
+      ) {
         fetchLibraryListUpdate(url);
+      } else if (navigatePartial) {
+        navigatePartial(url);
       } else {
         submitForm(form);
       }

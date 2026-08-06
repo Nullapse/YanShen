@@ -58,7 +58,20 @@ export function editablePlainText(element) {
   ) {
     editorLines.forEach((line, index) => {
       if (index) pushLineBreak(false);
-      walk(line);
+      const meaningfulChildren = Array.from(line.childNodes).filter((child) => (
+        child.nodeType !== Node.ELEMENT_NODE
+        || !child.matches("[data-editor-decoration]")
+      ));
+      const isBrowserBlankLine = (
+        meaningfulChildren.length === 1
+        && meaningfulChildren[0].nodeType === Node.ELEMENT_NODE
+        && meaningfulChildren[0].tagName === "BR"
+      );
+      // Chromium keeps a lone <br> inside an empty contenteditable line as a
+      // caret placeholder. The line boundary above already represents its
+      // newline, so treating that placeholder as content creates a second
+      // blank line whenever an annotation is rendered.
+      if (!isBrowserBlankLine) walk(line);
     });
     return parts.map((part) => part.text).join("");
   }
@@ -606,6 +619,39 @@ export function applyMaterialHighlight(highlights, start, end, color, textLength
 }
 
 export function textOffsetInContainer(container, targetNode, targetOffset) {
+  const editorLines = Array.from(container.children || []);
+  const usesEditorLines = (
+    editorLines.length
+    && editorLines.length === container.childNodes.length
+    && editorLines.every((line) => line.matches("[data-editor-line]"))
+  );
+  if (usesEditorLines) {
+    const targetElement = targetNode.nodeType === Node.TEXT_NODE
+      ? targetNode.parentElement
+      : targetNode;
+    const targetLine = targetElement?.closest?.("[data-editor-line]");
+    if (targetLine?.parentElement === container) {
+      let lineOffset = 0;
+      for (const line of editorLines) {
+        if (line === targetLine) break;
+        // renderEditorParagraphs represents every paragraph boundary with one
+        // newline in editableValue, including boundaries around empty lines.
+        lineOffset += editablePlainText(line).length + 1;
+      }
+      const offsetInLine = textOffsetInContainer(targetLine, targetNode, targetOffset);
+      return offsetInLine < 0 ? -1 : lineOffset + offsetInLine;
+    }
+  }
+
+  if (targetNode === container && Number.isInteger(targetOffset)) {
+    const boundary = Math.max(0, Math.min(targetOffset, container.childNodes.length));
+    const prefix = document.createElement("div");
+    Array.from(container.childNodes).slice(0, boundary).forEach((node) => {
+      prefix.append(node.cloneNode(true));
+    });
+    return editablePlainText(prefix).length;
+  }
+
   const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
       return node.parentElement?.closest("[data-editor-decoration]")

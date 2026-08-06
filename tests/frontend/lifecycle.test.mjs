@@ -107,6 +107,70 @@ test("multiline annotations do not paint blank line fragments", async () => {
   dom.window.close();
 });
 
+test("answer annotation offsets include preceding paragraphs and preserve blank lines", async () => {
+  const dom = installDom("http://localhost/attempts/7");
+  const annotations = await import(`../../static/js/annotations.js?paragraph-offset=${Date.now()}`);
+  const editor = document.createElement("div");
+  editor.setAttribute("contenteditable", "true");
+  editor.setAttribute("data-text-annotation", "");
+  editor.dataset.annotationType = "answer";
+  editor.dataset.annotationId = "7";
+  editor.dataset.highlightScope = "attempt-7";
+  editor.innerHTML = "<div data-editor-line>甲</div><div data-editor-line></div><div data-editor-line>乙文</div>";
+  editor.__usesParagraphAlignment = true;
+  document.body.append(editor);
+
+  const lastLineText = editor.children[2].firstChild;
+  assert.equal(annotations.textOffsetInContainer(editor, lastLineText, 0), 3);
+  assert.equal(annotations.textOffsetInContainer(editor, lastLineText, 2), 5);
+  assert.equal(annotations.editableValue(editor), "甲\n\n乙文");
+
+  editor.dataset.savedAnnotations = JSON.stringify([{
+    start: 3,
+    end: 5,
+    color: "yellow",
+  }]);
+  annotations.renderTextAnnotations(editor);
+
+  assert.equal(editor.querySelector(".text-annotation-highlight").textContent, "乙文");
+  assert.equal(annotations.editableValue(editor), "甲\n\n乙文");
+  assert.equal(editor.querySelectorAll(":scope > [data-editor-line]").length, 3);
+  const blankLine = editor.querySelectorAll(":scope > [data-editor-line]")[1];
+  assert.equal(blankLine.childNodes.length, 0);
+  dom.window.close();
+});
+
+test("browser br placeholders in empty answer lines do not duplicate blank lines", async () => {
+  const dom = installDom("http://localhost/attempts/7");
+  const annotations = await import(`../../static/js/annotations.js?br-placeholder=${Date.now()}`);
+  const editor = document.createElement("div");
+  editor.setAttribute("contenteditable", "true");
+  editor.setAttribute("data-text-annotation", "");
+  editor.dataset.annotationType = "answer";
+  editor.dataset.annotationId = "7";
+  editor.dataset.highlightScope = "attempt-7";
+  editor.innerHTML = "<div data-editor-line>甲段</div><div data-editor-line><br></div><div data-editor-line>乙段</div>";
+  editor.__usesParagraphAlignment = true;
+  document.body.append(editor);
+
+  assert.equal(annotations.editableValue(editor), "甲段\n\n乙段");
+  editor.dataset.savedAnnotations = JSON.stringify([{
+    start: 0,
+    end: 6,
+    color: "yellow",
+  }]);
+  annotations.renderTextAnnotations(editor);
+
+  assert.equal(annotations.editableValue(editor), "甲段\n\n乙段");
+  assert.equal(editor.querySelectorAll(":scope > [data-editor-line]").length, 3);
+  assert.equal(editor.querySelectorAll(":scope > [data-editor-line]")[1].childNodes.length, 0);
+  assert.deepEqual(
+    Array.from(editor.querySelectorAll(".text-annotation-highlight")).map((mark) => mark.textContent),
+    ["甲段", "乙段"],
+  );
+  dom.window.close();
+});
+
 test("material annotation decorations never become source text", async () => {
   const dom = installDom("http://localhost/attempts/7");
   const annotations = await import(`../../static/js/annotations.js?material=${Date.now()}`);

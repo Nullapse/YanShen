@@ -549,8 +549,8 @@ class SmartGradingTest(unittest.TestCase):
         self.assertIn("不得把所有 partial 机械写成0.5", grading_prompt)
         self.assertIn("修改版答案目标为 315—336 格", grading_prompt)
         self.assertIn("最终结果必须严格低于 350 格", grading_prompt)
-        self.assertIn("维度分采用“得分制”", grading_prompt)
-        self.assertIn("理由若只描述轻微问题，分数不得低于70%", grading_prompt)
+        self.assertIn("符合真实考场阅卷强度的“得分制”", grading_prompt)
+        self.assertIn("普通“写到了”不能进入此档", grading_prompt)
         self.assertIn('"max_score": 70.0', grading_prompt)
 
     def test_selected_reference_full_content_is_kept_in_both_prompts(self):
@@ -791,10 +791,20 @@ class SmartGradingTest(unittest.TestCase):
             ],
         }
         result = validate_grading_result(raw, rubric, "有效原句", [])
-        self.assertEqual(result["content_score"], 64.4)
-        self.assertEqual(result["score"], 94.4)
-        self.assertEqual(result["display_score"], 9.5)
+        self.assertEqual(result["content_score"], 57.7)
+        self.assertEqual(result["score"], 84.6)
+        self.assertEqual(result["display_score"], 8.5)
         self.assertIn("采分点覆盖校准", result["holistic_adjustment_reason"])
+        self.assertNotIn("真实考场高分稀缺度", result["holistic_adjustment_reason"])
+        self.assertTrue(any("真实考场高分稀缺度" in note for note in result["validation_errors"]))
+
+    def test_dimension_prompt_starts_from_evidence_not_full_marks(self):
+        from gongkao.grading_pipeline.evidence import DIMENSION_SCORING_GUIDANCE, _dimension_score_template
+
+        template = _dimension_score_template([{"dimension": "content", "weight": 70}])
+        self.assertEqual(template[0]["score"], 0)
+        self.assertIn("不是从满分起步", DIMENSION_SCORING_GUIDANCE)
+        self.assertIn("90%—100%仅用于", DIMENSION_SCORING_GUIDANCE)
 
     def test_miss_reason_cannot_claim_the_point_was_fully_covered(self):
         rubric = {

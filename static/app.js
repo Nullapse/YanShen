@@ -62,7 +62,7 @@ export function mountPage() {
   initializeShellControls(signal);
   initializePractice(signal);
   initializeAnnotations(signal);
-  initializeFilters(signal);
+  initializeFilters(signal, navigatePartial);
   initializeGrading(signal, navigatePartial);
   initializeTabsAndPagination(signal, navigatePartial);
   initializeHome(signal);

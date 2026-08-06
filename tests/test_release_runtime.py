@@ -38,6 +38,7 @@ from gongkao.web.runtime import (
     evidence_return_path,
     grading_references_from_form,
     grading_report_return_path,
+    hide_internal_score_calibration,
     inline_markdown,
     is_report_citation_return,
     knowledge_evidence_href,
@@ -71,6 +72,17 @@ SEED = ROOT / "data" / "gongkao_seed.sqlite3"
 
 
 class ReleaseRuntimeTest(unittest.TestCase):
+    def test_internal_score_calibration_note_is_hidden_from_old_reports(self):
+        report = (
+            "## 采分点证据与整体校准\n"
+            "- 整体调整理由：采分点覆盖校准。 已按真实考场高分稀缺度校准总分：94→84.4。\n"
+            "- 参考答案使用说明：按材料核验。"
+        )
+        cleaned = hide_internal_score_calibration(report)
+        self.assertNotIn("真实考场高分稀缺度", cleaned)
+        self.assertIn("整体调整理由：采分点覆盖校准。", cleaned)
+        self.assertIn("参考答案使用说明", cleaned)
+
     def test_timed_paper_recommendation_skips_completed_papers_and_essay_status(self):
         conn = sqlite3.connect(":memory:")
         conn.row_factory = sqlite3.Row
@@ -2517,6 +2529,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
         self.assertIn("subprocess.run", launcher_source)
         self.assertIn("desktop_host_path", launcher_source)
         self.assertIn('START_PATH = "/home"', launcher_source)
+        self.assertIn('HEALTH_PATH = "/health"', launcher_source)
         self.assertIn('APP_USER_MODEL_ID = "GongkaoShenlun.Desktop"', launcher_source)
         self.assertIn("SetCurrentProcessExplicitAppUserModelID", launcher_source)
         self.assertIn("CoreWebView2CreationProperties", host_source)
@@ -2532,6 +2545,10 @@ class ReleaseRuntimeTest(unittest.TestCase):
         manifest_source = (ROOT / "desktop_host" / "app.manifest").read_text(encoding="utf-8")
         self.assertIn("PerMonitorV2,PerMonitor", manifest_source)
         self.assertIn("wait_for_server_ready", launcher_source)
+        self.assertIn("class StartupSplash", launcher_source)
+        self.assertIn("SERVER_READY_TIMEOUT_SECONDS = 90", launcher_source)
+        self.assertIn("CreateStartupPanel", host_source)
+        self.assertIn("NavigationCompleted", host_source)
         self.assertIn("urllib.request.urlopen", launcher_source)
         self.assertIn("create_server(port=0)", launcher_source)
         self.assertIn('SERVER_PORT_FILE = "server-port.txt"', launcher_source)
@@ -2587,7 +2604,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
 
         self.assertEqual(run_mock.call_args.args[0][3], "")
 
-    def test_launcher_remembers_port_and_checks_home_page(self):
+    def test_launcher_remembers_port_and_uses_health_check(self):
         app = desktop_launcher.Launcher()
         fake_server = MagicMock()
         fake_server.server_address = ("127.0.0.1", 43123)
@@ -2609,6 +2626,19 @@ class ReleaseRuntimeTest(unittest.TestCase):
         self.assertEqual(app.start_url, "http://127.0.0.1:43123/home")
         fake_server.shutdown.assert_called_once_with()
         fake_server.server_close.assert_called_once_with()
+
+    def test_launcher_readiness_probe_skips_database_backed_home_page(self):
+        app = desktop_launcher.Launcher()
+        app.url = "http://127.0.0.1:43123"
+        app.start_url = f"{app.url}/home"
+        response = MagicMock(status=200)
+        response_context = MagicMock()
+        response_context.__enter__.return_value = response
+
+        with patch("launcher.urllib.request.urlopen", return_value=response_context) as open_mock:
+            app.wait_for_server_ready()
+
+        open_mock.assert_called_once_with("http://127.0.0.1:43123/health", timeout=2.0)
 
     def test_launcher_reports_missing_webview2_runtime(self):
         with patch("launcher.webview2_runtime_version", return_value=""):

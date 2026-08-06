@@ -780,6 +780,8 @@ class LibraryController:
         kind = query.get("kind", ["questions"])[0]
         if kind not in ("questions", "papers"):
             kind = "questions"
+        page = requested_page(query)
+        page_size = 12
         with connect(self.db_path) as conn:
             counts = conn.execute(
                 """
@@ -788,6 +790,10 @@ class LibraryController:
                   (SELECT COUNT(*) FROM paper_favorites) AS papers
                 """
             ).fetchone()
+            total_items = int(counts[kind] or 0)
+            total_pages = max(1, math.ceil(total_items / page_size))
+            page = min(page, total_pages)
+            offset = (page - 1) * page_size
             questions = (
                 conn.execute(
                     """
@@ -805,9 +811,11 @@ class LibraryController:
              LEFT JOIN reference_answers r ON r.question_id = q.id
              LEFT JOIN attempts a ON a.question_id = q.id
              LEFT JOIN grading_reports gr ON gr.attempt_id = a.id
-              GROUP BY q.id
-              ORDER BY f.created_at DESC, f.id DESC
-                """
+               GROUP BY q.id
+               ORDER BY f.created_at DESC, f.id DESC
+                  LIMIT ? OFFSET ?
+                """,
+                    (page_size, offset),
                 ).fetchall()
                 if kind == "questions"
                 else []
@@ -828,9 +836,11 @@ class LibraryController:
              LEFT JOIN reference_answers r ON r.question_id = q.id
              LEFT JOIN attempts a ON a.question_id = q.id
              LEFT JOIN grading_reports gr ON gr.attempt_id = a.id
-              GROUP BY p.id
-              ORDER BY f.created_at DESC, f.id DESC
-                """
+               GROUP BY p.id
+               ORDER BY f.created_at DESC, f.id DESC
+                  LIMIT ? OFFSET ?
+                """,
+                    (page_size, offset),
                 ).fetchall()
                 if kind == "papers"
                 else []
@@ -882,6 +892,7 @@ class LibraryController:
                 f'<div class="empty-state"><h2>还没有收藏的{noun}</h2><p>在{noun}卡片或详情页点击星标后，会集中显示在这里。</p></div>'
             )
 
+        pager = pagination_html("/favorites", {"kind": kind}, page, total_items, page_size)
         body = f"""
         <section class="page-head">
           <div><p class="eyebrow">Review Collection</p><h1>收藏夹</h1></div>
@@ -892,6 +903,7 @@ class LibraryController:
           <a class="{"active" if kind == "papers" else ""}" href="/favorites?kind=papers">收藏的试卷 <span>{counts["papers"]}</span></a>
         </nav>
         <section class="question-grid">{"".join(cards)}</section>
+        {pager}
         """
         self.send_html(layout("收藏夹 - 研申", body, "favorites"))
 
