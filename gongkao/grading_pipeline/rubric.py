@@ -19,6 +19,7 @@ from .common import (
     dedupe_references,
     question_display_max_score,
     question_score_is_estimated,
+    question_word_limit_text,
     reference_set_hash,
     rubric_source_hash,
     split_semantic_clauses,
@@ -177,7 +178,8 @@ def _material_text(materials):
 
 def build_rubric_prompt(question, materials, references, consensus):
     reference_context = _full_reference_context(references)
-    word_budget = word_limit_budget(question.get("word_limit") or "")
+    effective_word_limit = question_word_limit_text(question)
+    word_budget = word_limit_budget(effective_word_limit)
     budget_guidance = _word_budget_guidance(word_budget)
     return f"""你正在为一道申论题建立可缓存、可审计的评分基准。只建立本题评分基准，不批改用户答案。
 
@@ -187,7 +189,7 @@ def build_rubric_prompt(question, materials, references, consensus):
 题型：{question.get("question_type")}
 题干：{question.get("prompt")}
 要求：{question.get("requirements")}
-字数：{question.get("word_limit")}
+字数：{effective_word_limit}
 结构化字数预算：{json.dumps(word_budget, ensure_ascii=False)}
 本题占格要求：{budget_guidance}
 
@@ -207,12 +209,18 @@ def build_rubric_prompt(question, materials, references, consensus):
 {{
   "question_id": {int(question.get("id") or 0)},
   "task_constraints": {{"object": "", "required_structure": [], "format_rules": []}},
+  "equal_weight_reason": "仅当三个以上计分点确实应等权时填写具体理由，否则留空",
   "points": [
     {{
       "label": "简短采分点名",
       "canonical_expression": "规范表达",
       "aliases": ["同义表达"],
       "tier": "core|material_core|supporting|disputed",
+      "importance": "critical|major|supporting",
+      "suggested_weight": 0.0,
+      "weight_reason": "该点相对权重的材料与任务依据",
+      "coverage_role": "required|alternative|bonus",
+      "alternative_group": "同组替代论据标识；无则为空",
       "required_for_full_score": true,
       "required_elements": ["该点不可缺少的语义成分"],
       "optional_details": ["受字数限制可省略的例子、修饰或效果"],
@@ -236,7 +244,9 @@ def build_rubric_prompt(question, materials, references, consensus):
 8. 题干未明确要求“意义、作用、成效、影响”时，不得把泛化的“整体成效/示范意义”单列为必答扣分点；它只能是可选补充。
 9. disputed 不计分。控制在4—12个有效采分点，避免把一条答案拆成大量细碎扣分项。
 10. 只要上面机构参考答案数量大于 0，就不得声称“无参考答案”或“未提供参考答案”；本地候选聚类只是辅助信息，不得替代对答案全文的核对。
-11. 不输出 Markdown、解释或用户答案。
+11. 综合写作不得把每一则具体材料案例都设为必答点。中心立意可以是 required；不同材料案例应作为同一 alternative_group 下的可替代论据；一般升华、科技手段等只能是 bonus。
+12. 每个计分点必须填写 suggested_weight 和 weight_reason；不要机械等权。若三个以上计分点确实等权，必须在顶层 equal_weight_reason 说明它们为何对完成题目任务同等重要。
+13. 不输出 Markdown、解释或用户答案。
 """
 
 
@@ -252,6 +262,41 @@ def extract_tagged_json(text, tag):
         if start >= 0 and end > start:
             return json.loads(candidate[start : end + 1])
         raise
+
+
+def normalize_essay_coverage_roles(rubric):
+    """Keep essay thesis mandatory while treating material lines as alternatives."""
+    if not isinstance(rubric, dict) or rubric.get("question_type") != "综合写作":
+        return rubric
+    points = [point for point in rubric.get("points", []) if isinstance(point, dict)]
+    scoreable = [
+        point for point in points
+        if float(point.get("suggested_weight", point.get("weight")) or 0) > 0
+        and point.get("coverage_role") != "bonus"
+        and point.get("tier") != "disputed"
+    ]
+    thesis_pattern = re.compile(r"中心立意|中心论点|总论点|核心观点|文章主旨|主题")
+    thesis = next(
+        (
+            point for point in scoreable
+            if thesis_pattern.search(
+                f"{point.get('label') or ''} {point.get('canonical_expression') or ''}"
+            )
+        ),
+        scoreable[0] if scoreable else None,
+    )
+    for point in scoreable:
+        if point is thesis:
+            point["coverage_role"] = "required"
+            point["required_for_full_score"] = True
+            point["score_role"] = "required"
+            point["alternative_group"] = ""
+        else:
+            point["coverage_role"] = "alternative"
+            point["required_for_full_score"] = False
+            point["score_role"] = "alternative"
+            point["alternative_group"] = point.get("alternative_group") or "essay-evidence"
+    return rubric
 
 
 def _quote_in_materials(quote, materials, label=""):
@@ -452,7 +497,14 @@ def validate_rubric(raw, question, materials, references, question_feedback=None
         )
         importance = _point_importance(candidate, tier)
         suggested_weight = _positive_number(candidate.get("suggested_weight", candidate.get("weight")))
-        if tier == "disputed" or (not required_for_full_score and _is_generic_optional_effect(candidate, question)):
+        coverage_role = "required" if required_for_full_score else "bonus"
+        alternative_group = _clean(candidate.get("alternative_group"), 80)
+        if question.get("question_type") == "综合写作" and tier == "material_core":
+            coverage_role = "alternative"
+            alternative_group = alternative_group or "essay-evidence"
+        if tier == "disputed" or coverage_role == "bonus" or (
+            not required_for_full_score and _is_generic_optional_effect(candidate, question)
+        ):
             suggested_weight = 0
         elif not suggested_weight:
             suggested_weight = {
@@ -485,6 +537,8 @@ def validate_rubric(raw, question, materials, references, question_feedback=None
             "score_role": "required"
             if required_for_full_score
             else ("disputed" if tier == "disputed" else "supplementary"),
+            "coverage_role": coverage_role,
+            "alternative_group": alternative_group,
             "suggested_weight": suggested_weight,
         }
         if not point["label"] or not point["canonical_expression"]:
@@ -499,7 +553,18 @@ def validate_rubric(raw, question, materials, references, question_feedback=None
             point["source_point_key"] = supplied_key
         if point["point_key"] not in invalid_keys:
             points.append(point)
-    scoreable = [point for point in points if point["suggested_weight"] > 0]
+    if question.get("question_type") == "综合写作":
+        normalize_essay_coverage_roles({"question_type": "综合写作", "points": points})
+    allowed_roles = (
+        {"required", "alternative"}
+        if question.get("question_type") == "综合写作"
+        else {"required"}
+    )
+    scoreable = [
+        point
+        for point in points
+        if point["suggested_weight"] > 0 and point.get("coverage_role") in allowed_roles
+    ]
     if not scoreable:
         raise ValueError("评分基准没有通过材料校验的有效采分点")
     if (
@@ -528,6 +593,12 @@ def validate_rubric(raw, question, materials, references, question_feedback=None
         "display_max_score": question_display_max_score(question),
         "score_is_estimated": question_score_is_estimated(question),
         "question_type": question.get("question_type") or "",
+        "word_limit": question_word_limit_text(question),
+        "scoring_mode": (
+            "holistic_essay"
+            if question.get("question_type") == "综合写作"
+            else "point_based"
+        ),
         "selected_reference_count": len(references),
         "selected_references": [
             {

@@ -12,6 +12,7 @@ from .common import (
     _row_dict,
     _word_budget_guidance,
     question_display_max_score,
+    question_word_limit_text,
     reference_set_hash,
     rubric_source_hash,
 )
@@ -39,6 +40,15 @@ DIMENSION_SCORING_GUIDANCE = """维度分采用符合真实考场阅卷强度的
 - 低于40%用于核心任务大面积缺失、严重偏题、文种/结构根本错误或表达大面积不可理解。
 - 不得因答案语句通顺就默认给结构、表达、格式高分；每个高于80%的维度都必须指出达到高分档的具体证据。
 - 称谓、落款等仅在题干或相应文种确实要求时评分；题目不要求的要素缺失不得扣分。"""
+
+
+ESSAY_SCORING_GUIDANCE = """综合写作必须先判断整篇文章所处的整体档位，再把该档位总分合理分配到各维度；不能先给每个维度“看起来不错”的高比例后相加。
+- 80—100：罕见的考场优秀范文。立意深刻准确，主要论证线均充分展开，材料转化准确且几乎没有事实、逻辑或表达硬伤。
+- 70—79：明显高于一般水平。立意、结构和主要论证均较强，材料名称与事实基本准确，不得存在主要段落空泛或明显材料误读。
+- 60—69：主体任务成立的中上档。立意与结构较好，但存在一个主要部分论证偏薄、若干材料事实不准确，或论据转化较普通等常见问题。
+- 50—59：基本切题但完成质量一般，论证、材料转化或结构存在多处明显不足。
+- 50以下：偏题、任务完成不充分，或论证结构存在严重缺陷。
+若诊断中已经指出“事实偏差/材料误读”且某一主要论证部分空泛、缺少展开，通常不得给到80分以上；语言流畅、标题完整和分段清楚本身不足以进入优秀档。"""
 
 
 def _evidence_card(row, role, confidence=None):
@@ -224,7 +234,7 @@ def build_combined_grading_prompt(
 ):
     history_meta = history_meta or {}
     reference_context = _full_reference_context(references or [])
-    word_budget = word_limit_budget(question.get("word_limit") or "")
+    word_budget = word_limit_budget(question_word_limit_text(question))
     budget_guidance = _word_budget_guidance(word_budget)
     question_context = {
         key: question.get(key)
@@ -340,7 +350,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
     "conflicts": []
   }},
   "evaluation": {{
-    "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "coverage_ratio": 0.0, "answer_quote": "用户答案连续原文", "reason": "覆盖或缺失说明"}}],
+    "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "coverage_ratio": 0.0, "answer_quote": "尽量使用用户答案短且连续的原文", "reason": "覆盖或缺失说明", "confidence": 0.0, "missing_elements": []}}],
     "dimension_scores": {json.dumps(dimension_score_template, ensure_ascii=False)},
     "holistic_adjustment_reason": "",
     "annotations": [{{"kind": "good|polish|change|delete|add|critical", "severity": "positive|low|medium|high|critical", "quote": "非补充类必须为用户答案连续原文", "anchor": "补充类必须为用户答案连续原文，表示插入在此句之后", "replacement": "", "reason": "", "point_key": ""}}],
@@ -348,7 +358,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
     "material_reading": ["材料信息 -> 可转化要点 -> 答案表达"],
     "optimization_suggestions": ["具体建议"],
     "personalized_findings": [{{"finding": "跨题共性现象", "root_cause": "导致该现象的具体作答机制/原因", "next_step": "下一步针对这个原因练什么", "evidence_ids": [""], "confidence": "stage|recurring"}}],
-    "overall_summary": "说明整体完成情况、最大得分处和最大失分处",
+    "summary": {{"verdict": "不含分数的整体判断", "strengths": ["主要优点"], "weaknesses": ["主要问题"]}},
     "revised_answer": "可直接替换的修改版答案正文"
   }}
 }}
@@ -358,7 +368,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
 1. rubric 的采分点权重总和必须等于 content 维度满分。明确评分标准中的数值优先；否则依据任务必要性、材料层级和机构共识动态分配，禁止无理由平均分配。
 2. rubric.point_key 只使用 point-1、point-2 这类 ASCII 标识；evaluation.point_matches 必须逐字复制对应的 rubric.point_key，不得翻译、改写或另起编号。先逐点分析，再给 dimension_scores。内容分是结合重点覆盖、准确性、完整性和材料转化质量的综合判断，不得机械等于逐点覆盖加总。
 3. dimension_scores 必须逐项覆盖固定维度；JSON 中 max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。各维度问题只扣一次，不再输出整体质量乘数。
-4. hit/partial 的 answer_quote 必须是用户答案中的连续原文；找不到只能判 miss。annotations 中除 add 外 quote 必须是连续原文；add 必须填写可在原文精确定位的 anchor，并把拟补文字写入 replacement。
+4. hit/partial 应提供用户答案中的短连续原文；若同一要点散落在多处，可用“……”连接多个按原文顺序出现的短片段，不得因此改判 miss。annotations 中除 add 外 quote 必须是连续原文；add 必须填写可在原文精确定位的 anchor，并把拟补文字写入 replacement。
 5. coaching context（跨题、知识、历史证据）只用于建议和 personalized_findings，绝不能影响 point_matches 或 dimension_scores。
 6. personalized_findings 的 finding 必须指出跨题共性（至少 2 条证据支撑才算 recurring）；root_cause 分析具体环节而不是复述症状；next_step 给出可执行的下一道题训练动作。宁可少写一条，也不要写空话。
 7. 修改版答案以 suggested_min—suggested_max 为目标，低于硬上限并预留至少8格。
@@ -444,7 +454,7 @@ def build_grading_prompt(
             "is_full_original",
         )
     }
-    question_context["word_budget"] = word_limit_budget(question.get("word_limit") or "")
+    question_context["word_budget"] = word_limit_budget(question_word_limit_text(question))
     question_context["display_max_score"] = question_display_max_score(question)
     attempt_context = {
         "id": attempt.get("id"),
@@ -467,6 +477,7 @@ def build_grading_prompt(
     )
     dimension_score_template = _dimension_score_template(dimension_profile)
     budget_guidance = _word_budget_guidance(question_context["word_budget"])
+    essay_guidance = ESSAY_SCORING_GUIDANCE if question.get("question_type") == "综合写作" else ""
     return f"""你正在使用已校验的不等权评分基准执行申论综合批改。先分析全部采分点，再按评分基准中的固定维度综合评分。
 评分只能依据 current_scoring：本题信息、材料、参考答案和评分基准。coaching_context 只用于点评建议，不得影响任何得分。
 
@@ -504,6 +515,8 @@ coaching_context（跨题、知识和历史最小证据）：
 
 {DIMENSION_SCORING_GUIDANCE}
 
+{essay_guidance}
+
 输出保持干练：每个 reason 最多 60 字；annotations 最多 6 条；
 material_reading 最多 6 条；optimization_suggestions 最多 5 条；
 personalized_findings 最多 3 条。不要重复题干、材料或参考答案全文。
@@ -516,7 +529,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
 <smart_grading_json>
 {{
   "evaluation": {{
-    "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "coverage_ratio": 0.0, "answer_quote": "用户答案连续原文", "reason": "覆盖或缺失说明"}}],
+    "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "coverage_ratio": 0.0, "answer_quote": "尽量使用用户答案短且连续的原文", "reason": "覆盖或缺失说明", "confidence": 0.0, "missing_elements": []}}],
     "dimension_scores": {json.dumps(dimension_score_template, ensure_ascii=False)},
     "holistic_adjustment_reason": "",
     "annotations": [{{"kind": "good|polish|change|delete|add|critical", "severity": "positive|low|medium|high|critical", "quote": "非补充类必须为用户答案连续原文", "anchor": "补充类必须为用户答案连续原文，表示插入在此句之后", "replacement": "", "reason": "", "point_key": ""}}],
@@ -524,7 +537,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
     "material_reading": ["材料信息 -> 可转化要点 -> 答案表达"],
     "optimization_suggestions": ["具体建议"],
     "personalized_findings": [{{"finding": "跨题共性现象", "root_cause": "导致该现象的具体作答机制/原因", "next_step": "下一步针对这个原因练什么", "evidence_ids": [""], "confidence": "stage|recurring"}}],
-    "overall_summary": "说明整体完成情况、最大得分处和最大失分处",
+    "summary": {{"verdict": "不含分数的整体判断", "strengths": ["主要优点"], "weaknesses": ["主要问题"]}},
     "revised_answer": "可直接替换的修改版答案正文"
   }}
 }}
@@ -533,15 +546,15 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
 规则：
 1. 每个可计分 point_key 必须且只能出现一次，并逐字复制评分基准中的 point_key，不得翻译、改写或另起编号；先在原答案中查找同义表达，避免误判漏点。
 2. point_matches 的每项还必须输出 coverage_ratio（0—1）。hit 固定为1，miss固定为0；partial 根据 required_elements 中实际覆盖的核心语义给出0.1—0.9，不得把所有 partial 机械写成0.5。简洁同义表达完整覆盖核心语义时应判 hit，不能因没写 optional_details 而降分。
-3. hit/partial 的 answer_quote 必须是用户答案中的连续原文；找不到原句只能判 miss。annotations 中除 add 外 quote 必须是连续原文；add 必须填写可在原文精确定位的 anchor，并把拟补文字写入 replacement。
-4. dimension_scores 必须逐项覆盖评分基准 dimensions；max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。内容分需综合全部不等权采分点、准确性、完整性和材料转化质量，不得机械逐点相加。
+3. hit/partial 应提供用户答案中的短连续原文；若语义散落在多处，可用“……”连接按顺序出现的多个短片段。找不到一个完整长句不等于未命中。annotations 的定位规则保持严格。
+4. dimension_scores 必须逐项覆盖评分基准 dimensions；max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。point_based 模式的内容分最终由系统按必答点计算；holistic_essay 模式必须整体评价立意、材料转化和论证质量，具体材料案例只是可替代论据，不得因未使用某一则材料直接判核心任务失败。
 5. 同一个问题只能在最相关维度扣一次，不得再使用 overall_quality_ratio、总分系数或统一封顶。
 6. recurring 只在 history_stable=true 时使用，否则写 stage。
 7. personalized_findings 只能引用上面存在且 role=personalization 的 evidence_id。
 8. personalized_findings 的 finding 必须指出跨题共性（至少 2 条证据支撑才算 recurring）；root_cause 分析具体环节而不是复述症状；next_step 给出可执行的下一道题训练动作。宁可少写一条，也不要写空话。
 9. 修改版答案必须按结构化 word_budget 生成，以 suggested_min—suggested_max 为目标，并至少预留8格安全余量。{ANSWER_GRID_RULES}
 10. 输出修改版答案前先在内部按上述规则估算占格；除文种或结构确有需要外避免手动换行，因为换行会结算当前行剩余格。不得用空话凑字数，也不得为了写全 optional_details 挤占 required 点。
-11. 不直接输出总分；系统将各维度 score 相加，并缩放到原题满分。
+11. 不直接输出总分、分数算式、折算分或等级；系统将各维度 score 相加、校准并缩放到原题满分。
 12. 同题人工纠错优先用于识别同义表达，但本次 hit/partial 仍必须给出当前用户答案中的连续原句。
 13. 上面的机构参考答案数量大于 0 时，reference_fusion 必须说明实际纳入的机构答案及其共性/差异，严禁写“无参考答案”“无额外参考答案”或“未提供参考答案”。
 """

@@ -40,6 +40,8 @@ desktop_host/gongkao_desktop_host.exe
 
 # Isolated product-video workspace (generated/private outputs)
 .demo-data/
+/video/
+/scripts/demo/
 video/node_modules/
 video/.remotion/
 video/public/captures/*.webm
@@ -49,6 +51,8 @@ video/public/captures/profile/
 video/public/audio/voiceover/*.mp3
 video/out/*.mp4
 video/out/*.wav
+video/out/edge-tts-demos/
+video/public/audio/user-bgm.ogg
 video/artifacts/private/
 video/artifacts/voiceover/*.vtt
 playwright-report/

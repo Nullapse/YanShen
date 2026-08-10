@@ -86,8 +86,8 @@ DB_PATH = user_db_path()
 DEFAULT_APP_CONTEXT = ApplicationContext.create(DB_PATH, ROOT)
 AUTOSAVE_LOCK = DEFAULT_APP_CONTEXT.autosave.lock
 AUTOSAVE_REVISIONS = DEFAULT_APP_CONTEXT.autosave.revisions
-APP_VERSION = "1.4.0"
-APP_BUILD = "1.4.0.5"
+APP_VERSION = "1.4.1"
+APP_BUILD = "1.4.1.3"
 ASSET_VERSION = f"gk-{APP_BUILD.replace('.', '-')}"
 
 FILTER_RESTORE_BOOTSTRAP = ""

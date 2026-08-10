@@ -37,11 +37,11 @@ def _extract_matching_quote(quote, reason, answer_text):
     return ""
 
 
-RUBRIC_VERSION = "rubric-v4"
+RUBRIC_VERSION = "rubric-v5"
 
-RESULT_VERSION = "grading-result-v5"
+RESULT_VERSION = "grading-result-v6"
 
-PIPELINE_VERSION = "smart-grading-v4"
+PIPELINE_VERSION = "smart-grading-v5"
 
 CONSENSUS_MAX_MATERIAL_CLAUSES = 240
 
@@ -164,6 +164,34 @@ def question_display_max_score(question):
             if 0 < value <= 100:
                 return int(value) if value.is_integer() else value
     return 100
+
+
+def question_word_limit_text(question):
+    """Find the question's word/grid requirement across legacy source fields."""
+    question = question or {}
+    values = [
+        str(question.get(key) or "").strip()
+        for key in ("word_limit", "requirements", "prompt", "title", "original_text")
+    ]
+    range_pattern = re.compile(r"\d+\s*[～~—至到-]\s*\d+\s*(?:字|格)(?:以内|左右|之间)?")
+    # A source range is more informative than a legacy one-sided word_limit.
+    for text in values:
+        match = range_pattern.search(text)
+        if match:
+            return match.group(0)
+    explicit = values[0]
+    if explicit:
+        return explicit
+    patterns = (
+        re.compile(r"(?:不少于|不低于|不超过|不多于|控制在|约)\s*\d+\s*(?:字|格)(?:以内|左右)?"),
+        re.compile(r"\d+\s*(?:字|格)(?:以内|左右)"),
+    )
+    for text in values[1:]:
+        for pattern in patterns:
+            match = pattern.search(text)
+            if match:
+                return match.group(0)
+    return ""
 
 
 def question_score_is_estimated(question):

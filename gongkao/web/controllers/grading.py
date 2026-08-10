@@ -261,8 +261,9 @@ class GradingController:
                     evidence = json.loads(context_row["retrieval_json"] or "[]")
                     result = json.loads(context_row["result_json"] or "{}")
                     rubric = json.loads(context_row["rubric_json"] or "{}")
+                    validation = json.loads(context_row["validation_json"] or "{}")
                 except (TypeError, json.JSONDecodeError):
-                    evidence, result, rubric = [], {}, {}
+                    evidence, result, rubric, validation = [], {}, {}, {}
                 if result.get("dimension_scores"):
                     dimension_cards = []
                     for dimension in result.get("dimension_scores", []):
@@ -312,6 +313,28 @@ class GradingController:
                 point_by_key = {point.get("point_key"): point for point in rubric.get("points", [])}
                 consensus_summary = rubric.get("consensus_summary") or {}
                 retrieval_badge = " · 检索质量降级" if consensus_summary.get("degraded") else ""
+                call_labels = {
+                    "basic_grading": "基础模式批改",
+                    "rubric_generation": "建立评分基准",
+                    "rubric_repair": "修复评分基准",
+                    "grading": "正式批改",
+                    "request_retry": "请求失败后重试",
+                    "schema_repair": "修复返回结构",
+                    "independent_review": "独立复核",
+                    "revised_answer_compression": "压缩超字数修改稿",
+                }
+                call_items = []
+                for call in validation.get("api_calls") or []:
+                    purpose = call_labels.get(call.get("purpose"), call.get("purpose") or "模型调用")
+                    reason = call.get("reason") or ""
+                    reason_html = f"<small>{esc(reason)}</small>" if reason else ""
+                    call_items.append(
+                        f"<li><strong>第 {esc(call.get('index'))} 次：{esc(purpose)}</strong>{reason_html}</li>"
+                    )
+                if not call_items:
+                    call_items.append(
+                        "<li><strong>旧报告未记录逐次用途</strong><small>仅保留调用总次数。</small></li>"
+                    )
                 feedback_items = []
                 for match in result.get("point_matches", []):
                     point = point_by_key.get(match.get("point_key")) or {}
@@ -346,6 +369,7 @@ class GradingController:
                 smart_context_html = f"""
                 <details class="grading-context-panel">
                   <summary>本次使用的数据 · {context_row["api_call_count"]} 次 API · {context_row["latency_ms"]} ms{retrieval_badge}</summary>
+                  <ul class="grading-evidence-list">{"".join(call_items)}</ul>
                   <ul class="grading-evidence-list">{"".join(evidence_items)}</ul>
                 </details>
                 <details class="grading-feedback-panel">

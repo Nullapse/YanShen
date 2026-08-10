@@ -1,0 +1,219 @@
+{
+  "schema_version": "grading-anchor-eval-v1",
+  "question_results": [
+    {
+      "anchor_id": "16847799c371716e",
+      "question_id": 887,
+      "question_max_score": 20,
+      "predicted_score": 13.5,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 17
+    },
+    {
+      "anchor_id": "16847799c371716e",
+      "question_id": 888,
+      "question_max_score": 30,
+      "predicted_score": 17.5,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 16
+    },
+    {
+      "anchor_id": "16847799c371716e",
+      "question_id": 889,
+      "question_max_score": 50,
+      "predicted_score": 37.5,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 9
+    },
+    {
+      "anchor_id": "7c1e760d4277f5f9",
+      "question_id": 5442,
+      "question_max_score": 15,
+      "predicted_score": 11.5,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 9
+    },
+    {
+      "anchor_id": "7c1e760d4277f5f9",
+      "question_id": 5443,
+      "question_max_score": 20,
+      "predicted_score": 13.0,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 10
+    },
+    {
+      "anchor_id": "7c1e760d4277f5f9",
+      "question_id": 5444,
+      "question_max_score": 25,
+      "predicted_score": 12.5,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 10
+    },
+    {
+      "anchor_id": "7c1e760d4277f5f9",
+      "question_id": 5445,
+      "question_max_score": 40,
+      "predicted_score": 35.0,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 3
+    },
+    {
+      "anchor_id": "d9cfc83183aa253a",
+      "question_id": 5613,
+      "question_max_score": 15,
+      "predicted_score": 10.0,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 5
+    },
+    {
+      "anchor_id": "d9cfc83183aa253a",
+      "question_id": 5614,
+      "question_max_score": 20,
+      "predicted_score": 15.0,
+      "score_status": "provisional",
+      "review_triggered": true,
+      "reference_count_after_exclusion": 6
+    },
+    {
+      "anchor_id": "d9cfc83183aa253a",
+      "question_id": 5615,
+      "question_max_score": 25,
+      "predicted_score": 20.5,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 4
+    },
+    {
+      "anchor_id": "d9cfc83183aa253a",
+      "question_id": 5616,
+      "question_max_score": 40,
+      "predicted_score": 31.5,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 3
+    },
+    {
+      "anchor_id": "e10e235dc442b4fc",
+      "question_id": 804,
+      "question_max_score": 20,
+      "predicted_score": 19.5,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 27
+    },
+    {
+      "anchor_id": "e10e235dc442b4fc",
+      "question_id": 805,
+      "question_max_score": 20,
+      "predicted_score": 16.5,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 20
+    },
+    {
+      "anchor_id": "e10e235dc442b4fc",
+      "question_id": 806,
+      "question_max_score": 20,
+      "predicted_score": 16.0,
+      "score_status": "valid",
+      "review_triggered": false,
+      "reference_count_after_exclusion": 16
+    },
+    {
+      "anchor_id": "e10e235dc442b4fc",
+      "question_id": 807,
+      "question_max_score": 40,
+      "predicted_score": 33.0,
+      "score_status": "provisional",
+      "review_triggered": true,
+      "reference_count_after_exclusion": 10
+    }
+  ],
+  "failures": [],
+  "residuals": [
+    {
+      "anchor_id": "16847799c371716e",
+      "paper_id": 818,
+      "classification": "complete_exam",
+      "actual_score": 85.5,
+      "predicted_score": 68.5,
+      "residual": 17.0,
+      "questions": [
+        {
+          "question_id": 887,
+          "question_max_score": 20,
+          "predicted_score": 13.5,
+          "score_status": "valid",
+          "review_triggered": false,
+          "reference_count_after_exclusion": 17
+        },
+        {
+          "question_id": 888,
+          "question_max_score": 30,
+          "predicted_score": 17.5,
+          "score_status": "valid",
+          "review_triggered": false,
+          "reference_count_after_exclusion": 16
+        },
+        {
+          "question_id": 889,
+          "question_max_score": 50,
+          "predicted_score": 37.5,
+          "score_status": "valid",
+          "review_triggered": false,
+          "reference_count_after_exclusion": 9
+        }
+      ]
+    },
+    {
+      "anchor_id": "7c1e760d4277f5f9",
+      "paper_id": 2041,
+      "classification": "complete_exam",
+      "actual_score": 79.0,
+      "predicted_score": 72.0,
+      "residual": 7.0,
+      "questions": [
+        {
+          "question_id": 5442,
+          "question_max_score": 15,
+          "predicted_score": 11.5,
+          "score_status": "valid",
+          "review_triggered": false,
+          "reference_count_after_exclusion": 9
+        },
+        {
+          "question_id": 5443,
+          "question_max_score": 20,
+          "predicted_score": 13.0,
+          "score_status": "valid",
+          "review_triggered": false,
+          "reference_count_after_exclusion": 10
+        },
+        {
+          "question_id": 5444,
+          "question_max_score": 25,
+          "predicted_score": 12.5,
+          "score_status": "valid",
+          "review_triggered": false,
+          "reference_count_after_exclusion": 10
+        },
+        {
+          "question_id": 5445,
+          "question_max_score": 40,
+          "predicted_score": 35.0,
+          "score_status": "valid",
+          "review_triggered": false,
+          "reference_count_after_exclusion": 3
+        }
+      ]
+    }
+  ]
+}

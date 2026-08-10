@@ -74,6 +74,47 @@ test("alignment applies only to the caret line or selected paragraphs", async ()
   dom.window.close();
 });
 
+test("a new line inherits centered alignment and keeps the center button active", async () => {
+  const dom = installDom(`
+    <div class="answer-editor-toolbar" data-editor-toolbar data-editor-target="#answer">
+      <button type="button" data-editor-align="left">左</button>
+      <button type="button" data-editor-align="center">中</button>
+      <button type="button" data-editor-align="right">右</button>
+    </div>
+    <div id="answer" contenteditable="true" data-text-annotation
+      data-paragraph-alignments='["center"]'>居中标题</div>
+  `);
+  const practice = await import(`../../static/js/practice.js?enter-alignment=${Date.now()}`);
+  practice.initializeEditorToolbars(new AbortController().signal);
+  const editor = document.querySelector("#answer");
+  const firstLine = editor.querySelector(":scope > [data-editor-line]");
+  const selection = window.getSelection();
+  const caret = document.createRange();
+  caret.setStart(firstLine.firstChild, firstLine.firstChild.nodeValue.length);
+  caret.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(caret);
+  document.dispatchEvent(new Event("selectionchange"));
+
+  editor.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  firstLine.append(document.createTextNode("\n"));
+  const nextLineCaret = document.createRange();
+  nextLineCaret.setStart(firstLine.lastChild, 1);
+  nextLineCaret.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(nextLineCaret);
+  editor.dispatchEvent(new InputEvent("input", {
+    bubbles: true,
+    inputType: "insertParagraph",
+    data: null,
+  }));
+
+  assert.equal(practice.paragraphAlignmentsJson(editor), '["center","center"]');
+  assert.equal(document.querySelector('[data-editor-align="center"]').getAttribute("aria-pressed"), "true");
+  assert.equal(document.querySelector('[data-editor-align="left"]').getAttribute("aria-pressed"), "false");
+  dom.window.close();
+});
+
 test("an empty answer editor stays empty until the user types", async () => {
   const dom = installDom(`
     <div class="answer-editor-toolbar" data-editor-toolbar data-editor-target="#answer">

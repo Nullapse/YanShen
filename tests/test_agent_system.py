@@ -199,6 +199,72 @@ class AgentSystemTest(unittest.TestCase):
         if self.tmpdir.exists() and not any(self.tmpdir.iterdir()):
             self.tmpdir.rmdir()
 
+    def test_init_db_migrates_current_version_database_with_missing_columns(self):
+        with connect(self.db_file) as conn:
+            conn.execute("ALTER TABLE questions DROP COLUMN content_hash")
+            conn.execute("ALTER TABLE agent_context_chunks DROP COLUMN content_hash")
+            conn.execute("ALTER TABLE agent_context_vectors DROP COLUMN content_hash")
+            conn.execute("ALTER TABLE agent_context_dense_vectors DROP COLUMN content_hash")
+            conn.execute(
+                "UPDATE agent_context_index_state SET dirty = 0, full_rebuild = 0 WHERE id = 1"
+            )
+
+        init_db(self.db_file)
+
+        with connect(self.db_file) as conn:
+            for table in (
+                "questions",
+                "agent_context_chunks",
+                "agent_context_vectors",
+                "agent_context_dense_vectors",
+            ):
+                columns = {
+                    row["name"] for row in conn.execute(f"PRAGMA table_info({table})")
+                }
+                self.assertIn("content_hash", columns)
+            state = conn.execute(
+                "SELECT dirty, full_rebuild FROM agent_context_index_state WHERE id = 1"
+            ).fetchone()
+            self.assertEqual((state["dirty"], state["full_rebuild"]), (1, 1))
+            rebuild_agent_context_index(conn)
+            hashes = conn.execute(
+                "SELECT content_hash FROM agent_context_chunks"
+            ).fetchall()
+            self.assertTrue(hashes)
+            self.assertTrue(all(row["content_hash"] for row in hashes))
+
+    def test_init_db_recreates_current_version_derived_index_tables(self):
+        with connect(self.db_file) as conn:
+            conn.execute("DROP TABLE agent_context_fts")
+            conn.execute("DROP TABLE agent_context_vectors")
+            conn.execute(
+                "UPDATE agent_context_index_state SET dirty = 0, full_rebuild = 0 WHERE id = 1"
+            )
+
+        init_db(self.db_file)
+
+        with connect(self.db_file) as conn:
+            tables = {
+                row["name"]
+                for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+            }
+            self.assertIn("agent_context_fts", tables)
+            self.assertIn("agent_context_vectors", tables)
+            state = conn.execute(
+                "SELECT dirty, full_rebuild FROM agent_context_index_state WHERE id = 1"
+            ).fetchone()
+            self.assertEqual((state["dirty"], state["full_rebuild"]), (1, 1))
+
+    def test_init_db_rejects_legacy_schema_versions(self):
+        for version in (4, 5):
+            with self.subTest(version=version):
+                with connect(self.db_file) as conn:
+                    conn.execute(f"PRAGMA user_version = {version}")
+                with self.assertRaisesRegex(
+                    RuntimeError, f"unsupported database schema {version}"
+                ):
+                    init_db(self.db_file)
+
     def test_agent_tables_exist_and_api_run_persists_trace(self):
         with patch("gongkao.agent_graph._graph_for", return_value=FakeGraph()):
             run_id = run_agent(

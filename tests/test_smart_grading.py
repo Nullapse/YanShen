@@ -83,6 +83,32 @@ class SmartGradingTest(unittest.TestCase):
         def chat(settings, prompt, request_options=None):
             calls.append(prompt)
             chat.request_options.append(request_options or {})
+            if "<rubric_json>" in prompt:
+                payload = {
+                    "question_id": 1,
+                    "task_constraints": {"object": "数字服务变化", "required_structure": ["分点"], "format_rules": []},
+                    "points": [
+                        {
+                            "point_key": "point-convenience", "label": "办事便利",
+                            "canonical_expression": "提高村民办事便利度", "aliases": ["办事方便"],
+                            "tier": "core", "importance": "critical", "suggested_weight": 45,
+                            "weight_reason": "直接回应主要变化。", "required_for_full_score": True,
+                            "material_evidence": [{"material_number": 1, "quote": "村民办事更加方便"}],
+                            "reference_ids": reference_ids, "confidence": 0.92,
+                        },
+                        {
+                            "point_key": "point-timely", "label": "查询及时",
+                            "canonical_expression": "政策查询更加及时", "aliases": [],
+                            "tier": "core", "importance": "major", "suggested_weight": 25,
+                            "weight_reason": "属于另一项重要变化。", "required_for_full_score": True,
+                            "material_evidence": [{"material_number": 1, "quote": "政策查询也更加及时"}],
+                            "reference_ids": reference_ids, "confidence": 0.9,
+                        },
+                    ],
+                    "conflicts": [],
+                }
+                text = f"<rubric_json>{json.dumps(payload, ensure_ascii=False)}</rubric_json>"
+                return text, text
             if "<smart_grading_json>" in prompt:
                 rubric_payload = None
                 if "系统校验后的评分基准：\n" in prompt:
@@ -174,13 +200,13 @@ class SmartGradingTest(unittest.TestCase):
             ):
                 report_id = run_grading_job(path, job["id"], chat)
             self.assertIsNotNone(report_id)
-            self.assertEqual(len(calls), 1)
+            self.assertEqual(len(calls), 2)
             self.assertIn("机构参考答案样本提示", calls[0])
             self.assertIn("样本不足", calls[0])
-            self.assertEqual([item.get("thinking") for item in chat.request_options], ["disabled"])
+            self.assertEqual([item.get("thinking") for item in chat.request_options], ["disabled", "disabled"])
             self.assertEqual(
                 [item.get("response_format") for item in chat.request_options],
-                [{"type": "json_object"}],
+                [{"type": "json_object"}, {"type": "json_object"}],
             )
 
             with connect(path) as conn:
@@ -193,11 +219,27 @@ class SmartGradingTest(unittest.TestCase):
             ):
                 second_report_id = run_grading_job(path, second_job["id"], chat)
             self.assertIsNotNone(second_report_id)
-            self.assertEqual(len(calls), 2)
+            self.assertEqual(len(calls), 3)
             with connect(path) as conn:
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM grading_rubrics").fetchone()[0], 1)
                 self.assertEqual(conn.execute("SELECT status FROM grading_jobs WHERE id = ?", (second_job["id"],)).fetchone()[0], "completed")
                 self.assertEqual(conn.execute("SELECT api_call_count FROM grading_report_contexts WHERE report_id = ?", (second_report_id,)).fetchone()[0], 1)
+                first_validation = json.loads(conn.execute(
+                    "SELECT validation_json FROM grading_report_contexts WHERE report_id = ?",
+                    (report_id,),
+                ).fetchone()[0])
+                second_validation = json.loads(conn.execute(
+                    "SELECT validation_json FROM grading_report_contexts WHERE report_id = ?",
+                    (second_report_id,),
+                ).fetchone()[0])
+            self.assertEqual(
+                [item["purpose"] for item in first_validation["api_calls"]],
+                ["rubric_generation", "grading"],
+            )
+            self.assertEqual(
+                [item["purpose"] for item in second_validation["api_calls"]],
+                ["grading"],
+            )
 
     def test_consensus_preprocessing_never_starts_dense_model_and_bounds_materials(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -296,7 +338,7 @@ class SmartGradingTest(unittest.TestCase):
             ):
                 report_id = run_grading_job(path, job["id"], chat)
             self.assertIsNotNone(report_id)
-            self.assertEqual([item.get("thinking") for item in chat.request_options], ["disabled"])
+            self.assertEqual([item.get("thinking") for item in chat.request_options], ["disabled", "disabled"])
             with connect(path) as conn:
                 options = json.loads(conn.execute("SELECT options_json FROM grading_jobs WHERE id = ?", (job["id"],)).fetchone()[0])
                 validation = json.loads(conn.execute("SELECT validation_json FROM grading_report_contexts WHERE report_id = ?", (report_id,)).fetchone()[0])
@@ -336,7 +378,7 @@ class SmartGradingTest(unittest.TestCase):
                 report_id = run_grading_job(path, job["id"], overflowing_chat)
 
             self.assertIsNotNone(report_id)
-            self.assertEqual(len(calls), 2)
+            self.assertEqual(len(calls), 3)
             with connect(path) as conn:
                 failed_job = conn.execute("SELECT * FROM grading_jobs WHERE id = ?", (job["id"],)).fetchone()
                 saved_report = conn.execute(
@@ -354,6 +396,10 @@ class SmartGradingTest(unittest.TestCase):
             self.assertEqual(saved_report["status"], "ok")
             self.assertIn("乙" * 250, saved_report["report_text"])
             self.assertTrue(validation["word_count_status"]["over_limit"])
+            self.assertEqual(
+                [item["purpose"] for item in validation["api_calls"]],
+                ["rubric_generation", "grading", "revised_answer_compression"],
+            )
             payload = grading_job_payload(failed_job)
             self.assertFalse(payload["preview_available"])
             self.assertEqual(payload["report_id"], report_id)
@@ -445,7 +491,9 @@ class SmartGradingTest(unittest.TestCase):
             [],
         )
         self.assertEqual(result["score"], 0)
-        self.assertEqual(result["point_matches"][0]["status"], "miss")
+        self.assertEqual(result["point_matches"][0]["status"], "hit")
+        self.assertEqual(result["point_matches"][0]["evidence_status"], "unresolved")
+        self.assertEqual(result["score_status"], "provisional")
 
     def test_partial_matches_use_ai_coverage_instead_of_fixed_half(self):
         rubric = {
@@ -671,8 +719,8 @@ class SmartGradingTest(unittest.TestCase):
                     ).fetchone()[0]
                 )
             self.assertEqual(result["answer_snapshot"], original_answer)
-            self.assertIn(original_answer, calls[0])
-            self.assertNotIn("批改开始后编辑的新答案", calls[0])
+            self.assertIn(original_answer, calls[1])
+            self.assertNotIn("批改开始后编辑的新答案", calls[1])
 
     def test_feedback_marks_holistic_score_stale_without_model_call(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -700,7 +748,7 @@ class SmartGradingTest(unittest.TestCase):
                 ).fetchone()[0]
                 self.assertIn("原评分（已过期）", report_text)
                 self.assertEqual(build_training_statistics(conn)["recognized_scores"], 0)
-            self.assertEqual(len(calls), 1)
+            self.assertEqual(len(calls), 2)
 
     def test_question_type_profiles_match_holistic_scoring_plan(self):
         self.assertEqual(QUESTION_TYPE_PROFILES["归纳概括"], {"content": 70, "structure": 15, "expression": 10, "format": 5})
@@ -775,7 +823,7 @@ class SmartGradingTest(unittest.TestCase):
                 [],
             )
 
-    def test_holistic_score_is_calibrated_to_weighted_coverage(self):
+    def test_point_based_content_score_comes_from_resolved_required_coverage(self):
         rubric = {
             "question_type": "归纳概括",
             "display_max_score": 10,
@@ -791,12 +839,11 @@ class SmartGradingTest(unittest.TestCase):
             ],
         }
         result = validate_grading_result(raw, rubric, "有效原句", [])
-        self.assertEqual(result["content_score"], 57.7)
-        self.assertEqual(result["score"], 84.6)
-        self.assertEqual(result["display_score"], 8.5)
-        self.assertIn("采分点覆盖校准", result["holistic_adjustment_reason"])
-        self.assertNotIn("真实考场高分稀缺度", result["holistic_adjustment_reason"])
-        self.assertTrue(any("真实考场高分稀缺度" in note for note in result["validation_errors"]))
+        self.assertEqual(result["content_score"], 70.0)
+        self.assertEqual(result["score"], 100.0)
+        self.assertEqual(result["display_score"], 10.0)
+        self.assertEqual(result["score_calibration"]["adjustment"], 0.0)
+        self.assertEqual(result["score_status"], "valid")
 
     def test_dimension_prompt_starts_from_evidence_not_full_marks(self):
         from gongkao.grading_pipeline.evidence import DIMENSION_SCORING_GUIDANCE, _dimension_score_template
@@ -836,13 +883,17 @@ class SmartGradingTest(unittest.TestCase):
         self.assertTrue(question_score_is_estimated({"prompt": "概括主要做法。"}))
         self.assertFalse(question_score_is_estimated({"prompt": "分析原因。（100分）"}))
 
-    def test_validation_failure_never_uses_more_than_two_api_calls(self):
+    def test_validation_failure_never_uses_more_than_three_api_calls(self):
         with tempfile.TemporaryDirectory() as directory:
             path, _, attempt_id, reference_ids = self.make_database(directory)
             calls = []
 
+            valid_rubric_chat = self.fake_chat(reference_ids, [])
+
             def invalid_chat(settings, prompt, request_options=None):
                 calls.append(prompt)
+                if "<rubric_json>" in prompt:
+                    return valid_rubric_chat(settings, prompt, request_options)
                 text = "<smart_grading_json>{\"evaluation\": {}}</smart_grading_json>"
                 return text, text
 
@@ -856,7 +907,7 @@ class SmartGradingTest(unittest.TestCase):
             ):
                 report_id = run_grading_job(path, job["id"], invalid_chat)
             self.assertIsNone(report_id)
-            self.assertEqual(len(calls), 2)
+            self.assertEqual(len(calls), 3)
             with connect(path) as conn:
                 self.assertEqual(
                     conn.execute("SELECT status FROM grading_jobs WHERE id = ?", (job["id"],)).fetchone()[0],

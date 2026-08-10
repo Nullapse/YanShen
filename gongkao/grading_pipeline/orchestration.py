@@ -13,6 +13,7 @@ from ..grading import (
     replace_revised_answer_body,
     revised_answer_word_count_status,
 )
+from .calibration import load_calibration_policy
 from .common import (
     PIPELINE_VERSION,
     QUESTION_TYPE_PROFILES,
@@ -22,13 +23,14 @@ from .common import (
     grading_input_hash,
     question_display_max_score,
     question_score_is_estimated,
+    question_word_limit_text,
     reference_set_hash,
     rubric_source_hash,
 )
 from .contracts import GradingJobOptions
 from .evidence import (
+    ESSAY_SCORING_GUIDANCE,
     _save_rubric_to_db,
-    build_combined_grading_prompt,
     build_grading_prompt,
     retrieve_grading_evidence,
 )
@@ -111,6 +113,44 @@ def _smart_response_parts(response, expects_rubric):
     return rubric, evaluation
 
 
+def _build_review_prompt(question, rubric, answer_text, result):
+    essay_guidance = ESSAY_SCORING_GUIDANCE if question.get("question_type") == "综合写作" else ""
+    return f"""你正在复核一份申论智能评分中的结构化冲突。只纠正采分点状态、证据短引文和维度分，不重写点评或修改版答案。
+
+题目信息：
+{json.dumps({key: question.get(key) for key in ('question_type', 'prompt', 'requirements', 'word_limit')}, ensure_ascii=False)}
+
+评分基准：
+{json.dumps(rubric, ensure_ascii=False)}
+
+用户答案：
+{answer_text}
+
+待复核结果与触发原因：
+{json.dumps({'point_matches': result.get('point_matches'), 'dimension_scores': result.get('dimension_scores'), 'review': result.get('review')}, ensure_ascii=False)}
+
+{essay_guidance}
+
+只输出 <smart_grading_json> 包裹的合法 JSON：
+<smart_grading_json>
+{{"evaluation": {{
+  "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "coverage_ratio": 0.0, "answer_quote": "一段短连续原文，或用……连接按顺序出现的短片段", "reason": "复核依据", "confidence": 0.0, "missing_elements": []}}],
+  "dimension_scores": [{{"dimension": "", "score": 0.0, "reason": "复核后的维度依据"}}]
+}}}}
+</smart_grading_json>
+
+规则：每个评分基准 point_key 和每个维度必须且只能出现一次；不得输出总分；不得因空格、标点、引号或省略号形式差异把已有语义改判为未命中；综合写作不要求机械覆盖每一则材料案例。
+"""
+
+
+def _merge_review_evaluation(original, reviewed):
+    merged = dict(original or {})
+    for key in ("point_matches", "dimension_scores", "holistic_adjustment_reason"):
+        if reviewed.get(key) is not None:
+            merged[key] = reviewed[key]
+    return merged
+
+
 def _call_grading_model(
     chat_completion_func,
     settings,
@@ -166,7 +206,7 @@ def run_grading_job(db_path, job_id, chat_completion_func):
                 materials,
                 options.get("custom_reference_answer") or "",
             )
-            run_state.reserve_model_call()
+            run_state.reserve_model_call("basic_grading", "基础模式正式批改")
             response, raw = _call_grading_model(
                 chat_completion_func,
                 settings,
@@ -228,9 +268,8 @@ def run_grading_job(db_path, job_id, chat_completion_func):
         if reused:
             _update_job(db_path, job_id, "reusing_rubric", 42, "已复用评分基准，正在准备综合批改…")
             consensus = {}
-            retrieval_rubric = rubric
         else:
-            _update_job(db_path, job_id, "building_rubric", 20, "正在轻量整理材料与参考答案…")
+            _update_job(db_path, job_id, "building_rubric", 20, "正在独立建立评分基准…")
             try:
                 with connect(db_path) as conn:
                     consensus = compact_reference_consensus(conn, references, materials)
@@ -248,13 +287,64 @@ def run_grading_job(db_path, job_id, chat_completion_func):
                     "degraded": True,
                     "error": str(consensus_error)[:300],
                 }
-            _update_job(db_path, job_id, "building_rubric", 34, "材料预处理完成，正在整理检索证据…")
-            retrieval_rubric = {"points": [], "question_type": question.get("question_type")}
+            rubric_prompt = build_rubric_prompt(question, materials, references, consensus)
+            prompts.append(rubric_prompt)
+            run_state.reserve_model_call("rubric_generation", "首次建立可缓存评分基准")
+            rubric_response, rubric_raw = _call_grading_model(
+                chat_completion_func,
+                settings,
+                rubric_prompt,
+                deep_thinking,
+                structured=True,
+            )
+            raw_parts.append(rubric_raw)
+            try:
+                parsed_rubric = extract_tagged_json(rubric_response, "rubric_json")
+                rubric = validate_rubric(
+                    parsed_rubric,
+                    question,
+                    materials,
+                    references,
+                    question_feedback,
+                )
+            except Exception:
+                if not run_state.can_call():
+                    raise
+                repair_prompt = _repair_json_prompt(rubric_prompt, rubric_response, "rubric_json")
+                prompts.append(repair_prompt)
+                run_state.reserve_model_call("rubric_repair", "评分基准返回格式校验失败")
+                rubric_response, rubric_raw = _call_grading_model(
+                    chat_completion_func,
+                    settings,
+                    repair_prompt,
+                    False,
+                    structured=True,
+                )
+                raw_parts.append(rubric_raw)
+                parsed_rubric = extract_tagged_json(rubric_response, "rubric_json")
+                rubric = validate_rubric(
+                    parsed_rubric,
+                    question,
+                    materials,
+                    references,
+                    question_feedback,
+                )
+            cached_row, rubric = _save_rubric_to_db(
+                db_path,
+                question,
+                references,
+                materials,
+                settings,
+                question_feedback,
+                parsed_rubric,
+                consensus,
+            )
+            _update_job(db_path, job_id, "building_rubric", 38, "评分基准已建立，正在整理检索证据…")
 
         _update_job(db_path, job_id, "retrieving", 46, "正在检索本题相关训练证据…")
         try:
             with connect(db_path) as conn:
-                evidence, history_meta = retrieve_grading_evidence(conn, question, attempt, retrieval_rubric, options)
+                evidence, history_meta = retrieve_grading_evidence(conn, question, attempt, rubric, options)
         except Exception as retrieval_error:
             evidence = []
             history_meta = {
@@ -271,34 +361,20 @@ def run_grading_job(db_path, job_id, chat_completion_func):
             58,
             "已连接 AI，正在完成采分点分析与综合评分…",
         )
-        prompt = (
-            build_grading_prompt(
-                question,
-                materials,
-                attempt,
-                rubric,
-                evidence,
-                options.get("custom_reference_answer") or "",
-                history_meta,
-                question_feedback,
-                references,
-            )
-            if reused
-            else build_combined_grading_prompt(
-                question,
-                materials,
-                references,
-                attempt,
-                consensus,
-                evidence,
-                options.get("custom_reference_answer") or "",
-                history_meta,
-                question_feedback,
-            )
+        prompt = build_grading_prompt(
+            question,
+            materials,
+            attempt,
+            rubric,
+            evidence,
+            options.get("custom_reference_answer") or "",
+            history_meta,
+            question_feedback,
+            references,
         )
         prompts.append(prompt)
         try:
-            run_state.reserve_model_call()
+            run_state.reserve_model_call("grading", "正式结构化批改")
             response, raw = _call_grading_model(
                 chat_completion_func,
                 settings,
@@ -308,9 +384,9 @@ def run_grading_job(db_path, job_id, chat_completion_func):
             )
             raw_parts.append(raw)
         except Exception:
-            if run_state.api_calls >= 2:
+            if not run_state.can_call():
                 raise
-            run_state.reserve_model_call()
+            run_state.reserve_model_call("request_retry", "正式批改请求失败后重试")
             response, raw = _call_grading_model(
                 chat_completion_func,
                 settings,
@@ -320,43 +396,30 @@ def run_grading_job(db_path, job_id, chat_completion_func):
             )
             raw_parts.append(raw)
 
-        def parse_and_validate(candidate_response):
-            rubric_payload, evaluation = _smart_response_parts(candidate_response, expects_rubric=not reused)
-            candidate_rubric = rubric
-            if not reused:
-                candidate_rubric = validate_rubric(
-                    rubric_payload,
-                    question,
-                    materials,
-                    references,
-                    question_feedback,
-                )
-                candidate_rubric["source_hash"] = source_hash
-                candidate_rubric["reference_set_hash"] = ref_hash
-                candidate_rubric["consensus_summary"] = {
-                    "embedding_model": consensus.get("embedding_model"),
-                    "preprocessing_mode": consensus.get("preprocessing_mode"),
-                    "degraded": bool(consensus.get("degraded")),
-                    "organization_count": consensus.get("organization_count"),
-                    "source_clause_count": consensus.get("source_clause_count"),
-                    "material_clause_count": consensus.get("material_clause_count"),
-                }
+        calibration_policy = load_calibration_policy()
+
+        def parse_and_validate(candidate_response, reviewed=False, original_evaluation=None):
+            _, evaluation = _smart_response_parts(candidate_response, expects_rubric=False)
+            if original_evaluation is not None:
+                evaluation = _merge_review_evaluation(original_evaluation, evaluation)
             candidate_result = validate_grading_result(
                 evaluation,
-                candidate_rubric,
+                rubric,
                 attempt.get("answer_text") or "",
                 evidence,
+                calibration_policy=calibration_policy,
+                reviewed=reviewed,
             )
-            return rubric_payload, candidate_rubric, candidate_result
+            return evaluation, candidate_result
 
         _update_job(db_path, job_id, "validating", 82, "正在校验权重、引用与综合维度分…")
         try:
-            parsed_rubric, rubric, result = parse_and_validate(response)
+            evaluation, result = parse_and_validate(response)
         except Exception as validation_error:
-            if run_state.api_calls >= 2:
+            if not run_state.can_call():
                 raise
             repair_prompt = _repair_smart_response_prompt(prompt, response, str(validation_error))
-            run_state.reserve_model_call()
+            run_state.reserve_model_call("schema_repair", str(validation_error))
             response, repair_raw = _call_grading_model(
                 chat_completion_func,
                 settings,
@@ -365,31 +428,52 @@ def run_grading_job(db_path, job_id, chat_completion_func):
                 structured=True,
             )
             raw_parts.append(repair_raw)
-            parsed_rubric, rubric, result = parse_and_validate(response)
+            evaluation, result = parse_and_validate(response)
 
-        if not reused:
-            cached_row, rubric = _save_rubric_to_db(
-                db_path,
+        if result.get("review", {}).get("triggered") and run_state.can_call():
+            _update_job(db_path, job_id, "validating", 87, "发现关键证据冲突，正在独立复核…")
+            review_prompt = _build_review_prompt(
                 question,
-                references,
-                materials,
-                settings,
-                question_feedback,
-                parsed_rubric,
-                consensus,
+                rubric,
+                attempt.get("answer_text") or "",
+                result,
             )
+            prompts.append(review_prompt)
+            review_reasons = result.get("review", {}).get("reasons") or []
+            run_state.reserve_model_call(
+                "independent_review",
+                "；".join(str(item) for item in review_reasons) or "评分证据触发独立复核",
+            )
+            review_response, review_raw = _call_grading_model(
+                chat_completion_func,
+                settings,
+                review_prompt,
+                False,
+                structured=True,
+            )
+            raw_parts.append(review_raw)
+            evaluation, result = parse_and_validate(
+                review_response,
+                reviewed=True,
+                original_evaluation=evaluation,
+            )
+        effective_word_limit = question_word_limit_text(question)
+        result["word_limit"] = effective_word_limit
         result["revised_answer"] = compact_revised_answer_linebreaks(
             result.get("revised_answer") or "",
-            question.get("word_limit") or "",
+            effective_word_limit,
         )
         result["answer_snapshot"] = attempt.get("answer_text") or ""
         report_text = render_grading_report(result, rubric, evidence)
-        report_text = normalize_revised_answer_word_count(report_text, question.get("word_limit") or "")
-        status = revised_answer_word_count_status(report_text, question.get("word_limit") or "")
-        if status["over_limit"] and run_state.api_calls < 2:
+        report_text = normalize_revised_answer_word_count(report_text, effective_word_limit)
+        status = revised_answer_word_count_status(report_text, effective_word_limit)
+        if status["over_limit"] and run_state.can_call():
             _update_job(db_path, job_id, "repairing_answer", 90, "修改版答案超出硬限制，正在局部压缩…")
-            retry_prompt = build_revised_answer_retry_prompt(prompt, report_text, question.get("word_limit") or "")
-            run_state.reserve_model_call()
+            retry_prompt = build_revised_answer_retry_prompt(prompt, report_text, effective_word_limit)
+            run_state.reserve_model_call(
+                "revised_answer_compression",
+                f"修改版答案超过字数硬上限 {status['over_by']} 字",
+            )
             repair_response, repair_raw = _call_grading_model(
                 chat_completion_func,
                 settings,
@@ -402,16 +486,20 @@ def run_grading_job(db_path, job_id, chat_completion_func):
                 result["revised_answer"] = repaired_answer
                 report_text = render_grading_report(result, rubric, evidence)
                 report_text = replace_revised_answer_body(
-                    report_text, repaired_answer, question.get("word_limit") or ""
+                    report_text, repaired_answer, effective_word_limit
                 )
-        status = revised_answer_word_count_status(report_text, question.get("word_limit") or "")
+        status = revised_answer_word_count_status(report_text, effective_word_limit)
         latency_ms = run_state.latency_ms()
         validation = {
             "errors": result.get("validation_errors") or [],
             "score": result.get("score"),
+            "score_status": result.get("score_status"),
+            "review": result.get("review") or {},
+            "score_calibration": result.get("score_calibration") or {},
             "history_meta": history_meta,
             "deep_thinking": deep_thinking,
             "word_count_status": status,
+            "api_calls": run_state.api_call_audit,
         }
         with connect(db_path) as conn:
             cursor = conn.execute(
@@ -452,7 +540,11 @@ def run_grading_job(db_path, job_id, chat_completion_func):
         completed_message = (
             f"智能批改完成，修改版答案超出字数限制 {status['over_by']} 字。"
             if status["over_limit"]
-            else "智能批改完成。"
+            else (
+                "智能批改已生成待复核结果。"
+                if result.get("score_status") == "provisional"
+                else "智能批改完成。"
+            )
         )
         _update_job(db_path, job_id, "completed", 100, completed_message, report_id=report_id, retryable=0)
         logging.info(

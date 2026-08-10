@@ -12,7 +12,7 @@ ACTIVE_JOB_STATUSES = (
     "validating",
     "repairing_answer",
 )
-MAX_MODEL_CALLS = 2
+MAX_MODEL_CALLS = 3
 
 
 class GradingErrorCategory(StrEnum):
@@ -31,11 +31,23 @@ class GradingRunState:
     raw_parts: list[str] = field(default_factory=list)
     prompts: list[str] = field(default_factory=list)
     api_calls: int = 0
+    api_call_audit: list[dict[str, object]] = field(default_factory=list)
 
-    def reserve_model_call(self) -> None:
+    def reserve_model_call(self, purpose: str = "unknown", reason: str = "") -> int:
         if self.api_calls >= MAX_MODEL_CALLS:
             raise RuntimeError(f"批改模型调用已达到上限（{MAX_MODEL_CALLS} 次）")
         self.api_calls += 1
+        self.api_call_audit.append(
+            {
+                "index": self.api_calls,
+                "purpose": str(purpose or "unknown"),
+                "reason": " ".join(str(reason or "").split())[:500],
+            }
+        )
+        return self.api_calls
+
+    def can_call(self) -> bool:
+        return self.api_calls < MAX_MODEL_CALLS
 
     def add_raw_response(self, raw: str) -> None:
         self.raw_parts.append(raw)

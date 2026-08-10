@@ -66,7 +66,7 @@ def build_training_statistics(conn, now=None):
              LEFT JOIN grading_report_contexts context
                     ON context.report_id = candidate.id
                  WHERE candidate.status = 'ok'
-                   AND COALESCE(json_extract(context.result_json, '$.score_status'), 'valid') <> 'stale'
+                   AND COALESCE(json_extract(context.result_json, '$.score_status'), 'valid') = 'valid'
               GROUP BY candidate.attempt_id
           ) latest ON latest.latest_id = gr.id
         """
@@ -178,7 +178,7 @@ def build_module_score_statistics(conn, score_mode="first"):
              LEFT JOIN grading_report_contexts context
                     ON context.report_id = candidate.id
                  WHERE candidate.status = 'ok'
-                   AND COALESCE(json_extract(context.result_json, '$.score_status'), 'valid') <> 'stale'
+                   AND COALESCE(json_extract(context.result_json, '$.score_status'), 'valid') = 'valid'
               GROUP BY candidate.attempt_id
           ) latest ON latest.attempt_id = a.id
           JOIN grading_reports gr ON gr.id = latest.latest_id

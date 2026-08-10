@@ -1,0 +1,916 @@
+{
+  "schema_version": "exam-anchor-manifest-v1",
+  "policy_version": "exam-anchor-calibration-v1",
+  "counts": {
+    "ambiguous": 16,
+    "complete_exam": 4,
+    "partial_exam": 29
+  },
+  "anchors": [
+    {
+      "anchor_id": "6c42918f6b75d773",
+      "paper_id": 285,
+      "paper_name": "2023年国家公考《申论》题（副省级）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 75.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        566
+      ],
+      "reference_ids": [
+        1519
+      ],
+      "covered_max_score": 20.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "3d08949e7febf9f8",
+      "paper_id": 289,
+      "paper_name": "2022年国家公考《申论》题（地市级）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 70.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        583
+      ],
+      "reference_ids": [
+        1886
+      ],
+      "covered_max_score": 15.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "14075d79efb2efb1",
+      "paper_id": 297,
+      "paper_name": "2023年浙江省公考《申论》题（C卷）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 75.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        621
+      ],
+      "reference_ids": [
+        3251
+      ],
+      "covered_max_score": 50.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "aee61562f8d6405c",
+      "paper_id": 303,
+      "paper_name": "2024年国家公考《申论》题（副省级）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 73.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        637
+      ],
+      "reference_ids": [
+        3445
+      ],
+      "covered_max_score": 15.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "e7646f323e95da39",
+      "paper_id": 310,
+      "paper_name": "2025年国家公考《申论》题（行政执法）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 70.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        665
+      ],
+      "reference_ids": [
+        4188
+      ],
+      "covered_max_score": 15.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "6c3aa668b59e2dc8",
+      "paper_id": 801,
+      "paper_name": "2024年广东省公考《申论》题（县镇）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 80.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        877
+      ],
+      "reference_ids": [
+        7465
+      ],
+      "covered_max_score": 50.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "97325b2b6ea233c9",
+      "paper_id": 832,
+      "paper_name": "2026年广东省公考《申论》题（行政执法）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 85.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        900
+      ],
+      "reference_ids": [
+        8580
+      ],
+      "covered_max_score": 20.0,
+      "paper_max_score": 65.0
+    },
+    {
+      "anchor_id": "7154df263014c321",
+      "paper_id": 1242,
+      "paper_name": "2024年公务员多省联考《申论》题（内蒙古旗县卷）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 80.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        2392
+      ],
+      "reference_ids": [
+        23928
+      ],
+      "covered_max_score": 25.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "07c0d44f5b4a6d25",
+      "paper_id": 1855,
+      "paper_name": "2023年公务员多省联考《申论》题（河南县级卷）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 78.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        4711
+      ],
+      "reference_ids": [
+        69874
+      ],
+      "covered_max_score": 20.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "85b734a47edd8420",
+      "paper_id": 1949,
+      "paper_name": "2020年0725公务员多省联考《申论》题（天津A卷）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 70.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        5096
+      ],
+      "reference_ids": [
+        70978
+      ],
+      "covered_max_score": 25.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "c3e45fbd222c2de8",
+      "paper_id": 1981,
+      "paper_name": "2023年公务员多省联考《申论》题（广西C卷）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 76.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        5215
+      ],
+      "reference_ids": [
+        71244
+      ],
+      "covered_max_score": 25.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "6ec39f2b3337dc19",
+      "paper_id": 2021,
+      "paper_name": "2024年公务员多省联考《申论》题（安徽C卷）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 78.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        5364
+      ],
+      "reference_ids": [
+        71655
+      ],
+      "covered_max_score": 25.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "d460dcba483aa085",
+      "paper_id": 2022,
+      "paper_name": "2024年公务员多省联考《申论》题（福建县乡卷）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 81.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        5366
+      ],
+      "reference_ids": [
+        71665
+      ],
+      "covered_max_score": 15.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "f70f932bd04d3aa5",
+      "paper_id": 2043,
+      "paper_name": "2024年深圳市公务员考试《申论》题（二卷）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 81.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        5451
+      ],
+      "reference_ids": [
+        72131
+      ],
+      "covered_max_score": 30.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "1f475148a93c469b",
+      "paper_id": 2061,
+      "paper_name": "2025年公务员多省联考《申论》题（山西县乡卷）",
+      "candidate_key": "啊呜一口芋泥",
+      "actual_score": 80.0,
+      "classification": "ambiguous",
+      "reason": "conflicting_answer_variants",
+      "question_ids": [
+        5518,
+        5519,
+        5520
+      ],
+      "reference_ids": [
+        72294,
+        72304,
+        72312,
+        72313
+      ],
+      "covered_max_score": 60.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "8d0714ab2d30c0d8",
+      "paper_id": 2069,
+      "paper_name": "2025年公务员多省联考《申论》题（安徽C卷）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 75.0,
+      "classification": "ambiguous",
+      "reason": "candidate_identity_missing",
+      "question_ids": [
+        5551
+      ],
+      "reference_ids": [
+        72465
+      ],
+      "covered_max_score": 25.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "e10e235dc442b4fc",
+      "paper_id": 470,
+      "paper_name": "2024年江苏省公考《申论》题（A、乡镇选调卷）",
+      "candidate_key": "岸上的路小路a类",
+      "actual_score": 81.0,
+      "classification": "complete_exam",
+      "reason": "",
+      "question_ids": [
+        804,
+        805,
+        806,
+        807
+      ],
+      "reference_ids": [
+        3744,
+        3770,
+        3791,
+        3808
+      ],
+      "covered_max_score": 100.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "16847799c371716e",
+      "paper_id": 818,
+      "paper_name": "2025年广东省公考《申论》题（县镇）",
+      "candidate_key": "anonymous_complete_exam",
+      "actual_score": 85.5,
+      "classification": "complete_exam",
+      "reason": "",
+      "question_ids": [
+        887,
+        888,
+        889
+      ],
+      "reference_ids": [
+        8137,
+        8157,
+        8173
+      ],
+      "covered_max_score": 100.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "7c1e760d4277f5f9",
+      "paper_id": 2041,
+      "paper_name": "2024年公务员多省联考《申论》题（山西县乡卷）",
+      "candidate_key": "小镇做题家",
+      "actual_score": 79.0,
+      "classification": "complete_exam",
+      "reason": "",
+      "question_ids": [
+        5442,
+        5443,
+        5444,
+        5445
+      ],
+      "reference_ids": [
+        72094,
+        72108,
+        72119,
+        72122
+      ],
+      "covered_max_score": 100.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "d9cfc83183aa253a",
+      "paper_id": 2085,
+      "paper_name": "2025年公务员多省联考《申论》题（黑龙江县乡卷、普通选调卷）",
+      "candidate_key": "胡巴",
+      "actual_score": 84.0,
+      "classification": "complete_exam",
+      "reason": "",
+      "question_ids": [
+        5613,
+        5614,
+        5615,
+        5616
+      ],
+      "reference_ids": [
+        72720,
+        72726,
+        72730,
+        72736
+      ],
+      "covered_max_score": 100.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "ca81fc0d07c801c3",
+      "paper_id": 289,
+      "paper_name": "2022年国家公考《申论》题（地市级）",
+      "candidate_key": "yy",
+      "actual_score": 80.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        583
+      ],
+      "reference_ids": [
+        1876
+      ],
+      "covered_max_score": 15.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "1a1a678747d6f422",
+      "paper_id": 303,
+      "paper_name": "2024年国家公考《申论》题（副省级）",
+      "candidate_key": "芭乐",
+      "actual_score": 80.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        635
+      ],
+      "reference_ids": [
+        3350
+      ],
+      "covered_max_score": 10.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "979ff0dd0c3cb03d",
+      "paper_id": 304,
+      "paper_name": "2024年国家公考《申论》题（地市级）",
+      "candidate_key": "上岸人讲",
+      "actual_score": 76.5,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        640
+      ],
+      "reference_ids": [
+        3496
+      ],
+      "covered_max_score": 10.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "8f10d6b56a077769",
+      "paper_id": 305,
+      "paper_name": "2024年国家公考《申论》题（行政执法）",
+      "candidate_key": "上岸人讲",
+      "actual_score": 76.5,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        645
+      ],
+      "reference_ids": [
+        3621
+      ],
+      "covered_max_score": 10.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "164d7ce16eaf0de2",
+      "paper_id": 309,
+      "paper_name": "2025年国家公考《申论》题（地市级）",
+      "candidate_key": "当当",
+      "actual_score": 73.5,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        659
+      ],
+      "reference_ids": [
+        4012
+      ],
+      "covered_max_score": 10.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "a1a24b63cb2df138",
+      "paper_id": 310,
+      "paper_name": "2025年国家公考《申论》题（行政执法）",
+      "candidate_key": "离别开出瓜",
+      "actual_score": 73.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        664
+      ],
+      "reference_ids": [
+        4177
+      ],
+      "covered_max_score": 10.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "e064645620753e00",
+      "paper_id": 310,
+      "paper_name": "2025年国家公考《申论》题（行政执法）",
+      "candidate_key": "hilunaaa",
+      "actual_score": 77.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        666
+      ],
+      "reference_ids": [
+        4234
+      ],
+      "covered_max_score": 20.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "66c45a147e6173cc",
+      "paper_id": 316,
+      "paper_name": "2026年国家公考《申论》题（副省级）",
+      "candidate_key": "大厂码公考",
+      "actual_score": 77.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        688
+      ],
+      "reference_ids": [
+        4854
+      ],
+      "covered_max_score": 10.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "a9d8de61d8a4f712",
+      "paper_id": 316,
+      "paper_name": "2026年国家公考《申论》题（副省级）",
+      "candidate_key": "大厂码考公",
+      "actual_score": 77.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        689,
+        690,
+        691
+      ],
+      "reference_ids": [
+        4861,
+        4867,
+        4874
+      ],
+      "covered_max_score": 55.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "176c0b6e519bd4cd",
+      "paper_id": 432,
+      "paper_name": "2023年江苏省公考《申论》题（A、乡镇选调卷）",
+      "candidate_key": "张夏",
+      "actual_score": 80.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        707
+      ],
+      "reference_ids": [
+        2577
+      ],
+      "covered_max_score": 20.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "a49bdde9253e94e9",
+      "paper_id": 434,
+      "paper_name": "2022年江苏省公考《申论》题（A、普通选调卷）",
+      "candidate_key": "中指的教室",
+      "actual_score": 77.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        717
+      ],
+      "reference_ids": [
+        2731
+      ],
+      "covered_max_score": 20.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "fccf6b1d3a15cd56",
+      "paper_id": 801,
+      "paper_name": "2024年广东省公考《申论》题（县镇）",
+      "candidate_key": "菜头公考学员",
+      "actual_score": 83.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        877
+      ],
+      "reference_ids": [
+        7464
+      ],
+      "covered_max_score": 50.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "060051466cc58cd0",
+      "paper_id": 818,
+      "paper_name": "2025年广东省公考《申论》题（县镇）",
+      "candidate_key": "xzzh",
+      "actual_score": 90.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        888
+      ],
+      "reference_ids": [
+        8168
+      ],
+      "covered_max_score": 30.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "0764c9f4063e1721",
+      "paper_id": 818,
+      "paper_name": "2025年广东省公考《申论》题（县镇）",
+      "candidate_key": "xzzhup主ahazels",
+      "actual_score": 90.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        889
+      ],
+      "reference_ids": [
+        8176
+      ],
+      "covered_max_score": 50.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "abd1457660deb459",
+      "paper_id": 819,
+      "paper_name": "2025年广东省公考《申论》题（省市）",
+      "candidate_key": "车公庙公考",
+      "actual_score": 82.5,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        891
+      ],
+      "reference_ids": [
+        8203
+      ],
+      "covered_max_score": 30.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "ec8c94d0334a5bfe",
+      "paper_id": 833,
+      "paper_name": "2026年广东省公考《申论》题（县镇）",
+      "candidate_key": "红薯",
+      "actual_score": 81.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        902
+      ],
+      "reference_ids": [
+        8587
+      ],
+      "covered_max_score": 20.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "088d5ef978ec23f3",
+      "paper_id": 1225,
+      "paper_name": "2025年公务员多省联考《申论》题（安徽B卷）",
+      "candidate_key": "公考椰子",
+      "actual_score": 80.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        2327,
+        2328,
+        2329
+      ],
+      "reference_ids": [
+        23760,
+        23769,
+        23780
+      ],
+      "covered_max_score": 60.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "09d0e2effcac25cc",
+      "paper_id": 1225,
+      "paper_name": "2025年公务员多省联考《申论》题（安徽B卷）",
+      "candidate_key": "江舟稳渡",
+      "actual_score": 85.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        2329
+      ],
+      "reference_ids": [
+        23778
+      ],
+      "covered_max_score": 25.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "1ff70219a74ee816",
+      "paper_id": 1247,
+      "paper_name": "2025年公务员多省联考《申论》题（山西省市卷）",
+      "candidate_key": "可可豆",
+      "actual_score": 76.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        2412,
+        2413,
+        2414
+      ],
+      "reference_ids": [
+        23996,
+        24002,
+        24008
+      ],
+      "covered_max_score": 60.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "d3f19cdc02fedc69",
+      "paper_id": 1247,
+      "paper_name": "2025年公务员多省联考《申论》题（山西省市卷）",
+      "candidate_key": "公考小王师",
+      "actual_score": 77.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        2412,
+        2413,
+        2414
+      ],
+      "reference_ids": [
+        23995,
+        24005,
+        24011
+      ],
+      "covered_max_score": 60.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "3a73ee32648690f8",
+      "paper_id": 1820,
+      "paper_name": "2023年广东省公考《申论》题（县级）",
+      "candidate_key": "菜头公考",
+      "actual_score": 83.5,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        4572,
+        4573
+      ],
+      "reference_ids": [
+        69253,
+        69275
+      ],
+      "covered_max_score": 50.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "c846fc2ab34797fc",
+      "paper_id": 1821,
+      "paper_name": "2023年广东省公考《申论》题（乡镇）",
+      "candidate_key": "b站广东小贝壳23年",
+      "actual_score": 86.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        4576
+      ],
+      "reference_ids": [
+        69334
+      ],
+      "covered_max_score": 15.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "3d74421029b8705e",
+      "paper_id": 1822,
+      "paper_name": "2022年广东省公考《申论》题（县级）",
+      "candidate_key": "菜头公考完善",
+      "actual_score": 82.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        4580,
+        4581
+      ],
+      "reference_ids": [
+        69380,
+        69393
+      ],
+      "covered_max_score": 50.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "e069ab5db22843b4",
+      "paper_id": 1889,
+      "paper_name": "2021年公务员多省联考《申论》题（江西省市县卷）",
+      "candidate_key": "江西华公教研室",
+      "actual_score": 80.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        4851
+      ],
+      "reference_ids": [
+        70335
+      ],
+      "covered_max_score": 25.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "7b916023e74711b0",
+      "paper_id": 2014,
+      "paper_name": "2023年公务员多省联考《申论》题（江西省市卷）",
+      "candidate_key": "叶",
+      "actual_score": 76.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        5335
+      ],
+      "reference_ids": [
+        71457
+      ],
+      "covered_max_score": 15.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "664ec9f9a5e2efbb",
+      "paper_id": 2040,
+      "paper_name": "2024年公务员多省联考《申论》题（山西省市卷）",
+      "candidate_key": "赫连江山",
+      "actual_score": 77.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        5438,
+        5439,
+        5440
+      ],
+      "reference_ids": [
+        72065,
+        72076,
+        72085
+      ],
+      "covered_max_score": 60.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "f1964c3c78dd7b30",
+      "paper_id": 2040,
+      "paper_name": "2024年公务员多省联考《申论》题（山西省市卷）",
+      "candidate_key": "还珠郭郭呗",
+      "actual_score": 76.0,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        5438,
+        5439,
+        5440
+      ],
+      "reference_ids": [
+        72066,
+        72074,
+        72086
+      ],
+      "covered_max_score": 60.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "923195d4b5483346",
+      "paper_id": 2041,
+      "paper_name": "2024年公务员多省联考《申论》题（山西县乡卷）",
+      "candidate_key": "年纪轻轻一遇挫折松散懈怠",
+      "actual_score": 80.5,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        5443
+      ],
+      "reference_ids": [
+        72104
+      ],
+      "covered_max_score": 20.0,
+      "paper_max_score": 100.0
+    },
+    {
+      "anchor_id": "eb83e0ad17a607f9",
+      "paper_id": 2085,
+      "paper_name": "2025年公务员多省联考《申论》题（黑龙江县乡卷、普通选调卷）",
+      "candidate_key": "知乎",
+      "actual_score": 81.3,
+      "classification": "partial_exam",
+      "reason": "",
+      "question_ids": [
+        5614
+      ],
+      "reference_ids": [
+        72724
+      ],
+      "covered_max_score": 20.0,
+      "paper_max_score": 100.0
+    }
+  ],
+  "policy": {
+    "policy_version": "exam-anchor-calibration-v1",
+    "enabled": false,
+    "anchor_count": 2,
+    "paper_count": 2,
+    "offset": 0.0,
+    "applicable_band": [
+      65,
+      100
+    ],
+    "full_effect_from": 75,
+    "max_adjustment": 3.0,
+    "baseline_mae": 12.0,
+    "calibrated_mae": 10.667,
+    "validation_method": "leave_one_paper_out",
+    "reason": "activation_gate_not_met"
+  }
+}

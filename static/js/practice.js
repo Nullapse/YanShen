@@ -537,6 +537,41 @@ export function initializeEditorToolbars(signal) {
         button.setAttribute("aria-pressed", active ? "true" : "false");
       });
     };
+    let pendingEnterAlignment = null;
+    const prepareEnterAlignment = (event) => {
+      if (event.key !== "Enter" || event.isComposing) return;
+      const snapshot = selectionSnapshot();
+      if (!snapshot || !snapshot.collapsed) {
+        pendingEnterAlignment = null;
+        return;
+      }
+      const currentLine = lineSpan(snapshot).start;
+      const beforeLineCount = editableValue(target).split("\n").length;
+      while (target.__paragraphAlignments.length < beforeLineCount) {
+        target.__paragraphAlignments.push("left");
+      }
+      pendingEnterAlignment = {
+        align: target.__paragraphAlignments[currentLine] || "left",
+        beforeLineCount,
+        insertAt: currentLine + 1,
+      };
+    };
+    const inheritEnterAlignment = () => {
+      const pending = pendingEnterAlignment;
+      pendingEnterAlignment = null;
+      if (!pending) return;
+      const afterLineCount = editableValue(target).split("\n").length;
+      const addedLines = Math.max(0, afterLineCount - pending.beforeLineCount);
+      if (!addedLines) return;
+      target.__paragraphAlignments.splice(
+        pending.insertAt,
+        0,
+        ...Array(addedLines).fill(pending.align),
+      );
+      saveSelection();
+      syncAlignButtons();
+      target.dispatchEvent(new CustomEvent("gongkao:editor-format-change", { bubbles: true }));
+    };
     const applyAlign = (align) => {
       const snapshot = target.__savedSelection || selectionSnapshot();
       if (!snapshot) return;
@@ -559,6 +594,8 @@ export function initializeEditorToolbars(signal) {
         applyAlign(button.dataset.editorAlign);
       }, signal ? { signal } : undefined);
     });
+    target.addEventListener("keydown", prepareEnterAlignment, signal ? { signal } : undefined);
+    target.addEventListener("input", inheritEnterAlignment, signal ? { signal } : undefined);
     target.addEventListener("keyup", saveSelection, signal ? { signal } : undefined);
     target.addEventListener("click", saveSelection, signal ? { signal } : undefined);
     if (target.isContentEditable) {

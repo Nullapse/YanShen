@@ -1,3 +1,5 @@
+import re
+
 from .contracts import GradingEvidence, GradingResult
 
 CONTENT_WEIGHTS = {
@@ -11,6 +13,19 @@ CONTENT_WEIGHTS = {
 
 def _format_score(value) -> str:
     return f"{round(float(value or 0), 1):g}"
+
+
+def _safe_overall_summary(result):
+    summary = result.get("summary")
+    if isinstance(summary, dict):
+        values = [summary.get("verdict")]
+        values.extend(summary.get("strengths") or [])
+        values.extend(summary.get("weaknesses") or [])
+        text = "；".join(str(value).strip("；。 ") for value in values if str(value or "").strip())
+    else:
+        text = str(result.get("overall_summary") or "").strip()
+    text = re.sub(r"(?:总评|总分|得分)\s*[：:].*?(?:。|$)", "", text).strip("；。 ")
+    return text or "请结合维度得分与采分点分析查看。"
 
 
 def render_grading_report(
@@ -28,6 +43,7 @@ def render_grading_report(
     )
     display_score = float(result.get("display_score") or 0)
     stale = result.get("score_status") == "stale"
+    provisional = result.get("score_status") == "provisional"
     score_label = "原评分（已过期）" if stale else "总分"
     estimated = " · 百分制估分" if result.get("score_is_estimated") else ""
     if score >= 80:
@@ -42,10 +58,15 @@ def render_grading_report(
         "## 总体评分",
         f"- {score_label}：{_format_score(display_score)}/{_format_score(display_max)}{estimated}",
         f"- 等级：{grade}",
-        f"- 综合判断：{result.get('overall_summary') or '请结合维度得分与采分点分析查看。'}",
+        f"- 综合判断：{_safe_overall_summary(result)}",
     ]
+    word_limit = str(result.get("word_limit") or rubric.get("word_limit") or "").strip()
+    if word_limit:
+        lines.append(f"- 字数要求：{word_limit}")
     if stale:
         lines.append("- 状态：采分点已人工纠正，总分待重新批改；该分数不计入统计。")
+    elif provisional:
+        lines.append("- 状态：存在尚未解析的关键证据，当前分数待复核且不计入统计。")
 
     display_scale = display_max / 100
     content_weight = CONTENT_WEIGHTS.get(rubric.get("question_type"), 70)
@@ -66,6 +87,13 @@ def render_grading_report(
     )
     if result.get("holistic_adjustment_reason"):
         lines.append(f"- 整体调整理由：{result['holistic_adjustment_reason']}")
+    calibration = result.get("score_calibration") or {}
+    if calibration.get("adjustment"):
+        lines.append(
+            "- 考场锚点校准："
+            f"{_format_score(calibration.get('raw_score'))}→{_format_score(score)}"
+            f"（{calibration.get('policy_version') or '未标注版本'}）"
+        )
     reference_count = int(
         rubric.get("selected_reference_count")
         or len(rubric.get("selected_references") or [])
@@ -99,6 +127,8 @@ def render_grading_report(
         if match.get("status") == "partial":
             ratio = round(float(match.get("coverage_ratio") or 0) * 100)
             status += f"（覆盖{ratio}%）"
+        if match.get("evidence_status") == "unresolved" and match.get("status") in {"hit", "partial"}:
+            status += " · 证据待复核"
         lines.append(
             "| {label} | {importance} | {weight} | {status} | {quote} | {reason} |".format(
                 label=(point.get("label") or match.get("point_key") or "").replace(

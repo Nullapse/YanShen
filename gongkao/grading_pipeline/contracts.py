@@ -29,6 +29,11 @@ class PointMatch(TypedDict):
     reason: str
     weight: NotRequired[float]
     importance: NotRequired[str]
+    coverage_role: NotRequired[str]
+    evidence_status: NotRequired[str]
+    evidence_spans: NotRequired[list[dict]]
+    confidence: NotRequired[float]
+    missing_elements: NotRequired[list[str]]
 
 
 class DimensionScore(TypedDict):
@@ -69,3 +74,7 @@ class GradingResult(TypedDict, total=False):
     content_score: float
     validation_errors: list[str]
     answer_snapshot: str
+    score_calibration: dict
+    review: dict
+    summary: dict
+    word_limit: str

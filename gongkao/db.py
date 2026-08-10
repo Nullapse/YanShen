@@ -592,10 +592,46 @@ REQUIRED_SCHEMA_TABLES = frozenset(
     )
 )
 
-# These three index/settings structures were added while the public database still used schema v4.
-# Keep the migration explicit: known additive changes are created in place;
-# any other missing current-version table is treated as corruption.
-SCHEMA_V4_ADDITIONS = """
+REQUIRED_SCHEMA_COLUMNS = {
+    "questions": frozenset({"content_hash"}),
+    "attempts": frozenset({"answer_format_json"}),
+    "agent_context_chunks": frozenset({"content_hash"}),
+    "agent_context_vectors": frozenset({"content_hash"}),
+    "agent_context_dense_vectors": frozenset({"content_hash"}),
+    "agent_context_pending": frozenset(
+        {"retry_count", "last_error", "next_retry_at", "status"}
+    ),
+    "agent_context_worker_state": frozenset(
+        {
+            "status",
+            "current_type",
+            "processed_count",
+            "total_count",
+            "failed_count",
+            "last_error",
+            "started_at",
+            "updated_at",
+        }
+    ),
+}
+
+CURRENT_SCHEMA_ADDITIVE_COLUMNS = {
+    "questions": (("content_hash", "TEXT NOT NULL DEFAULT ''"),),
+    "attempts": (("answer_format_json", "TEXT NOT NULL DEFAULT '[]'"),),
+    "agent_context_chunks": (("content_hash", "TEXT NOT NULL DEFAULT ''"),),
+    "agent_context_vectors": (("content_hash", "TEXT NOT NULL DEFAULT ''"),),
+    "agent_context_dense_vectors": (
+        ("content_hash", "TEXT NOT NULL DEFAULT ''"),
+    ),
+    "agent_context_pending": (
+        ("retry_count", "INTEGER NOT NULL DEFAULT 0"),
+        ("last_error", "TEXT NOT NULL DEFAULT ''"),
+        ("next_retry_at", "TEXT"),
+        ("status", "TEXT NOT NULL DEFAULT 'pending'"),
+    ),
+}
+
+CURRENT_SCHEMA_ADDITIONS = """
 CREATE TABLE IF NOT EXISTS agent_ai_settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     use_grading_api INTEGER NOT NULL DEFAULT 1 CHECK (use_grading_api IN (0, 1)),
@@ -635,7 +671,7 @@ CREATE TABLE IF NOT EXISTS agent_context_worker_state (
 
 INSERT OR IGNORE INTO agent_context_worker_state (id) VALUES (1);
 """
-SCHEMA_V4_ADDITIVE_TABLES = frozenset(
+CURRENT_SCHEMA_ADDITIVE_TABLES = frozenset(
     {
         "agent_ai_settings",
         "agent_context_vectors",
@@ -733,38 +769,68 @@ def _ensure_index_queue_triggers(conn):
             )
 
 
-def _ensure_index_worker_schema(conn):
-    pending_columns = {
-        row["name"] for row in conn.execute("PRAGMA table_info(agent_context_pending)")
-    }
-    additions = (
-        ("retry_count", "INTEGER NOT NULL DEFAULT 0"),
-        ("last_error", "TEXT NOT NULL DEFAULT ''"),
-        ("next_retry_at", "TEXT"),
-        ("status", "TEXT NOT NULL DEFAULT 'pending'"),
-    )
-    for name, declaration in additions:
-        if name not in pending_columns:
-            conn.execute(
-                f"ALTER TABLE agent_context_pending ADD COLUMN {name} {declaration}"
-            )
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS agent_context_worker_state (
-            id INTEGER PRIMARY KEY CHECK (id = 1),
-            status TEXT NOT NULL DEFAULT 'idle',
-            current_type TEXT NOT NULL DEFAULT '',
-            processed_count INTEGER NOT NULL DEFAULT 0,
-            total_count INTEGER NOT NULL DEFAULT 0,
-            failed_count INTEGER NOT NULL DEFAULT 0,
-            last_error TEXT NOT NULL DEFAULT '',
-            started_at TEXT,
-            updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )
-        """
-    )
+def _initialize_index_worker(conn):
     conn.execute("INSERT OR IGNORE INTO agent_context_worker_state (id) VALUES (1)")
     _ensure_index_queue_triggers(conn)
+
+
+def _migrate_current_schema(conn, existing_tables):
+    """Repair known additive drift inside the current schema version only."""
+    missing_tables = REQUIRED_SCHEMA_TABLES - existing_tables
+    additive_tables = missing_tables & CURRENT_SCHEMA_ADDITIVE_TABLES
+    migrated_index_table = bool(
+        additive_tables & {"agent_context_vectors", "agent_context_fts"}
+    )
+    if additive_tables:
+        conn.executescript(CURRENT_SCHEMA_ADDITIONS)
+        existing_tables = _table_names(conn)
+
+    for table, additions in CURRENT_SCHEMA_ADDITIVE_COLUMNS.items():
+        if table not in existing_tables:
+            continue
+        actual_columns = {
+            row["name"] for row in conn.execute(f"PRAGMA table_info({table})")
+        }
+        for column, declaration in additions:
+            if column in actual_columns:
+                continue
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {declaration}")
+            actual_columns.add(column)
+            if table in {
+                "agent_context_chunks",
+                "agent_context_vectors",
+                "agent_context_dense_vectors",
+            }:
+                migrated_index_table = True
+
+    if migrated_index_table and "agent_context_index_state" in existing_tables:
+        conn.execute(
+            "UPDATE agent_context_index_state SET dirty = 1, full_rebuild = 1 WHERE id = 1"
+        )
+    return existing_tables
+
+
+def _validate_current_schema(conn, existing_tables):
+    missing_tables = REQUIRED_SCHEMA_TABLES - existing_tables
+    if missing_tables:
+        names = ", ".join(sorted(missing_tables))
+        raise RuntimeError(
+            f"incompatible database schema {CURRENT_SCHEMA_VERSION}; missing tables: {names}"
+        )
+
+    missing_columns = []
+    for table, required_columns in REQUIRED_SCHEMA_COLUMNS.items():
+        actual_columns = {
+            row["name"] for row in conn.execute(f"PRAGMA table_info({table})")
+        }
+        missing_columns.extend(
+            f"{table}.{column}" for column in sorted(required_columns - actual_columns)
+        )
+    if missing_columns:
+        names = ", ".join(missing_columns)
+        raise RuntimeError(
+            f"incompatible database schema {CURRENT_SCHEMA_VERSION}; missing columns: {names}"
+        )
 
 
 def init_db(db_path):
@@ -779,33 +845,17 @@ def init_db(db_path):
                     raise RuntimeError(
                         f"unsupported database schema {version}; expected {CURRENT_SCHEMA_VERSION}"
                     )
-                if version not in {0, 4, 5, CURRENT_SCHEMA_VERSION}:
+                if version not in {0, CURRENT_SCHEMA_VERSION}:
                     raise RuntimeError(
                         f"unsupported database schema {version}; expected {CURRENT_SCHEMA_VERSION}"
                     )
-                missing_tables = REQUIRED_SCHEMA_TABLES - existing_tables
                 if version == 0 or not existing_tables:
                     conn.executescript(SCHEMA)
-                elif missing_tables:
-                    unknown_missing = missing_tables - SCHEMA_V4_ADDITIVE_TABLES
-                    if unknown_missing:
-                        names = ", ".join(sorted(unknown_missing))
-                        raise RuntimeError(f"current database schema is incomplete; missing tables: {names}")
-                    conn.executescript(SCHEMA_V4_ADDITIONS)
-                if version == 4:
-                    attempt_columns = {
-                        row["name"] for row in conn.execute("PRAGMA table_info(attempts)")
-                    }
-                    if "answer_format_json" not in attempt_columns:
-                        conn.execute(
-                            "ALTER TABLE attempts ADD COLUMN answer_format_json TEXT NOT NULL DEFAULT '[]'"
-                        )
-                attempt_columns = {
-                    row["name"] for row in conn.execute("PRAGMA table_info(attempts)")
-                }
-                if "answer_format_json" not in attempt_columns:
-                    raise RuntimeError("current database schema is incomplete; missing attempts.answer_format_json")
-                _ensure_index_worker_schema(conn)
+                    existing_tables = _table_names(conn)
+                elif version == CURRENT_SCHEMA_VERSION:
+                    existing_tables = _migrate_current_schema(conn, existing_tables)
+                _validate_current_schema(conn, existing_tables)
+                _initialize_index_worker(conn)
                 try:
                     conn.execute("PRAGMA journal_mode = WAL")
                 except Exception:

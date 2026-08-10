@@ -1,3 +1,6 @@
+import re
+
+from .calibration import apply_score_calibration
 from .common import (
     _NO_REFERENCE_CLAIMS,
     CRITERION_LABELS,
@@ -7,6 +10,7 @@ from .common import (
     _round_half,
 )
 from .contracts import GradingResult
+from .evidence_resolution import resolve_answer_evidence
 from .rubric import _default_criteria
 
 
@@ -27,16 +31,6 @@ def _coverage_factor(candidate, status):
         value = 0.5
     value = max(0.1, min(0.9, value))
     return round(value * 20) / 20
-
-
-def _exam_score_ceiling(score):
-    """Compress unusually high AI totals to a realistic closed-book exam scale."""
-    score = float(score or 0)
-    if score <= 70:
-        return round(score, 1)
-    # A raw model total above 70 still distinguishes strong answers, but the
-    # top range is deliberately harder to enter: even a raw 100 maps to 88.
-    return round(70 + (score - 70) * 0.6, 1)
 
 
 def _consistent_point_reason(status, reason, point):
@@ -96,6 +90,8 @@ def validate_grading_result(
     answer_text,
     evidence,
     report_feedback=None,
+    calibration_policy=None,
+    reviewed=False,
 ) -> GradingResult:
     """Validate model evidence while preserving its holistic dimension scores."""
     if isinstance(raw, dict) and isinstance(raw.get("evaluation"), dict):
@@ -104,7 +100,7 @@ def validate_grading_result(
         raise ValueError("批改结果不是 JSON 对象")
 
     points = sorted(
-        [point for point in rubric.get("points", []) if float(point.get("weight") or 0) > 0],
+        [point for point in rubric.get("points", []) if isinstance(point, dict) and point.get("point_key")],
         key=lambda point: (-float(point.get("weight") or 0), point.get("point_key") or ""),
     )
     point_by_key = {point["point_key"]: point for point in points}
@@ -122,11 +118,18 @@ def validate_grading_result(
         status = candidate.get("status")
         if status not in {"hit", "partial", "miss"}:
             status = "miss"
-        quote = _clean(candidate.get("answer_quote"), 180)
-        if status in {"hit", "partial"} and (not quote or quote not in answer_text):
-            status = "miss"
-            quote = ""
+        quote = _clean(candidate.get("answer_quote"), 240)
+        resolution = (
+            resolve_answer_evidence(quote, answer_text)
+            if status in {"hit", "partial"}
+            else {"status": "not_required", "quote": "", "spans": []}
+        )
+        if resolution["status"] == "resolved":
+            quote = _clean(resolution.get("quote"), 240)
         coverage = _coverage_factor(candidate, status)
+        coverage_role = point.get("coverage_role") or (
+            "required" if point.get("required_for_full_score", True) else "bonus"
+        )
         matches.append(
             {
                 "point_key": point["point_key"],
@@ -136,14 +139,35 @@ def validate_grading_result(
                 "reason": _consistent_point_reason(status, candidate.get("reason"), point),
                 "weight": round(float(point.get("weight") or 0), 3),
                 "importance": point.get("importance") or "supporting",
+                "coverage_role": coverage_role,
+                "evidence_status": resolution["status"],
+                "evidence_spans": resolution.get("spans") or [],
+                "confidence": max(0.0, min(1.0, float(candidate.get("confidence") or 0.7))),
+                "missing_elements": [
+                    _clean(value, 100)
+                    for value in (candidate.get("missing_elements") or [])
+                    if _clean(value)
+                ][:6],
             }
         )
 
     content_weight = float(
         (QUESTION_TYPE_PROFILES.get(rubric.get("question_type")) or QUESTION_TYPE_PROFILES["归纳概括"])["content"]
     )
+    scoring_mode = rubric.get("scoring_mode") or (
+        "holistic_essay" if rubric.get("question_type") == "综合写作" else "point_based"
+    )
     weighted_coverage = round(
-        sum(match["weight"] * match["coverage_ratio"] for match in matches),
+        sum(
+            match["weight"] * match["coverage_ratio"]
+            for match in matches
+            if match.get("coverage_role") in {"required", "alternative"}
+            and not (
+                scoring_mode == "point_based"
+                and match.get("status") in {"hit", "partial"}
+                and match.get("evidence_status") == "unresolved"
+            )
+        ),
         1,
     )
     dimensions = rubric.get("dimensions") or rubric.get("criteria") or _default_criteria(rubric.get("question_type"))
@@ -189,28 +213,16 @@ def validate_grading_result(
         0.0,
     )
     adjustment_reason = _clean(raw.get("holistic_adjustment_reason"), 360)
-    calibration_note = ""
-    if not blank_answer:
-        # Holistic quality may move the content score, but it must remain
-        # anchored to evidence-backed point coverage. Keeping this local also
-        # avoids an extra API retry solely because the model over-adjusted.
-        max_adjustment = content_weight * 0.08
-        lower_bound = max(0.0, weighted_coverage - max_adjustment)
-        upper_bound = min(content_weight, weighted_coverage + max_adjustment)
-        calibrated_content_score = round(
-            min(max(content_score, lower_bound), upper_bound),
-            1,
-        )
-        if calibrated_content_score != content_score:
-            calibration_note = f"综合内容分已按可核验采分点覆盖校准：{content_score:g}→{calibrated_content_score:g}。"
-            content_score = calibrated_content_score
-            for dimension in normalized_dimensions:
-                if dimension["dimension"] != "content":
-                    continue
-                dimension["score"] = content_score
-                dimension["reason"] = " ".join(value for value in (dimension.get("reason"), calibration_note) if value)
+    if not blank_answer and scoring_mode == "point_based":
+        content_score = min(content_weight, weighted_coverage)
+        for dimension in normalized_dimensions:
+            if dimension["dimension"] == "content":
+                dimension["score"] = round(content_score, 1)
+                dimension["reason"] = _clean(
+                    dimension.get("reason") or "内容分由必答采分点覆盖确定。",
+                    300,
+                )
                 break
-            adjustment_reason = " ".join(value for value in (adjustment_reason, calibration_note) if value)
 
     valid_evidence_ids = {card.get("evidence_id") for card in evidence if card.get("role") == "personalization"}
     history_stable = (
@@ -280,23 +292,60 @@ def validate_grading_result(
         )
 
     raw_score = round(sum(item["score"] for item in normalized_dimensions), 1)
-    score = _exam_score_ceiling(raw_score)
+    score, score_calibration = apply_score_calibration(raw_score, calibration_policy)
     if blank_answer:
         score = 0.0
-    exam_calibration_note = ""
+        score_calibration["adjustment"] = 0.0
     if raw_score > 0 and score != raw_score:
-        factor = score / raw_score
-        for dimension in normalized_dimensions:
-            dimension["score"] = round(dimension["score"] * factor, 1)
-        # Rounding individual dimensions can move the displayed sum by 0.1.
+        remaining = round(score - raw_score, 1)
+        if remaining < 0:
+            total = sum(item["score"] for item in normalized_dimensions) or 1
+            for dimension in normalized_dimensions:
+                share = remaining * dimension["score"] / total
+                dimension["score"] = round(max(0.0, dimension["score"] + share), 1)
+        else:
+            headroom = sum(item["max_score"] - item["score"] for item in normalized_dimensions) or 1
+            for dimension in normalized_dimensions:
+                share = remaining * (dimension["max_score"] - dimension["score"]) / headroom
+                dimension["score"] = round(min(dimension["max_score"], dimension["score"] + share), 1)
         difference = round(score - sum(item["score"] for item in normalized_dimensions), 1)
         if difference:
-            normalized_dimensions[0]["score"] = round(normalized_dimensions[0]["score"] + difference, 1)
+            for dimension in normalized_dimensions:
+                candidate = round(dimension["score"] + difference, 1)
+                if 0 <= candidate <= dimension["max_score"]:
+                    dimension["score"] = candidate
+                    break
         content_score = next(
             (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
             0.0,
         )
-        exam_calibration_note = f"已按真实考场高分稀缺度校准总分：{raw_score:g}→{score:g}。"
+
+    review_reasons = []
+    for match in matches:
+        if (
+            match.get("status") in {"hit", "partial"}
+            and match.get("evidence_status") == "unresolved"
+            and match.get("coverage_role") == "required"
+        ):
+            review_reasons.append(f"unresolved_required_evidence:{match['point_key']}")
+    if scoring_mode == "holistic_essay" and abs(content_score - weighted_coverage) > content_weight * 0.35:
+        review_reasons.append("essay_content_diagnostic_divergence")
+    essay_diagnostic = " ".join(item.get("reason") or "" for item in normalized_dimensions)
+    if (
+        scoring_mode == "holistic_essay"
+        and raw_score >= 70
+        and re.search(
+            r"(?:关键)?事实(?:偏差|错误)|材料误读|论证(?:空泛|薄弱|不足)|未能结合.{0,12}(?:材料|案例)|主要(?:部分|段落).{0,8}(?:缺少|不足)",
+            essay_diagnostic,
+        )
+    ):
+        review_reasons.append("essay_high_band_diagnostic_conflict")
+    score_status = "provisional" if review_reasons else "valid"
+    review = {
+        "triggered": bool(review_reasons),
+        "reasons": review_reasons,
+        "decision": "confirmed" if reviewed and not review_reasons else ("required" if review_reasons else "not_needed"),
+    }
     display_max_score = float(rubric.get("display_max_score") or 100)
     display_score = _round_half(score * display_max_score / 100)
     display_scale = display_max_score / 100
@@ -306,7 +355,7 @@ def validate_grading_result(
 
     return {
         "schema_version": RESULT_VERSION,
-        "score_status": "valid",
+        "score_status": score_status,
         "point_matches": matches,
         "dimension_scores": normalized_dimensions,
         # Kept for readers of older result payloads.
@@ -331,11 +380,14 @@ def validate_grading_result(
         "personalized_findings": personalized[:6],
         "overall_summary": _clean(raw.get("overall_summary"), 360)
         or ("空白答案，未完成作答。" if blank_answer else "请结合维度得分与采分点分析查看。"),
+        "summary": raw.get("summary") if isinstance(raw.get("summary"), dict) else {},
         "revised_answer": str(raw.get("revised_answer") or "").strip(),
         "score": score,
         "display_score": display_score,
         "display_max_score": int(display_max_score) if display_max_score.is_integer() else display_max_score,
         "score_is_estimated": bool(rubric.get("score_is_estimated")),
         "content_score": round(content_score, 1),
-        "validation_errors": [value for value in (calibration_note, exam_calibration_note) if value],
+        "score_calibration": score_calibration,
+        "review": review,
+        "validation_errors": review_reasons,
     }
