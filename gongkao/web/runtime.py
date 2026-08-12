@@ -86,8 +86,8 @@ DB_PATH = user_db_path()
 DEFAULT_APP_CONTEXT = ApplicationContext.create(DB_PATH, ROOT)
 AUTOSAVE_LOCK = DEFAULT_APP_CONTEXT.autosave.lock
 AUTOSAVE_REVISIONS = DEFAULT_APP_CONTEXT.autosave.revisions
-APP_VERSION = "1.4.1"
-APP_BUILD = "1.4.1.3"
+APP_VERSION = "1.4.2"
+APP_BUILD = "1.4.2.1"
 ASSET_VERSION = f"gk-{APP_BUILD.replace('.', '-')}"
 
 FILTER_RESTORE_BOOTSTRAP = ""
@@ -1225,25 +1225,19 @@ def _locate_grading_annotations(source_text, items):
         if item["css_class"] == "add":
             continue
         start = -1
-        if item["text"]:
-            search_from = 0
-            while True:
-                candidate = source_text.find(item["text"], search_from)
-                if candidate < 0:
-                    break
-                end = candidate + len(item["text"])
-                if not any(candidate < used_end and end > used_start for used_start, used_end in occupied):
-                    start = candidate
-                    occupied.append((candidate, end))
-                    break
-                search_from = candidate + 1
+        if item["text"] and source_text.count(item["text"]) == 1:
+            candidate = source_text.find(item["text"])
+            end = candidate + len(item["text"])
+            if not any(candidate < used_end and end > used_start for used_start, used_end in occupied):
+                start = candidate
+                occupied.append((candidate, end))
         located[index] = {**item, "start": start, "end": start + len(item["text"]) if start >= 0 else -1}
 
     for index, item in enumerate(items):
         if item["css_class"] != "add":
             continue
         start = -1
-        if item["anchor"]:
+        if item["anchor"] and source_text.count(item["anchor"]) == 1:
             candidate = source_text.find(item["anchor"])
             if candidate >= 0:
                 start = candidate + len(item["anchor"])
@@ -1298,7 +1292,17 @@ def render_grading_annotations(value, source_text="", scope="grading-annotation"
     items = _grading_annotation_items(value)
     if not items:
         return ""
-    items = _locate_grading_annotations(source_text or "", items)
+    located_items = _locate_grading_annotations(source_text or "", items)
+    rejected_count = sum(item["start"] < 0 for item in located_items)
+    # Model fragments are not authoritative source text. Only display annotations
+    # that map exactly and uniquely to the saved answer snapshot.
+    items = [item for item in located_items if item["start"] >= 0]
+    if not items:
+        return (
+            '<p class="grading-annotation-validation-note">'
+            "本次批注未通过原文定位校验，已隐藏；报告其余内容不受影响。"
+            "</p>"
+        )
     # Keep both columns in document order. Models commonly return an insertion
     # suggestion before later inline edits; preserving that response order
     # makes its connector cross every annotation between the card and anchor.
@@ -1313,13 +1317,9 @@ def render_grading_annotations(value, source_text="", scope="grading-annotation"
     source_html = _render_annotated_source(source_text or "", items, scope)
     rows = []
     for number, item in enumerate(items, start=1):
-        location_link = (
-            f'<a href="#{esc(scope)}-mark-{number}">定位原文</a>'
-            if item["start"] >= 0
-            else '<span class="grading-annotation-unlocated">未能定位</span>'
-        )
+        location_link = f'<a href="#{esc(scope)}-mark-{number}">定位原文</a>'
         quote_html = ""
-        if item["css_class"] == "add" or item["start"] < 0:
+        if item["css_class"] == "add":
             text_html = (
                 f"<del>{esc(item['text'])}</del>"
                 if item["css_class"] == "delete"
@@ -1342,11 +1342,17 @@ def render_grading_annotations(value, source_text="", scope="grading-annotation"
               {suggestion_html}
             </li>"""
         )
+    validation_note = (
+        f'<p class="grading-annotation-validation-note">已隐藏 {rejected_count} 条无法唯一定位的批注。</p>'
+        if rejected_count
+        else ""
+    )
     return (
         '<section class="grading-annotation-map" data-grading-review>'
         f"{source_html}"
         '<svg class="grading-review-connectors" aria-hidden="true"></svg>'
         f'<ol class="grading-annotation-notes grading-review-comments">{"".join(rows)}</ol>'
+        f"{validation_note}"
         "</section>"
     )
 

@@ -182,8 +182,8 @@ class SettingsController:
             agent_settings = conn.execute("SELECT * FROM agent_ai_settings WHERE id = 1").fetchone()
         mode_codex = " checked" if settings["mode"] == "codex" else ""
         mode_api = " checked" if settings["mode"] == "api" else ""
-        grading_enhanced = " checked" if (settings["grading_mode"] or "enhanced") == "enhanced" else ""
-        grading_basic = " checked" if settings["grading_mode"] == "basic" else ""
+        grading_enhanced = " checked" if settings["grading_mode"] == "enhanced" else ""
+        grading_basic = " checked" if (settings["grading_mode"] or "basic") == "basic" else ""
         agent_inherits_grading = " checked" if agent_settings["use_grading_api"] else ""
         agent_uses_custom = " checked" if not agent_settings["use_grading_api"] else ""
         key_status = masked_key(settings["api_key"]) or f"环境变量：{esc(settings['api_key_env'] or '未设置')}"
@@ -205,8 +205,8 @@ class SettingsController:
             </div>
             <h3>API 批改能力</h3>
             <div class="mode-grid grading-mode-grid">
-              <label class="mode-card"><input type="radio" name="grading_mode" value="enhanced"{grading_enhanced}><strong>智能批改（推荐）</strong><span>综合本题材料与机构共识评分，并结合历史提供改进建议。</span></label>
-              <label class="mode-card"><input type="radio" name="grading_mode" value="basic"{grading_basic}><strong>基础批改</strong><span>保留原有当前题直接批改链路，作为故障回退。</span></label>
+              <label class="mode-card"><input type="radio" name="grading_mode" value="basic"{grading_basic}><strong>基础批改（默认·快速）</strong><span>直接批改当前题，等待更短，更快生成完整批改报告。</span></label>
+              <label class="mode-card"><input type="radio" name="grading_mode" value="enhanced"{grading_enhanced}><strong>智能批改</strong><span>综合本题材料与参考答案共识评分，并结合历史提供改进建议。</span></label>
             </div>
             <div class="settings-fields">
               <label><span>服务商名称</span><input name="provider_name" value="{esc(settings["provider_name"])}" placeholder="DeepSeek"></label>
@@ -392,9 +392,9 @@ class SettingsController:
                     form.get("api_key_env", ["DEEPSEEK_API_KEY"])[0].strip(),
                     form.get("model", ["deepseek-v4-pro"])[0].strip() or "deepseek-v4-pro",
                     temperature,
-                    form.get("grading_mode", ["enhanced"])[0]
-                    if form.get("grading_mode", ["enhanced"])[0] in {"enhanced", "basic"}
-                    else "enhanced",
+                    form.get("grading_mode", ["basic"])[0]
+                    if form.get("grading_mode", ["basic"])[0] in {"enhanced", "basic"}
+                    else "basic",
                 ),
             )
             conn.execute(

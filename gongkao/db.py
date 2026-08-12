@@ -243,7 +243,7 @@ CREATE TABLE IF NOT EXISTS ai_settings (
     model TEXT NOT NULL DEFAULT 'deepseek-v4-pro',
     temperature REAL NOT NULL DEFAULT 0.2,
     prompt_template TEXT NOT NULL DEFAULT '',
-    grading_mode TEXT NOT NULL DEFAULT 'enhanced',
+    grading_mode TEXT NOT NULL DEFAULT 'basic',
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 

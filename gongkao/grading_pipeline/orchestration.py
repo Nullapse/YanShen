@@ -5,7 +5,6 @@ import threading
 from ..agent_modules import FEATURE_HASH_MODEL
 from ..db import connect
 from ..grading import (
-    build_ai_prompt,
     build_revised_answer_retry_prompt,
     compact_revised_answer_linebreaks,
     normalize_revised_answer_word_count,
@@ -197,52 +196,6 @@ def run_grading_job(db_path, job_id, chat_completion_func):
         # A grading job is evaluated against the answer as it existed when the
         # user started the job, even if autosave changes the attempt meanwhile.
         attempt["answer_text"] = options.get("answer_snapshot", attempt.get("answer_text") or "")
-        if (settings.get("grading_mode") or "enhanced") == "basic":
-            _update_job(db_path, job_id, "grading", 40, "正在按基础规则评估作答…")
-            prompt = build_ai_prompt(
-                question,
-                references,
-                attempt,
-                materials,
-                options.get("custom_reference_answer") or "",
-            )
-            run_state.reserve_model_call("basic_grading", "基础模式正式批改")
-            response, raw = _call_grading_model(
-                chat_completion_func,
-                settings,
-                prompt,
-                False,
-            )
-            raw_parts.append(raw)
-            report_text = normalize_revised_answer_word_count(response, question.get("word_limit") or "")
-            with connect(db_path) as conn:
-                cursor = conn.execute(
-                    """
-                    INSERT INTO grading_reports (
-                        attempt_id, provider, model, report_text, prompt_text, raw_response, status
-                    ) VALUES (?, ?, ?, ?, ?, ?, 'ok')
-                    """,
-                    (
-                        attempt["id"],
-                        settings.get("provider_name") or "",
-                        settings.get("model") or "",
-                        report_text,
-                        prompt,
-                        "\n\n--- basic grading call ---\n".join(raw_parts),
-                    ),
-                )
-                report_id = cursor.lastrowid
-            _update_job(
-                db_path,
-                job_id,
-                "completed",
-                100,
-                "基础批改完成。",
-                report_id=report_id,
-                retryable=0,
-            )
-            return report_id
-
         ref_hash = reference_set_hash(references)
         source_hash = rubric_source_hash(question, materials, references)
         cached_row = None

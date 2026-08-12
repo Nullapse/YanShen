@@ -103,6 +103,13 @@ class ImportAndPackageTest(unittest.TestCase):
         if self.tmpdir.exists() and not any(self.tmpdir.iterdir()):
             self.tmpdir.rmdir()
 
+    def test_new_database_defaults_to_fast_basic_grading(self):
+        with connect(self.db_path) as conn:
+            settings = conn.execute(
+                "SELECT grading_mode FROM ai_settings WHERE id = 1"
+            ).fetchone()
+        self.assertEqual(settings["grading_mode"], "basic")
+
     def test_import_questions_answers_and_build_package(self):
         questions_csv = (
             "题目编号,考试类型,年份,地区,来源省份,训练优先级,题型,标题,题干,材料,作答要求,字数限制,来源备注\n"

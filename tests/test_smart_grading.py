@@ -193,6 +193,7 @@ class SmartGradingTest(unittest.TestCase):
             with connect(path) as conn:
                 attempt = conn.execute("SELECT * FROM attempts WHERE id = ?", (attempt_id,)).fetchone()
                 settings = conn.execute("SELECT * FROM ai_settings WHERE id = 1").fetchone()
+                self.assertEqual(settings["grading_mode"], "basic")
                 job, _ = create_grading_job(conn, attempt, settings, reference_ids, "", {})
             with patch(
                 "gongkao.grading_pipeline.orchestration.retrieve_grading_evidence",
@@ -201,6 +202,7 @@ class SmartGradingTest(unittest.TestCase):
                 report_id = run_grading_job(path, job["id"], chat)
             self.assertIsNotNone(report_id)
             self.assertEqual(len(calls), 2)
+            self.assertNotIn("基础模式正式批改", calls)
             self.assertIn("机构参考答案样本提示", calls[0])
             self.assertIn("样本不足", calls[0])
             self.assertEqual([item.get("thinking") for item in chat.request_options], ["disabled", "disabled"])

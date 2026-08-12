@@ -231,6 +231,12 @@ class ReleaseRuntimeTest(unittest.TestCase):
         audit_database(SEED)
         with connect(SEED) as conn:
             self.assertEqual(conn.execute("PRAGMA user_version").fetchone()[0], CURRENT_SCHEMA_VERSION)
+            self.assertEqual(
+                conn.execute(
+                    "SELECT grading_mode FROM ai_settings WHERE id = 1"
+                ).fetchone()[0],
+                "basic",
+            )
 
     def test_release_audit_rejects_private_agent_data(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -1403,6 +1409,31 @@ class ReleaseRuntimeTest(unittest.TestCase):
             '                id="ordered-report-note-3"',
             html,
         )
+
+    def test_report_annotations_hide_ambiguous_and_overlapping_model_quotes(self):
+        html = markdownish(
+            "## 原文可视化批注\n"
+            "[修改|重复短句|模型引用不唯一||medium|改写]\n"
+            "[亮点|唯一原文片段|能够精确定位||positive|]\n"
+            "[润色|原文片段|与上一条范围重叠||low|优化]",
+            source_text="重复短句。唯一原文片段。重复短句。",
+            annotation_scope="validated-report",
+        )
+        self.assertIn("唯一原文片段", html)
+        self.assertIn("已隐藏 2 条无法唯一定位的批注", html)
+        self.assertNotIn("模型引用不唯一", html)
+        self.assertNotIn("与上一条范围重叠", html)
+        self.assertNotIn("未能定位", html)
+
+    def test_report_annotations_hide_all_unverified_model_fragments(self):
+        html = markdownish(
+            "## 原文可视化批注\n[修改|并非用户原文|无法定位||medium|建议写法]",
+            source_text="真实用户答案。",
+            annotation_scope="invalid-report",
+        )
+        self.assertIn("本次批注未通过原文定位校验，已隐藏", html)
+        self.assertNotIn("并非用户原文", html)
+        self.assertNotIn("建议写法", html)
 
     def test_report_answer_snapshot_prefers_saved_result_and_recovers_old_prompts(self):
         self.assertEqual(

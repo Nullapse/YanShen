@@ -173,7 +173,7 @@ class GradingController:
         if "smart" in query:
             smart_grading_enabled = query.get("smart", ["1"])[0] != "0"
         else:
-            smart_grading_enabled = (settings["grading_mode"] or "enhanced") == "enhanced"
+            smart_grading_enabled = (settings["grading_mode"] or "basic") == "enhanced"
         if "deep" in query:
             deep_thinking_enabled = query.get("deep", ["0"])[0] != "0"
         else:
@@ -727,7 +727,7 @@ class GradingController:
             use_smart_grading = "use_smart_grading" in form
             use_deep_thinking = "use_deep_thinking" in form
         else:
-            use_smart_grading = (settings["grading_mode"] or "enhanced") == "enhanced"
+            use_smart_grading = (settings["grading_mode"] or "basic") == "enhanced"
             use_deep_thinking = False
         if use_smart_grading:
             options = {

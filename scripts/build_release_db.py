@@ -1,5 +1,4 @@
 import argparse
-import os
 import shutil
 import sqlite3
 import sys
@@ -11,7 +10,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from gongkao.db import init_db
 from gongkao.organizations import canonicalize_organization
 from gongkao.taxonomy import QUESTION_TYPES, classify_question_type
-
 
 EXPECTED = {"papers": 455, "questions": 1750, "reference_answers": 9410}
 ALLOWED_QUESTION_TYPES = set(QUESTION_TYPES)
@@ -168,7 +166,7 @@ def build_release_db(source, output):
                SET mode = 'api', provider_name = 'DeepSeek',
                    api_base_url = 'https://api.deepseek.com', api_key = '',
                    api_key_env = 'DEEPSEEK_API_KEY', model = 'deepseek-v4-pro',
-                   temperature = 0.2, prompt_template = '', grading_mode = 'enhanced'
+                   temperature = 0.2, prompt_template = '', grading_mode = 'basic'
              WHERE id = 1
             """
         )
