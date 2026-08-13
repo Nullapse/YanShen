@@ -97,6 +97,7 @@ POST_ROUTE_GROUPS = {
         Route("handle_settings_import", exact="/settings/import"),
         Route("handle_settings_local_records_clear", exact="/settings/local-records/clear"),
         Route("handle_settings_local_records_open", exact="/settings/local-records/open"),
+        Route("handle_settings_api_test", exact="/settings/api/test"),
         Route("handle_settings", exact="/settings"),
     ),
     "agent": (

@@ -629,6 +629,8 @@ CURRENT_SCHEMA_ADDITIVE_COLUMNS = {
         ("next_retry_at", "TEXT"),
         ("status", "TEXT NOT NULL DEFAULT 'pending'"),
     ),
+    "ai_settings": (("grading_prompt_template", "TEXT NOT NULL DEFAULT ''"),),
+    "agent_ai_settings": (("agent_prompt_template", "TEXT NOT NULL DEFAULT ''"),),
 }
 
 CURRENT_SCHEMA_ADDITIONS = """

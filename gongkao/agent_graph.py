@@ -436,6 +436,7 @@ def _graph_for(settings, db_path, stack=None):
                 state.get("module_context", {}),
                 state.get("rag_context", {}),
                 _response_style(state),
+                agent_prompt_template=settings.get("agent_prompt_template", ""),
             )
         else:
             messages = build_agent_messages(
@@ -446,6 +447,7 @@ def _graph_for(settings, db_path, stack=None):
                 state.get("review_context", {}),
                 state.get("rag_context", {}),
                 _response_style(state),
+                agent_prompt_template=settings.get("agent_prompt_template", ""),
             )
         messages = with_conversation_history(
             messages,
