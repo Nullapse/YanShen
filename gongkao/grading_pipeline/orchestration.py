@@ -161,15 +161,12 @@ def _call_grading_model(
         "thinking": "enabled" if deep_thinking else "disabled",
     }
     if structured:
-        request_options.update(
-            {
-                "response_format": {"type": "json_object"},
-                # Deep-think reasoning consumes tokens before the final JSON,
-                # so the structured response needs headroom to avoid truncation
-                # (which used to force a repair round).
-                "max_tokens": 16384,
-            }
-        )
+        request_options["response_format"] = {"type": "json_object"}
+        if deep_thinking:
+            # Deep-think reasoning consumes tokens before the final JSON,
+            # so the structured response needs headroom to avoid truncation
+            # (which used to force a repair round).
+            request_options["max_tokens"] = 16384
     return chat_completion_func(
         settings,
         prompt,
@@ -324,6 +321,7 @@ def run_grading_job(db_path, job_id, chat_completion_func):
             history_meta,
             question_feedback,
             references,
+            grading_prompt_template=settings.get("grading_prompt_template", ""),
         )
         prompts.append(prompt)
         try:

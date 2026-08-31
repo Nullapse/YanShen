@@ -1,5 +1,7 @@
 """Settings, import, export, and local-record management controllers."""
 
+import urllib.request
+import urllib.error
 from ..runtime import (
     back_link,
     cgi,
@@ -209,12 +211,29 @@ class SettingsController:
               <label class="mode-card"><input type="radio" name="grading_mode" value="enhanced"{grading_enhanced}><strong>智能批改</strong><span>综合本题材料与参考答案共识评分，并结合历史提供改进建议。</span></label>
             </div>
             <div class="settings-fields">
-              <label><span>服务商名称</span><input name="provider_name" value="{esc(settings["provider_name"])}" placeholder="DeepSeek"></label>
-              <label><span>Base URL</span><input name="api_base_url" value="{esc(settings["api_base_url"])}" placeholder="https://api.deepseek.com"></label>
-              <label><span>模型名</span><input name="model" value="{esc(settings["model"])}" placeholder="deepseek-v4-pro"></label>
-              <label><span>Temperature</span><input name="temperature" value="{esc(settings["temperature"])}" inputmode="decimal"></label>
+              <label><span>预设服务商</span>
+                <select onchange="fillPreset(this, 'grading')">
+                  <option value="">自定义...</option>
+                  <option value="DeepSeek|https://api.deepseek.com">DeepSeek</option>
+                  <option value="Gemini|https://generativelanguage.googleapis.com/v1beta/openai/">Gemini</option>
+                  <option value="OpenAI|https://api.openai.com/v1">OpenAI</option>
+                </select>
+              </label>
+              <label><span>服务商名称</span><input name="provider_name" id="grading_provider_name" value="{esc(settings["provider_name"])}" placeholder="DeepSeek"></label>
+              <label><span>Base URL</span><input name="api_base_url" id="grading_api_base_url" value="{esc(settings["api_base_url"])}" placeholder="https://api.deepseek.com"></label>
               <label><span>API Key 环境变量</span><input name="api_key_env" value="{esc(settings["api_key_env"])}" placeholder="DEEPSEEK_API_KEY"></label>
-              <label><span>API Key</span><input name="api_key" value="" autocomplete="off" placeholder="{esc(key_status)}"></label>
+              <label><span>API Key</span><input name="api_key" id="grading_api_key" value="" autocomplete="off" placeholder="{esc(key_status)}"></label>
+              <div style="grid-column: 1 / -1; margin-top: 8px;">
+                <button type="button" class="button ghost" onclick="testApi('grading')">测试连通性并拉取模型</button>
+                <span id="grading_api_status" style="margin-left: 10px; font-size: 13px;"></span>
+              </div>
+              <label><span>选择模型</span>
+                <select id="grading_model_select" onchange="document.getElementById('grading_model').value = this.value">
+                  <option value="">手动输入 / 等待拉取...</option>
+                </select>
+              </label>
+              <label><span>模型名</span><input name="model" id="grading_model" value="{esc(settings["model"])}" placeholder="deepseek-v4-pro"></label>
+              <label><span>Temperature</span><input name="temperature" value="{esc(settings["temperature"])}" inputmode="decimal"></label>
             </div>
             <label class="check-line"><input type="checkbox" name="clear_api_key" value="1"> 清除已保存的 API Key</label>
             <p class="warning-note">API 自动模式会把题目、整卷材料、参考答案和你的答案发送给你配置的模型服务。</p>
@@ -229,18 +248,50 @@ class SettingsController:
               <div class="coach-api-collapsible" data-coach-api-fields aria-hidden="true">
                 <div class="coach-api-collapsible-inner">
                   <div class="settings-fields">
-                    <label><span>服务商名称</span><input name="agent_provider_name" value="{esc(agent_settings["provider_name"])}" placeholder="DeepSeek"></label>
-                    <label><span>Base URL</span><input name="agent_api_base_url" value="{esc(agent_settings["api_base_url"])}" placeholder="https://api.deepseek.com"></label>
-                    <label><span>模型名</span><input name="agent_model" value="{esc(agent_settings["model"])}" placeholder="deepseek-v4-pro"></label>
-                    <label><span>Temperature</span><input name="agent_temperature" value="{esc(agent_settings["temperature"])}" inputmode="decimal"></label>
+                    <label><span>预设服务商</span>
+                      <select onchange="fillPreset(this, 'agent')">
+                        <option value="">自定义...</option>
+                        <option value="DeepSeek|https://api.deepseek.com">DeepSeek</option>
+                        <option value="Gemini|https://generativelanguage.googleapis.com/v1beta/openai/">Gemini</option>
+                        <option value="OpenAI|https://api.openai.com/v1">OpenAI</option>
+                      </select>
+                    </label>
+                    <label><span>服务商名称</span><input name="agent_provider_name" id="agent_provider_name" value="{esc(agent_settings["provider_name"])}" placeholder="DeepSeek"></label>
+                    <label><span>Base URL</span><input name="agent_api_base_url" id="agent_api_base_url" value="{esc(agent_settings["api_base_url"])}" placeholder="https://api.deepseek.com"></label>
                     <label><span>API Key 环境变量</span><input name="agent_api_key_env" value="{esc(agent_settings["api_key_env"])}" placeholder="DEEPSEEK_API_KEY"></label>
-                    <label><span>API Key</span><input name="agent_api_key" value="" autocomplete="off" placeholder="{esc(agent_key_status)}"></label>
+                    <label><span>API Key</span><input name="agent_api_key" id="agent_api_key" value="" autocomplete="off" placeholder="{esc(agent_key_status)}"></label>
+                    <div style="grid-column: 1 / -1; margin-top: 8px;">
+                      <button type="button" class="button ghost" onclick="testApi('agent')">测试连通性并拉取模型</button>
+                      <span id="agent_api_status" style="margin-left: 10px; font-size: 13px;"></span>
+                    </div>
+                    <label><span>选择模型</span>
+                      <select id="agent_model_select" onchange="document.getElementById('agent_model').value = this.value">
+                        <option value="">手动输入 / 等待拉取...</option>
+                      </select>
+                    </label>
+                    <label><span>模型名</span><input name="agent_model" id="agent_model" value="{esc(agent_settings["model"])}" placeholder="deepseek-v4-pro"></label>
+                    <label><span>Temperature</span><input name="agent_temperature" value="{esc(agent_settings["temperature"])}" inputmode="decimal"></label>
                   </div>
                   <label class="check-line"><input type="checkbox" name="clear_agent_api_key" value="1"> 清除已保存的教练 API Key</label>
                 </div>
               </div>
             </section>
-            <button class="button primary" type="submit">保存设置</button>
+            <details class="settings-advanced-panel" style="margin-top: 1.5rem; padding: 1rem; border: 1px solid var(--border); border-radius: 8px;">
+              <summary style="cursor: pointer; font-weight: 500;">高级选项：自定义提示词 (Prompts)</summary>
+              <div style="margin-top: 1rem; display: flex; flex-direction: column; gap: 1rem;">
+                <label style="display: flex; flex-direction: column; gap: 0.5rem;">
+                  <span><strong>批改报告生成指令 (REPORT_INSTRUCTIONS)</strong> <small class="muted">留空则使用内置的高仿真阅卷组指令</small></span>
+                  <textarea name="grading_prompt_template" rows="8" style="resize: vertical; font-family: monospace; padding: 8px;">{esc(settings.get("grading_prompt_template", ""))}</textarea>
+                </label>
+                <label style="display: flex; flex-direction: column; gap: 0.5rem;">
+                  <span><strong>AI 教练系统指令 (AGENT_SYSTEM_PROMPT)</strong> <small class="muted">留空则使用内置的教练身份指令</small></span>
+                  <textarea name="agent_prompt_template" rows="8" style="resize: vertical; font-family: monospace; padding: 8px;">{esc(agent_settings.get("agent_prompt_template", ""))}</textarea>
+                </label>
+              </div>
+            </details>
+            <div style="margin-top: 1.5rem;">
+              <button class="button primary" type="submit">保存设置</button>
+            </div>
             </form>
           </div>
 
@@ -297,6 +348,42 @@ class SettingsController:
           </section>
           </div>
         </section>
+        <script>
+        function fillPreset(selectElem, prefix) {
+            if (!selectElem.value) return;
+            const parts = selectElem.value.split('|');
+            document.getElementById(prefix + '_provider_name').value = parts[0];
+            document.getElementById(prefix + '_api_base_url').value = parts[1];
+        }
+        async function testApi(prefix) {
+            const baseUrl = document.getElementById(prefix + '_api_base_url').value;
+            const apiKey = document.getElementById(prefix + '_api_key').value || "(saved)"; // Need actual key to test, but if saved, backend might not know it easily from here unless we pass it. Wait, the backend doesn't know the saved key if we don't send it. But let's assume user enters it or it's fetched.
+            const statusEl = document.getElementById(prefix + '_api_status');
+            statusEl.textContent = '测试中...';
+            statusEl.style.color = 'var(--text-color)';
+            try {
+                const response = await fetch('/settings/api/test', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: new URLSearchParams({ api_base_url: baseUrl, api_key: document.getElementById(prefix + '_api_key').value })
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.error || '未知错误');
+                statusEl.textContent = '✅ 连接成功！共找到 ' + data.models.length + ' 个模型';
+                statusEl.style.color = 'green';
+                const selectEl = document.getElementById(prefix + '_model_select');
+                selectEl.innerHTML = '<option value="">请选择模型...</option>';
+                data.models.forEach(m => {
+                    const opt = document.createElement('option');
+                    opt.value = m; opt.textContent = m;
+                    selectEl.appendChild(opt);
+                });
+            } catch (err) {
+                statusEl.textContent = '❌ ' + err.message;
+                statusEl.style.color = 'red';
+            }
+        }
+        </script>
         """
         self.send_html(layout("设置 - 研申", body, "settings", flashes))
 
@@ -381,7 +468,7 @@ class SettingsController:
                 UPDATE ai_settings
                    SET mode = ?, provider_name = ?, api_base_url = ?, api_key = ?,
                        api_key_env = ?, model = ?, temperature = ?, grading_mode = ?,
-                       updated_at = CURRENT_TIMESTAMP
+                       grading_prompt_template = ?, updated_at = CURRENT_TIMESTAMP
                  WHERE id = 1
                 """,
                 (
@@ -395,13 +482,14 @@ class SettingsController:
                     form.get("grading_mode", ["basic"])[0]
                     if form.get("grading_mode", ["basic"])[0] in {"enhanced", "basic"}
                     else "basic",
+                    form.get("grading_prompt_template", [""])[0].strip(),
                 ),
             )
             conn.execute(
                 """
                 UPDATE agent_ai_settings
                    SET use_grading_api = ?, provider_name = ?, api_base_url = ?, api_key = ?,
-                       api_key_env = ?, model = ?, temperature = ?, updated_at = CURRENT_TIMESTAMP
+                       api_key_env = ?, model = ?, temperature = ?, agent_prompt_template = ?, updated_at = CURRENT_TIMESTAMP
                  WHERE id = 1
                 """,
                 (
@@ -414,6 +502,7 @@ class SettingsController:
                     form.get("agent_api_key_env", [current_agent["api_key_env"]])[0].strip(),
                     form.get("agent_model", [current_agent["model"]])[0].strip() or "deepseek-v4-pro",
                     agent_temperature,
+                    form.get("agent_prompt_template", [""])[0].strip(),
                 ),
             )
         self.page_settings([("success", "设置已保存。")])
@@ -453,6 +542,51 @@ class SettingsController:
             [("success", f"已清理：{'、'.join(labels)}。")],
             clear_browser_state="browser" in scopes,
         )
+
+    def handle_settings_api_test(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        data = self.rfile.read(length).decode("utf-8") if length else ""
+        form = parse_qs(data)
+        api_base_url = form.get("api_base_url", [""])[0].strip()
+        api_key = form.get("api_key", [""])[0].strip()
+
+        if not api_key or api_key == "(saved)":
+            with connect(self.db_path) as conn:
+                # check both ai_settings and agent_ai_settings for the key that matches the base_url, or just return both and check if either has it
+                ai_settings = conn.execute("SELECT api_key, api_base_url FROM ai_settings WHERE id = 1").fetchone()
+                agent_ai_settings = conn.execute("SELECT api_key, api_base_url FROM agent_ai_settings WHERE id = 1").fetchone()
+                if ai_settings and ai_settings["api_base_url"] == api_base_url and ai_settings["api_key"]:
+                    api_key = ai_settings["api_key"]
+                elif agent_ai_settings and agent_ai_settings["api_base_url"] == api_base_url and agent_ai_settings["api_key"]:
+                    api_key = agent_ai_settings["api_key"]
+
+        if not api_base_url or not api_key:
+            self.send_json({"error": "缺少 Base URL 或 API Key"}, 400)
+            return
+        
+        models_url = api_base_url.rstrip("/") + "/v1/models"
+        request = urllib.request.Request(
+            models_url,
+            headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
+            method="GET",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                raw = response.read().decode("utf-8")
+                payload = json.loads(raw)
+                models = [m["id"] for m in payload.get("data", []) if "id" in m]
+                self.send_json({"models": models})
+        except urllib.error.HTTPError as exc:
+            try:
+                detail = json.loads(exc.read().decode("utf-8"))
+                msg = detail.get("error", {}).get("message") or str(detail)
+            except Exception:
+                msg = str(exc)
+            self.send_json({"error": f"API 返回错误: {msg}"}, 400)
+        except urllib.error.URLError as exc:
+            self.send_json({"error": f"网络连接失败: {exc.reason}"}, 400)
+        except Exception as exc:
+            self.send_json({"error": f"请求异常: {str(exc)}"}, 400)
 
     def handle_settings_local_records_open(self):
         record_directory = user_data_dir()

@@ -95,7 +95,7 @@ def chat_completion(settings, prompt, request_options=None):
     )
 
     try:
-        with urlopen(request, timeout=120) as response:
+        with urlopen(request, timeout=180) as response:
             raw = response.read().decode("utf-8")
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")

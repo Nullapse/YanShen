@@ -757,6 +757,7 @@ class GradingController:
             attempt,
             materials,
             custom_answer,
+            grading_prompt_template=settings.get("grading_prompt_template", ""),
         )
         try:
             report_text, raw = chat_completion(

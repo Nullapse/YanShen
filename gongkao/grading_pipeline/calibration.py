@@ -200,9 +200,9 @@ def apply_score_calibration(score, policy=None):
     raw_score = round(float(score or 0), 1)
     policy = policy or load_calibration_policy()
     adjustment = 0.0
-    if policy.get("enabled") and raw_score > 65:
-        blend = min(1.0, max(0.0, (raw_score - 65) / 10))
-        limit = abs(float(policy.get("max_adjustment") or 3.0))
+    if policy.get("enabled") and raw_score > 55:
+        blend = min(1.0, max(0.0, (raw_score - 55) / 15))
+        limit = abs(float(policy.get("max_adjustment") or 5.0))
         adjustment = max(-limit, min(limit, float(policy.get("offset") or 0))) * blend
     final_score = round(max(0.0, min(100.0, raw_score + adjustment)), 1)
     return final_score, {

@@ -3,22 +3,20 @@ import json
 AGENT_PROMPT_VERSION = "agent-prompts-v5-friendly-citations"
 
 
-AGENT_SYSTEM_PROMPT = """你是“研申”里的 AI 训练教练，不是泛聊天助手。
-
-你的目标是帮助用户形成可执行的训练闭环：诊断短板、解释证据、推荐题目、安排下一步动作。
+AGENT_SYSTEM_PROMPT = """你是“研申”里的前阅卷组组长、现在的申论高阶训练教练。
+你的核心目标是帮考生提分，而不是进行情感抚慰。你说话直接、专业、切中要害，就像真实的阅卷老师一样。
 
 约束：
-1. 只能依据输入上下文判断，不要编造题库里不存在的题目、报告或分数。
+1. 只能依据输入上下文判断，绝不编造题库里不存在的题目、报告或分数。
 2. 推荐题目必须使用 candidate_questions 中的题目 ID 和标题。
 3. 引用证据时必须优先标注 rag_context.evidence_cards 中的 evidence_id；没有证据时要明确说“证据不足”。
-4. 本题复盘必须区分材料遗漏、采分点遗漏、结构表达问题和下一次训练动作。
-5. 输出要具体、克制、可执行，不要写空泛鼓励。
+4. 本题复盘必须清晰区分：材料遗漏、采分点遗漏、结构表达问题。永远给出“下一次怎么改”的具体建议。
+5. 严禁使用“你可以”、“希望对你有帮助”、“继续加油哦”等常见 AI 废话套话。输出必须克制、冷峻、直击得分点。
 6. 如果上下文不足，说明缺口，并给出下一步应收集的数据。
 7. 回复末尾必须附一个 agent_response_v1 JSON 代码块，便于系统渲染和评测。
 8. 不得引用 grounding_contract.allowed_evidence_ids 之外的 evidence_id。
 9. 不得给题目编号编造网址或输出外部 Markdown 链接；题目和证据只写上下文中的 question_code、question_id 或 evidence_id，由系统生成本地链接。
-10. 引用知识卡时不要写知识库品牌、来源文件名或内部检索说明；只保留对应 evidence_id，界面会将其转换成可读的知识卡标题。
-"""
+10. 引用知识卡时不要写知识库品牌、来源文件名或内部检索说明；只保留对应 evidence_id，界面会将其转换成可读的知识卡标题。"""
 
 
 def with_conversation_history(base_messages, conversation_messages=None, conversation_summary="", current_user_goal=""):
@@ -244,7 +242,7 @@ def is_referential_followup(user_goal=""):
     return any(key in text for key in ("这道", "第二道", "这个问题", "刚才", "那具体", "按你说的", "和上一次", "为什么排"))
 
 
-def build_agent_messages(task_type, user_goal, user_context, candidates, review_context, rag_context=None, response_style=""):
+def build_agent_messages(task_type, user_goal, user_context, candidates, review_context, rag_context=None, response_style="", agent_prompt_template=""):
     payload = {
         "task_type": task_type,
         "user_goal": user_goal,
@@ -269,7 +267,7 @@ def build_agent_messages(task_type, user_goal, user_context, candidates, review_
         "```"
     )
     return [
-        ("system", AGENT_SYSTEM_PROMPT),
+        ("system", agent_prompt_template.strip() if agent_prompt_template and agent_prompt_template.strip() else AGENT_SYSTEM_PROMPT),
         ("human", user_message),
     ]
 
@@ -305,7 +303,7 @@ MODULE_REPORT_INSTRUCTION = """请基于 module_context 输出一份模块化训
 """
 
 
-def build_module_messages(user_goal, user_context, module_context, rag_context=None, response_style=""):
+def build_module_messages(user_goal, user_context, module_context, rag_context=None, response_style="", agent_prompt_template=""):
     concise = wants_concise_response(user_goal, response_style)
     followup = is_referential_followup(user_goal)
     compact_evidence = []
@@ -344,6 +342,6 @@ def build_module_messages(user_goal, user_context, module_context, rag_context=N
         "```"
     )
     return [
-        ("system", AGENT_SYSTEM_PROMPT),
+        ("system", agent_prompt_template.strip() if agent_prompt_template and agent_prompt_template.strip() else AGENT_SYSTEM_PROMPT),
         ("human", user_message),
     ]

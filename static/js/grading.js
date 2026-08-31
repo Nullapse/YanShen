@@ -204,10 +204,14 @@ export function initializeGrading(signal, navigatePartial) {
         if (!response.ok) throw new Error(payload.error || "无法读取批改进度");
         if (message) {
           const waitedSeconds = Math.floor((Date.now() - pollingStartedAt) / 1000);
-          const waitingSuffix = waitedSeconds >= 10
-            && !["completed", "failed", "interrupted"].includes(payload.status)
-            ? ` · 已等待 ${waitedSeconds} 秒`
-            : "";
+          let waitingSuffix = "";
+          if (!["completed", "failed", "interrupted"].includes(payload.status)) {
+            if (payload.status === "grading" && waitedSeconds > 30) {
+                waitingSuffix = ` · 阅卷模型推理中，预计需要1-2分钟，请耐心等待 (${waitedSeconds}s)`;
+            } else if (waitedSeconds >= 10) {
+                waitingSuffix = ` · 已等待 ${waitedSeconds} 秒`;
+            }
+          }
           message.textContent = `${payload.message || payload.status}${waitingSuffix}`;
         }
         if (progress) progress.textContent = `${payload.progress || 0}%`;
