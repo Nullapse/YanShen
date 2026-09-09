@@ -664,29 +664,30 @@ def cards_from_knowledge(conn, user_goal="", module="overview", limit=8):
     return cards
 
 
-def build_rag_context(conn, task_type, user_goal, subject_ids=None, module="", filters=None, user_context=None, candidates=None, review_context=None, query_plan=None):
+def build_rag_context(conn, task_type, user_goal, subject_ids=None, module="", filters=None, user_context=None, candidates=None, review_context=None, query_plan=None, retrieval_query=None):
     subject_ids = subject_ids or []
     filters = filters or {}
     module = valid_module_id(module or "")
     query_plan = normalize_query_plan(query_plan, user_goal, task_type, subject_ids, module)
     module = query_plan.get("module") or module
     rag_route = route_from_plan(query_plan)
+    search_query = retrieval_query or user_goal
     module_context = {}
     cards = []
     if rag_route in {"current_attempt_review", "structure_judgement", "rewrite_attempt"}:
         cards = cards_from_review_context(review_context or {}, rag_route)
         if "knowledge" in query_plan.get("sources", []) or rag_route in {"structure_judgement", "rewrite_attempt"}:
-            cards.extend(cards_from_knowledge(conn, user_goal, module, limit=6))
+            cards.extend(cards_from_knowledge(conn, search_query, module, limit=6))
     elif rag_route == "note_organization":
         cards = cards_from_notes(conn)
         if "knowledge" in query_plan.get("sources", []):
-            cards.extend(cards_from_knowledge(conn, user_goal, module, limit=6))
+            cards.extend(cards_from_knowledge(conn, search_query, module, limit=6))
     elif rag_route == "writing_guidance":
-        cards = cards_from_knowledge(conn, user_goal, module, limit=10)
+        cards = cards_from_knowledge(conn, search_query, module, limit=10)
     elif rag_route == "recommend_questions":
         cards = cards_from_candidates(candidates or [], user_context)
     else:
-        module_context = retrieve_module_evidence(conn, module or "overview", user_goal, filters)
+        module_context = retrieve_module_evidence(conn, module or "overview", search_query, filters)
         module_context["candidate_questions"] = candidates or []
         cards = cards_from_module_context(module_context)
         if candidates:

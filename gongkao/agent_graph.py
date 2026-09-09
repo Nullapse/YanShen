@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 import time
@@ -13,14 +14,19 @@ from .agent_prompts import (
     with_conversation_history,
     with_long_term_memories,
 )
-from .agent_rag import build_rag_context, fallback_query_plan, summarize_evidence_cards
+from .agent_rag import normalize_query_plan
+from .agent_react import (
+    MAX_MODEL_CALLS,
+    MAX_RUN_SECONDS,
+    MAX_TOOL_CALLS,
+    REACT_INSTRUCTION,
+    execute_tool,
+    observation,
+    tool_specs,
+)
 from .agent_store import add_step, complete_run, create_run, fail_run
 from .agent_tools import (
-    get_attempt_review_context,
-    get_attempts_review_context,
     input_summary,
-    load_user_context,
-    retrieve_candidates,
 )
 from .ai import resolve_api_key
 from .ai_config import load_effective_agent_settings
@@ -58,6 +64,13 @@ class AgentState(TypedDict, total=False):
     conversation_messages: list[Dict[str, Any]]
     conversation_summary: str
     long_term_memories: list[Dict[str, Any]]
+    react_messages: list[Any]
+    model_calls: int
+    tool_calls_count: int
+    deadline: float
+    pending_calls: list[Dict[str, Any]]
+    tool_cache: Dict[str, Any]
+    stop_reason: str
 
 
 def _subject_type(task_type):
@@ -69,9 +82,7 @@ def _load_langgraph():
         from langchain_openai import ChatOpenAI
         from langgraph.graph import END, START, StateGraph
     except ImportError as exc:
-        raise AgentDependencyError(
-            f"未安装 LangGraph/LangChain 依赖 ({exc})。请确认环境或重新安装依赖。"
-        ) from exc
+        raise AgentDependencyError(f"未安装 LangGraph/LangChain 依赖 ({exc})。请确认环境或重新安装依赖。") from exc
     return ChatOpenAI, StateGraph, START, END
 
 
@@ -211,9 +222,7 @@ def _conversation_excerpt(state):
     memories = state.get("long_term_memories") or []
     if memories:
         memory_text = "；".join(
-            f"{item.get('memory_key')}={item.get('content')}"
-            for item in memories[:8]
-            if item.get("content")
+            f"{item.get('memory_key')}={item.get('content')}" for item in memories[:8] if item.get("content")
         )
         if memory_text:
             lines.append(f"用户长期记忆：{memory_text}")
@@ -296,144 +305,49 @@ def _rerank_evidence_with_llm(llm, user_goal, rag_context, limit=20):
 
 
 def _graph_for(settings, db_path, stack=None):
+    from langchain_core.messages import ToolMessage
+
     ChatOpenAI, StateGraph, START, END = _load_langgraph()
+    temperature = settings.get("temperature")
     llm = ChatOpenAI(
         model=settings["model"],
         api_key=resolve_api_key(settings),
         base_url=_normalize_base_url(settings["api_base_url"]),
-        temperature=float(settings["temperature"] or 0.2),
-        timeout=60,
+        temperature=float(temperature if temperature not in (None, "") else 0.2),
+        timeout=45,
         max_retries=0,
+        max_tokens=2048,
     )
 
-    def classify_node(state: AgentState):
-        user_goal = state.get("user_goal", "")
-        conversation_excerpt = _conversation_excerpt(state)
-        module_hint = state.get("module", "")
-        module = classify_module_heuristic(user_goal, module_hint)
-        rag_query_plan = fallback_query_plan(
-            user_goal,
-            state.get("task_type", "diagnosis"),
-            state.get("subject_ids") or [],
-            module_hint or module,
+    def prepare_node(state):
+        module = classify_module_heuristic(state.get("user_goal", ""), state.get("module", ""))
+        plan = normalize_query_plan(
+            None, state.get("user_goal", ""), state["task_type"], state.get("subject_ids") or [], module
         )
-        planner_usage = {}
-        context_plan = {
+        return {
             "module": module,
-            "rag_query_plan": rag_query_plan,
-            "reason": "model_rag_planner_with_fallback",
-            "should_create_training_plan": False,
+            "context_plan": {"module": module, "rag_query_plan": plan},
+            "react_messages": [],
+            "pending_calls": [],
+            "model_calls": 0,
+            "tool_calls_count": 0,
+            "tool_cache": {},
+            "deadline": time.monotonic() + MAX_RUN_SECONDS,
         }
-        if "planner_usage" not in locals():
-            planner_usage = {}
-        _record_step(
-            state["db_path"],
-            state["run_id"],
-            "planner",
-            "classify_module",
-            {
-                "user_goal": user_goal,
-                "module_hint": module_hint,
-                "conversation_id": state.get("conversation_id"),
-                "conversation_message_count": len(state.get("conversation_messages") or []),
-                "has_conversation_summary": bool(state.get("conversation_summary")),
-            },
-            {**context_plan, "prompt_version": AGENT_PROMPT_VERSION, "token_usage": planner_usage},
-        )
-        return {"module": module, "context_plan": context_plan}
 
-    def load_node(state: AgentState):
-        with connect(state["db_path"]) as conn:
-            user_context = load_user_context(conn)
-        _record_step(
-            state["db_path"],
-            state["run_id"],
-            "tool",
-            "load_user_context",
-            {},
-            user_context,
-        )
-        return {"user_context": user_context}
-
-    def retrieve_candidates_node(state: AgentState):
-        filters = dict(state.get("filters") or {})
-        with connect(state["db_path"]) as conn:
-            candidates = [] if state.get("task_type") == "review" else retrieve_candidates(conn, filters, limit=8)
-            review_context = {}
-            if state.get("task_type") == "review":
-                subject_ids = state.get("subject_ids") or []
-                if subject_ids:
-                    review_context = get_attempts_review_context(conn, subject_ids)
-                elif state.get("subject_id"):
-                    review_context = get_attempt_review_context(conn, state["subject_id"])
-        _record_step(
-            state["db_path"],
-            state["run_id"],
-            "tool",
-            "retrieve_candidates",
-            filters,
-            {
-                "candidate_count": len(candidates),
-                "review_context": bool(review_context),
-                "branch": state.get("task_type"),
-                "review_uses_only_attempt_context": state.get("task_type") == "review",
-            },
-        )
-        return {"candidate_questions": candidates, "review_context": review_context}
-
-    def retrieve_rag_node(state: AgentState):
-        filters = dict(state.get("filters") or {})
-        with connect(state["db_path"]) as conn:
-            rag_context = build_rag_context(
-                conn,
-                state.get("task_type", "diagnosis"),
-                state.get("user_goal", ""),
-                subject_ids=state.get("subject_ids") or [],
-                module=state.get("module") or "overview",
-                filters=filters,
-                user_context=state.get("user_context", {}),
-                candidates=state.get("candidate_questions", []),
-                review_context=state.get("review_context", {}),
-                query_plan=(state.get("context_plan") or {}).get("rag_query_plan"),
-            )
-        rag_context, rerank = _rerank_evidence_with_llm(
-            llm,
-            state.get("user_goal", ""),
-            rag_context,
-        )
-        _record_step(
-            state["db_path"],
-            state["run_id"],
-            "reranker",
-            "LLMEvidenceReranker",
-            {"candidate_count": min(20, len(rag_context.get("evidence_cards") or []))},
-            rerank,
-        )
-        _record_step(
-            state["db_path"],
-            state["run_id"],
-            "tool",
-            "build_rag_context",
-            {"module": state.get("module"), "filters": filters},
-            {
-                "rag_route": rag_context.get("rag_route"),
-                "query_plan": rag_context.get("query_plan") or {},
-                "retrieval_policy": rag_context.get("retrieval_policy"),
-                "evidence_sufficiency": rag_context.get("evidence_sufficiency") or {},
-                "evidence_card_count": len(rag_context.get("evidence_cards", [])),
-                "allowed_evidence_ids": (rag_context.get("grounding_contract") or {}).get("allowed_evidence_ids", [])[:12],
-                "current_attempt_only": (rag_context.get("grounding_contract") or {}).get("current_attempt_only", False),
-                "evidence_cards": summarize_evidence_cards(rag_context.get("evidence_cards", []), limit=12),
-            },
-        )
-        return {"rag_context": rag_context, "module_context": rag_context.get("module_context", {})}
-
-    def analyze_node(state: AgentState):
+    def model_node(state):
+        remaining = state["deadline"] - time.monotonic()
+        if remaining <= 0 or state["model_calls"] >= MAX_MODEL_CALLS:
+            return {
+                "pending_calls": [],
+                "final_text": "本轮分析达到运行预算，请缩小问题范围后重试。",
+                "stop_reason": "budget",
+            }
         if state.get("module_context"):
             messages = build_module_messages(
                 state.get("user_goal", ""),
                 state.get("user_context", {}),
-                state.get("module_context", {}),
+                state["module_context"],
                 state.get("rag_context", {}),
                 _response_style(state),
             )
@@ -454,53 +368,123 @@ def _graph_for(settings, db_path, stack=None):
             state.get("user_goal") or "",
         )
         messages = with_long_term_memories(messages, state.get("long_term_memories") or [])
-        response = llm.invoke(messages)
-        final_text = getattr(response, "content", str(response))
-        token_usage = _response_usage(response)
-        visible_body = final_text.split("```json", 1)[0].strip()
-        style_rewritten = False
-        structured = _structured_output(final_text)
-        visible_body = final_text.split("```json", 1)[0].strip()
-        if wants_concise_response(state.get("user_goal", ""), _response_style(state)) and len(visible_body) > 260:
-            final_text = _compact_concise_response(final_text, structured)
-            structured = _structured_output(final_text)
-            _record_step(
-                state["db_path"],
-                state["run_id"],
-                "critic",
-                "compact_structured_response",
-                {"pre_compact_body_length": len(visible_body), "target_body_length": 260},
-                {"post_compact_body_length": len(final_text.split("```json", 1)[0].strip())},
+        final_round = state["model_calls"] == MAX_MODEL_CALLS - 1 or state["tool_calls_count"] >= MAX_TOOL_CALLS
+        messages.insert(
+            1,
+            (
+                "system",
+                REACT_INSTRUCTION
+                + ("\n已到最后一轮，请依据现有资料回复并明确证据缺口，停止调用工具。" if final_round else ""),
+            ),
+        )
+        messages.extend(state["react_messages"])
+        try:
+            response = llm.bind_tools(tool_specs(state), tool_choice="none" if final_round else "auto").invoke(
+                messages, timeout=min(45, remaining)
             )
+        except Exception as exc:
+            # Keep provider response bodies and credentials out of persisted user-facing errors.
+            raise AgentRunError("教练模型调用失败，请检查连接及模型的工具调用支持后重试。") from exc
+        if getattr(response, "invalid_tool_calls", None):
+            raise AgentRunError("模型返回了无法解析的工具参数，请重试或更换支持工具调用的模型。")
+        calls = list(getattr(response, "tool_calls", None) or [])
+        if len(calls) > MAX_TOOL_CALLS:
+            raise AgentRunError("模型单轮请求的工具数量超过上限，请缩小问题范围。")
+        if any(not call.get("id") for call in calls) or len({c["id"] for c in calls}) != len(calls):
+            raise AgentRunError("模型返回了无效的工具调用标识。")
         _record_step(
             state["db_path"],
             state["run_id"],
             "llm",
-            "ChatOpenAI",
+            "react_decide",
+            {"round": state["model_calls"] + 1, "final_round": final_round},
             {
-                "task_type": state["task_type"],
-                "module": state.get("module"),
-                "candidate_count": len(state.get("candidate_questions", [])),
-            },
-            {
-                "output_preview": final_text[:600],
+                "tool_names": [c.get("name") for c in calls],
+                "token_usage": _response_usage(response),
                 "prompt_version": AGENT_PROMPT_VERSION,
-                "token_usage": token_usage,
-                "style_rewritten": style_rewritten,
             },
         )
-        if structured:
+        update = {
+            "react_messages": [*state["react_messages"], response],
+            "model_calls": state["model_calls"] + 1,
+            "pending_calls": calls,
+        }
+        if calls and not final_round:
+            return update
+        if calls:
+            text = "本轮工具调用已达到预算，请缩小问题范围后重试。"
+            update["stop_reason"] = "budget"
+        else:
+            content = response.content
+            text = (
+                content
+                if isinstance(content, str)
+                else "\n".join(block.get("text", "") for block in content if isinstance(block, dict))
+            )
+            if not text.strip():
+                raise AgentRunError("模型未返回有效回复，请重试。")
+            update["stop_reason"] = "completed"
+        structured = _structured_output(text)
+        if wants_concise_response(state.get("user_goal", ""), _response_style(state)):
+            text = _compact_concise_response(text, structured)
+            structured = _structured_output(text)
+        update.update(pending_calls=[], analysis=text, final_text=text, structured_output=structured)
+        return update
+
+    def tools_node(state):
+        working = dict(state)
+        transcript = list(state["react_messages"])
+        cache = dict(state["tool_cache"])
+        count = state["tool_calls_count"]
+        updates = {}
+        for call in state["pending_calls"]:
+            name, args = call.get("name", ""), call.get("args")
+            status = "ok"
+            if count >= MAX_TOOL_CALLS or time.monotonic() >= state["deadline"]:
+                result = json.dumps({"ok": False, "error": "本轮工具预算耗尽，请使用现有结果。"}, ensure_ascii=False)
+                status = "budget"
+            else:
+                count += 1
+                key = json.dumps([name, args], sort_keys=True, ensure_ascii=False)
+                if name == "search_evidence":
+                    dependencies = [
+                        working.get(field) for field in ("user_context", "review_context", "candidate_questions")
+                    ]
+                    key += hashlib.sha256(
+                        json.dumps(dependencies, sort_keys=True, ensure_ascii=False, default=str).encode()
+                    ).hexdigest()
+                try:
+                    # Cache updates as well as observations so revisiting a query restores its evidence contract.
+                    if key in cache:
+                        change, result = cache[key]
+                        status = "cached"
+                    else:
+                        change = execute_tool(working, name, args)
+                        result = observation(change)
+                        cache[key] = (change, result)
+                    working.update(change)
+                    updates.update(change)
+                except ValueError as exc:
+                    result = json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
+                    status = "invalid_arguments"
+                except Exception:
+                    result = json.dumps(
+                        {"ok": False, "error": "工具读取失败，可调整查询或说明资料暂不可用。"}, ensure_ascii=False
+                    )
+                    status = "error"
+            transcript.append(ToolMessage(content=result, tool_call_id=call["id"], name=name))
             _record_step(
                 state["db_path"],
                 state["run_id"],
-                "parser",
-                "structured_output",
-                {"schema": "agent_response_v1"},
-                structured,
+                "tool",
+                name,
+                {"call_id": call["id"], "arguments": args},
+                {"status": status, "observation": result},
             )
-        return {"analysis": final_text, "final_text": final_text, "structured_output": structured}
+        updates.update(react_messages=transcript, tool_calls_count=count, tool_cache=cache, pending_calls=[])
+        return updates
 
-    def persist_node(state: AgentState):
+    def persist_node(state):
         summary = input_summary(
             state["task_type"],
             state.get("user_context", {}),
@@ -509,27 +493,30 @@ def _graph_for(settings, db_path, stack=None):
         )
         with connect(state["db_path"]) as conn:
             complete_run(conn, state["run_id"], state.get("final_text", ""), summary)
+        _record_step(
+            state["db_path"],
+            state["run_id"],
+            "agent",
+            "react_complete",
+            {},
+            {
+                "model_calls": state["model_calls"],
+                "tool_calls": state["tool_calls_count"],
+                "stop_reason": state.get("stop_reason"),
+            },
+        )
         return {}
 
     builder = StateGraph(AgentState)
-    builder.add_node("classify_module", classify_node)
-    builder.add_node("load_user_context", load_node)
-    builder.add_node("retrieve_candidates", retrieve_candidates_node)
-    builder.add_node("build_rag_context", retrieve_rag_node)
-    builder.add_node("analyze_gap", analyze_node)
+    builder.add_node("prepare", prepare_node)
+    builder.add_node("agent", model_node)
+    builder.add_node("tools", tools_node)
     builder.add_node("persist_result", persist_node)
-
-    builder.add_edge(START, "classify_module")
-    builder.add_edge("classify_module", "load_user_context")
-    builder.add_edge("load_user_context", "retrieve_candidates")
-    builder.add_edge("retrieve_candidates", "build_rag_context")
-    builder.add_edge("build_rag_context", "analyze_gap")
-    builder.add_edge("analyze_gap", "persist_result")
+    builder.add_edge(START, "prepare")
+    builder.add_edge("prepare", "agent")
+    builder.add_conditional_edges("agent", lambda state: "tools" if state.get("pending_calls") else "persist_result")
+    builder.add_edge("tools", "agent")
     builder.add_edge("persist_result", END)
-    if stack is not None:
-        checkpointer = _load_sqlite_checkpointer(db_path, stack)
-        if checkpointer is not None:
-            return builder.compile(checkpointer=checkpointer)
     return builder.compile()
 
 
