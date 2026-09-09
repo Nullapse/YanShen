@@ -1,6 +1,6 @@
 import json
 
-AGENT_PROMPT_VERSION = "agent-prompts-v5-friendly-citations"
+AGENT_PROMPT_VERSION = "agent-prompts-v6-react-tools"
 
 
 AGENT_SYSTEM_PROMPT = """你是“研申”里的 AI 训练教练，不是泛聊天助手。
@@ -210,7 +210,7 @@ TASK_INSTRUCTIONS = {
 RAG_CONTRACT_INSTRUCTION = """RAG 证据约束：
 
 - rag_context.rag_route 表示本轮检索路由。
-- rag_context.query_plan 表示模型规划出的 action、scope 和 sources，回答时要遵守这个证据范围。
+- rag_context.query_plan 表示应用限定的 action、scope 和 sources，回答时要遵守这个证据范围。
 - rag_context.evidence_cards 是唯一可信证据集合。
 - 每个关键判断必须引用 1 个以上 evidence_id。
 - 不要编造 evidence_id、题目、分数、报告或材料。
