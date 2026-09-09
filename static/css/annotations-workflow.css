@@ -1,41 +1,250 @@
-/* Custom Annotation styles */
+/* Custom Annotation styles - Draft Badge on Text */
 .highlight-note-indicator {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  margin-left: 4px;
-  border: 1px solid #cfe1e6;
-  border-radius: 5px;
-  background: #edf5f7;
-  color: #34778a;
-  vertical-align: .08em;
+  gap: 4px;
+  width: auto;
+  min-height: 20px;
+  margin: 0 4px;
+  padding: 1px 7px 1px 4px;
+  border: 1px solid #dcd49e;
+  border-radius: 4px;
+  background: #fdf8e2;
+  color: #4a3e14;
+  vertical-align: .12em;
   cursor: pointer;
   user-select: none;
   pointer-events: auto;
-  box-shadow: 0 1px 2px rgba(39, 85, 97, .08);
+  box-shadow: 0 1px 2px rgba(60, 50, 20, .08);
+  font-size: 11.5px;
+  line-height: 1.35;
+  font-weight: 500;
+  max-width: 320px;
+  transition: all 0.15s ease;
 }
 
 .highlight-note-indicator:hover {
-  border-color: #9ec3cd;
-  background: #e2f0f3;
-  color: #245f70;
+  border-color: #c9bc75;
+  background: #fbf2cc;
+  color: #3b310e;
+  box-shadow: 0 2px 5px rgba(60, 50, 20, .14);
+}
+
+.highlight-note-indicator .draft-badge-tag {
+  display: inline-block;
+  padding: 0 4px;
+  background: #eedda0;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #574312;
+  letter-spacing: 0.3px;
+  line-height: 1.35;
+}
+
+.highlight-note-indicator .draft-badge-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 240px;
 }
 
 .highlight-note-indicator .annotation-note-icon {
-  width: 12px;
-  height: 12px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.9;
+  display: none;
+}
+
+.material-highlight.has-note,
+.text-annotation-highlight.has-note {
+  border-bottom: 2px dashed #2f6f5e !important;
+}
+
+/* Cancel highlight confirmation popup bubble */
+.annotation-confirm-bubble {
+  position: fixed !important;
+  z-index: 99999 !important;
+  width: 210px !important;
+  background: #ffffff;
+  border: 1px solid #c8d8d0;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(27, 67, 50, 0.18);
+  padding: 11px 13px !important;
+  box-sizing: border-box;
+}
+
+.annotation-confirm-bubble[hidden] {
+  display: none !important;
+}
+
+.annotation-confirm-bubble .inline-confirm-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1c2622;
+  margin-bottom: 9px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.annotation-confirm-bubble .inline-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.annotation-confirm-bubble .inline-bubble-btn {
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px solid #d2dbd6;
+  background: #f4f6f5;
+  color: #55625d;
+  transition: all 0.15s ease;
+}
+
+.annotation-confirm-bubble .inline-bubble-btn:hover {
+  background: #e6ebe8;
+  color: #202622;
+}
+
+.annotation-confirm-bubble .inline-bubble-btn.delete-btn {
+  background: #d85b4f;
+  border-color: #cb4e42;
+  color: #ffffff;
+}
+
+.annotation-confirm-bubble .inline-bubble-btn.delete-btn:hover {
+  background: #c5483c;
+  border-color: #b73e32;
 }
 
 .highlight-clear {
   font-weight: 900 !important;
   font-size: 14px !important;
+}
+
+/* Lightweight floating inline annotation editor (above highlighted text) */
+.annotation-inline-bubble {
+  position: fixed !important;
+  z-index: 99999 !important;
+  width: 320px;
+  max-width: 90vw;
+  background: #ffffff;
+  border: 1px solid #c8d8d0;
+  border-radius: 8px;
+  box-shadow: 0 6px 22px rgba(27, 67, 50, 0.16);
+  padding: 10px;
+  box-sizing: border-box;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+.annotation-inline-bubble[hidden] {
+  display: none !important;
+}
+
+.annotation-inline-bubble .inline-bubble-input {
+  width: 100%;
+  min-height: 56px;
+  border: 1px solid #d4dfd9;
+  border-radius: 6px;
+  padding: 7px 9px;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #1c2622;
+  box-sizing: border-box;
+  resize: vertical;
+  outline: none;
+  background: #fbfdfc;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.annotation-inline-bubble .inline-bubble-input:focus {
+  border-color: #2f6f5e;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(47, 111, 94, 0.12);
+}
+
+.annotation-inline-bubble .inline-bubble-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  gap: 8px;
+}
+
+.annotation-inline-bubble .inline-bubble-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.annotation-inline-bubble .inline-bubble-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 5px;
+  cursor: pointer;
+  border: 1px solid #d2dbd6;
+  background: #f4f6f5;
+  color: #55625d;
+  transition: all 0.15s ease;
+}
+
+.annotation-inline-bubble .inline-bubble-btn:hover {
+  background: #e6ebe8;
+  color: #202622;
+}
+
+.annotation-inline-bubble .inline-bubble-btn.primary {
+  background: #2f6f5e;
+  border-color: #2f6f5e;
+  color: #ffffff;
+}
+
+.annotation-inline-bubble .inline-bubble-btn.primary:hover {
+  background: #275d4f;
+  border-color: #275d4f;
+}
+
+.annotation-inline-bubble .inline-bubble-btn.delete {
+  color: #c92a2a;
+  border-color: #ffc9c9;
+  background: #fff5f5;
+}
+
+.annotation-inline-bubble .inline-bubble-btn.delete:hover {
+  background: #ffe3e3;
+}
+
+.annotation-inline-bubble::after {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #ffffff;
+  border: 1px solid #c8d8d0;
+  transform: rotate(45deg);
+  box-sizing: border-box;
+}
+
+.annotation-inline-bubble.arrow-down::after {
+  bottom: -6px;
+  left: var(--bubble-arrow-left, 50%) !important;
+  margin-left: -5px !important;
+  border-top: 0;
+  border-left: 0;
+}
+
+.annotation-inline-bubble.arrow-up::after {
+  top: -6px;
+  left: var(--bubble-arrow-left, 50%) !important;
+  margin-left: -5px !important;
+  border-bottom: 0;
+  border-right: 0;
 }
 
 /* Custom Annotation Modal */
@@ -146,7 +355,7 @@
 
 /* Annotation Popover Card */
 .annotation-popover-card {
-  position: absolute;
+  position: fixed !important;
   background: #ffffff;
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -154,7 +363,7 @@
   max-width: 300px;
   min-width: 180px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.08);
-  z-index: 9999;
+  z-index: 99999 !important;
   font-size: 13px;
   color: var(--text);
   opacity: 0;

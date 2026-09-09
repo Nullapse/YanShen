@@ -340,3 +340,29 @@ test("deep thinking is enabled by default and persists across page mounts", asyn
   assert.equal(secondForm.querySelector("[data-deep-thinking-preference]").checked, false);
   dom.window.close();
 });
+
+test("annotation displays draft note badge and single-click shows cancel confirm", async () => {
+  const dom = installDom("http://localhost/attempts/8");
+  const annotations = await import(`../../static/js/annotations.js?draft=${Date.now()}`);
+  const material = document.createElement("div");
+  material.setAttribute("data-material-highlight", "");
+  material.dataset.materialId = "4";
+  material.dataset.highlightScope = "attempt-8";
+  material.dataset.savedAnnotations = JSON.stringify([{
+    start: 0,
+    end: 4,
+    color: "green",
+    note: "核心抓手",
+  }]);
+  material.textContent = "数字化政务建设推进";
+  document.body.append(material);
+
+  annotations.renderTextAnnotations(material);
+
+  const draftBadge = material.querySelector(".highlight-draft-badge");
+  assert.ok(draftBadge, "Draft badge should be rendered");
+  assert.equal(draftBadge.querySelector(".draft-badge-tag").textContent, "草稿");
+  assert.equal(draftBadge.querySelector(".draft-badge-text").textContent, "核心抓手");
+
+  dom.window.close();
+});

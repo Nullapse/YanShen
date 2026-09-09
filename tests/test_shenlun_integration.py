@@ -126,7 +126,137 @@ class ShenlunIntegrationTest(unittest.TestCase):
         }
         package = build_grading_package(question, [])
         self.assertIn("综合分析题型细分：词句理解类", package)
+        self.assertIn("Shenlun.skill 名师做题法与批改铁律", package)
+        self.assertIn("错别字免扣分铁律", package)
+        self.assertIn("名师标答与参考答案对照", package)
+
+    def test_report_instructions_contains_typo_exemption(self):
+        from gongkao.grading import REPORT_INSTRUCTIONS
+        self.assertIn("错别字免扣分铁律", REPORT_INSTRUCTIONS)
+        self.assertIn("名师标答与参考答案对照", REPORT_INSTRUCTIONS)
+
+    def test_render_grading_report_displays_reference_answers(self):
+        from gongkao.grading_pipeline.report import render_grading_report
+        result = {
+            "score": 75,
+            "display_score": 75,
+            "display_max_score": 100,
+            "overall_summary": "表现良好",
+            "revised_answer": "### 小马哥版\n1. 措施一。\n### 白鹭版\n一、小标题。展开。",
+            "reference_audit": "机构答案自创成语过多，缺少材料原词。",
+        }
+        rubric = {
+            "question_type": "提出对策",
+            "selected_references": [
+                {"organization": "粉笔", "answer_text": "粉笔参考答案"},
+                {"organization": "中公", "answer_text": "中公参考答案"},
+            ],
+            "points": [],
+        }
+        report = render_grading_report(result, rubric, [])
+        self.assertIn("## 机构参考答案对照", report)
+        self.assertIn("### 参考答案 · 粉笔", report)
+        self.assertIn("粉笔参考答案", report)
+        self.assertIn("### 参考答案 · 中公", report)
+        self.assertIn("名师解题逻辑 vs 机构参考答案对照审计", report)
+        self.assertIn("机构答案自创成语过多", report)
+
+    def test_relay_base_url_normalization_and_headers(self):
+        from gongkao.ai import build_chat_url, DEFAULT_USER_AGENT
+        from gongkao.web.controllers.settings import _clean_base_url
+        from gongkao.agent_graph import _normalize_base_url
+
+        # Test URL normalization for OpenCode Go
+        self.assertEqual(build_chat_url("https://opencode.ai/go"), "https://opencode.ai/zen/go/v1/chat/completions")
+        self.assertEqual(build_chat_url("https://opencode.ai/go/v1"), "https://opencode.ai/zen/go/v1/chat/completions")
+        self.assertEqual(build_chat_url("https://opencode.ai/zen/go/v1"), "https://opencode.ai/zen/go/v1/chat/completions")
+
+        self.assertEqual(_clean_base_url("https://opencode.ai/go"), "https://opencode.ai/zen/go/v1")
+        self.assertEqual(_clean_base_url("https://opencode.ai/go/v1"), "https://opencode.ai/zen/go/v1")
+        self.assertEqual(_normalize_base_url("https://opencode.ai/go"), "https://opencode.ai/zen/go/v1")
+
+        # Standard browser User-Agent
+        self.assertIn("Mozilla/5.0", DEFAULT_USER_AGENT)
+        self.assertNotIn("Python-urllib", DEFAULT_USER_AGENT)
+
+    def test_detect_provider_preset(self):
+        from gongkao.web.controllers.settings import detect_provider_preset
+
+        self.assertEqual(detect_provider_preset("DeepSeek", "https://api.deepseek.com"), "official")
+        self.assertEqual(detect_provider_preset("DeepSeek 官方", "https://api.deepseek.com"), "official")
+        self.assertEqual(detect_provider_preset("OpenCode Go", "https://opencode.ai/zen/go/v1"), "opencode")
+        self.assertEqual(detect_provider_preset("", "https://opencode.ai/go"), "opencode")
+        self.assertEqual(detect_provider_preset("自定义中转", "https://api.siliconflow.cn/v1"), "custom")
+        self.assertEqual(detect_provider_preset("", "https://my-oneapi-relay.com/v1"), "custom")
+
+    def test_settings_provider_presets_save(self):
+        import io
+        import tempfile
+        from pathlib import Path
+        from urllib.parse import urlencode
+        from gongkao.db import connect, prepare_user_database
+        from gongkao.web.controllers.settings import SettingsController
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            db_path = Path(tempdir) / "test_settings.sqlite3"
+            prepare_user_database(db_path)
+
+            class DummyHandler:
+                def __init__(self, db, post_body):
+                    self.db_path = db
+                    encoded = urlencode(post_body).encode("utf-8")
+                    self.rfile = io.BytesIO(encoded)
+                    self.headers = {"Content-Length": str(len(encoded))}
+                    self.flashes = []
+
+                def page_settings(self, flashes=None):
+                    self.flashes = flashes or []
+
+            # 1. 官方预设保存
+            handler = DummyHandler(db_path, {
+                "mode": "api",
+                "provider_preset": "official",
+                "api_key": "sk-official-test",
+            })
+            SettingsController.handle_settings(handler)
+            with connect(db_path) as conn:
+                row = conn.execute("SELECT * FROM ai_settings WHERE id = 1").fetchone()
+                self.assertEqual(row["provider_name"], "DeepSeek 官方")
+                self.assertEqual(row["api_base_url"], "https://api.deepseek.com")
+                self.assertEqual(row["api_key"], "sk-official-test")
+
+            # 2. 留空 key 不覆盖现有 key
+            handler = DummyHandler(db_path, {
+                "mode": "api",
+                "provider_preset": "opencode",
+                "api_key": "",  # 留空
+            })
+            SettingsController.handle_settings(handler)
+            with connect(db_path) as conn:
+                row = conn.execute("SELECT * FROM ai_settings WHERE id = 1").fetchone()
+                self.assertEqual(row["provider_name"], "OpenCode Go")
+                self.assertEqual(row["api_base_url"], "https://opencode.ai/zen/go/v1")
+                self.assertEqual(row["api_key"], "sk-official-test")  # 仍然保留
+
+            # 3. 自定义中转
+            handler = DummyHandler(db_path, {
+                "mode": "api",
+                "provider_preset": "custom",
+                "provider_name": "硅基流动",
+                "api_base_url": "https://api.siliconflow.cn/v1",
+                "model": "deepseek-ai/DeepSeek-V3",
+                "api_key": "sk-silicon-test",
+            })
+            SettingsController.handle_settings(handler)
+            with connect(db_path) as conn:
+                row = conn.execute("SELECT * FROM ai_settings WHERE id = 1").fetchone()
+                self.assertEqual(row["provider_name"], "硅基流动")
+                self.assertEqual(row["api_base_url"], "https://api.siliconflow.cn/v1")
+                self.assertEqual(row["model"], "deepseek-ai/DeepSeek-V3")
+                self.assertEqual(row["api_key"], "sk-silicon-test")
 
 
 if __name__ == "__main__":
     unittest.main()
+
+

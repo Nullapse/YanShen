@@ -370,7 +370,7 @@ textarea:focus-visible,
 .shell.sidebar-top .nav-group-label { display: none; }
 .shell.sidebar-top .nav a { padding: 7px 9px; }
 
-@media (max-width: 1120px) {
+@media (max-width: 768px) {
   .sidebar { display: block; padding: 13px 16px; }
   .nav { display: flex; flex-direction: row; overflow-x: auto; }
   .nav-group { display: contents; }
@@ -418,9 +418,17 @@ body { background: #fff; }
 body { color: #202622; }
 
 .sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
   border-color: var(--line);
   background: #f7faf8;
   backdrop-filter: none;
+  z-index: 90;
 }
 
 .main {
@@ -430,9 +438,18 @@ body { color: #202622; }
   padding-top: 28px;
 }
 
-.nav { gap: 3px; }
+.nav {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 3px;
+}
 .nav a { min-height: 39px; }
-.nav .nav-settings { margin-top: auto; }
+.nav .nav-settings {
+  margin-top: auto;
+  padding-top: 8px;
+}
 
 .shell.sidebar-top .sidebar {
   flex-direction: row;
@@ -861,7 +878,6 @@ body[data-active-section="papers"] .paper-card {
 @media (max-width: 1120px) {
   .question-grid { grid-template-columns: 1fr; }
   .statistics-compact .stat-metrics > div:nth-child(5n) { border-right: 1px solid var(--line); }
-  .nav .nav-settings { margin-top: 0; }
 }
 
 @media (max-width: 760px) {
@@ -1409,6 +1425,43 @@ body[data-active-section="settings"] .mode-card strong {
 body[data-active-section="settings"] .mode-card span {
   font-size: 13px;
   line-height: 1.5;
+}
+
+body[data-active-section="settings"] .provider-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 768px) {
+  body[data-active-section="settings"] .provider-mode-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.model-quick-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.model-quick-tags .button.small.ghost {
+  border: 1px dashed #cedbd4;
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  padding: 2px 8px;
+  min-height: 24px;
+  line-height: 20px;
+  color: var(--green, #2b554b);
+  cursor: pointer;
+}
+
+.model-quick-tags .button.small.ghost:hover {
+  background: #eef5f2;
+  border-color: var(--green, #2b554b);
 }
 
 .settings-ai-panel {

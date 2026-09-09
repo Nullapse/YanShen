@@ -163,8 +163,10 @@ class Handler(
         self.send_header("Content-Type", mimetypes.guess_type(path.name)[0] or "application/octet-stream")
         self.send_header("Content-Length", str(len(data)))
         # ES module imports are not versioned per-file; force revalidation so a
-        # WebView2 cache can never mix JS/CSS from older builds with new HTML.
-        self.send_header("Cache-Control", "no-cache")
+        # WebView cache can never mix JS/CSS from older builds with new HTML.
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         if download:
             self.send_header("Content-Disposition", f"attachment; filename*=UTF-8''{quote(path.name)}")
         self.end_headers()

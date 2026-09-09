@@ -4815,7 +4815,7 @@ th { color: var(--muted); font-size: 12px; }
 
 .muted { color: var(--muted); }
 
-@media (max-width: 1120px) {
+@media (max-width: 768px) {
   .shell {
     display: block;
     grid-template-columns: 1fr;

@@ -213,4 +213,27 @@ def render_grading_report(
             result.get("revised_answer") or "（未生成有效修改版答案）",
         ]
     )
+
+    selected_refs = rubric.get("selected_references") or []
+    if selected_refs:
+        lines.extend(["", "## 机构参考答案对照"])
+        for ref in selected_refs:
+            org = ref.get("organization") or "机构答案"
+            text = ref.get("answer_text") or "未提供文本"
+            lines.extend(
+                [
+                    f"### 参考答案 · {org}",
+                    text,
+                    "",
+                ]
+            )
+        if result.get("reference_audit"):
+            lines.extend(
+                [
+                    "### 名师解题逻辑 vs 机构参考答案对照审计",
+                    result["reference_audit"],
+                    "",
+                ]
+            )
+
     return "\n".join(lines)

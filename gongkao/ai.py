@@ -1,8 +1,11 @@
 import json
 import os
+import uuid
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
+
+DEFAULT_USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
 
 
 class AiConfigError(Exception):
@@ -33,9 +36,19 @@ def resolve_api_key(settings):
 
 def build_chat_url(base_url):
     base = base_url.strip().rstrip("/")
+    parsed = urlparse(base)
+    # Proactively normalize OpenCode Go relay URLs (e.g. opencode.ai/go, opencode.ai/go/v1)
+    if parsed.netloc.endswith("opencode.ai") or "opencode.ai" in parsed.netloc:
+        scheme = parsed.scheme or "https"
+        netloc = parsed.netloc or "opencode.ai"
+        path = parsed.path.rstrip("/")
+        if path in {"", "/", "/go", "/go/v1", "/zen/go", "/zen/go/v1"}:
+            return f"{scheme}://{netloc}/zen/go/v1/chat/completions"
+        if path == "/go/v1/chat/completions":
+            return f"{scheme}://{netloc}/zen/go/v1/chat/completions"
+
     if base.endswith("/chat/completions"):
         return base
-    parsed = urlparse(base)
     if parsed.netloc.endswith("api.deepseek.com"):
         return base + "/chat/completions"
     if base.endswith("/v1"):
@@ -83,14 +96,22 @@ def chat_completion(settings, prompt, request_options=None):
     max_tokens = request_options.get("max_tokens")
     if isinstance(max_tokens, int) and 1 <= max_tokens <= 384000:
         payload["max_tokens"] = max_tokens
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+        "User-Agent": DEFAULT_USER_AGENT,
+        "Accept": "application/json",
+    }
+    parsed_url = urlparse(url)
+    if parsed_url.netloc.endswith("opencode.ai") or "opencode" in parsed_url.netloc:
+        session_id = request_options.get("session_id") or f"yanshen-{uuid.uuid4().hex[:12]}"
+        headers["x-opencode-session"] = session_id
+
     data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     request = Request(
         url,
         data=data,
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
         method="POST",
     )
 
@@ -99,6 +120,8 @@ def chat_completion(settings, prompt, request_options=None):
             raw = response.read().decode("utf-8")
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
+        if "1010" in detail or exc.code == 403:
+            raise AiRequestError(f"API 请求失败：HTTP {exc.code}。服务商或中转站拦截了请求（如 Cloudflare WAF）。详细：{detail[:300]}") from exc
         raise AiRequestError(f"API 请求失败：HTTP {exc.code}。{detail[:500]}") from exc
     except (TimeoutError, TimeoutAsyncError if 'TimeoutAsyncError' in globals() else TimeoutError) as exc:
         raise AiRequestError("API 请求超时（超过 300 秒），请检查网络或换用响应更快的模型。") from exc
@@ -109,7 +132,13 @@ def chat_completion(settings, prompt, request_options=None):
 
     try:
         parsed = json.loads(raw)
-        content = parsed["choices"][0]["message"]["content"]
+        choice = parsed["choices"][0]
+        message = choice.get("message") or {}
+        content = message.get("content") or ""
+        if not content and message.get("reasoning_content"):
+            content = message["reasoning_content"]
+        if not content and "text" in choice:
+            content = choice["text"]
     except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
         raise AiRequestError("API 返回格式无法解析，请检查服务商是否兼容 OpenAI chat completions。") from exc
     return content, raw

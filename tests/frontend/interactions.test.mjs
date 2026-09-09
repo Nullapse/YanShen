@@ -358,3 +358,39 @@ test("saved paragraph alignment is restored and serialized", async () => {
   assert.equal(practice.paragraphAlignmentsJson(editor), '["center","left","right"]');
   dom.window.close();
 });
+
+test("provider preset switching syncs base url and quick tag fills model", async () => {
+  const dom = installDom(`
+    <form class="settings-panel">
+      <div class="mode-grid provider-mode-grid" data-provider-group="grading">
+        <label class="mode-card"><input type="radio" name="provider_preset" value="official">官方</label>
+        <label class="mode-card"><input type="radio" name="provider_preset" value="opencode" checked>Go</label>
+        <label class="mode-card"><input type="radio" name="provider_preset" value="custom">自定义</label>
+      </div>
+      <input name="api_base_url" value="https://opencode.ai/zen/go/v1" data-provider-base-url="grading">
+      <input name="model" value="deepseek-v4-flash" data-provider-model="grading">
+      <div data-model-tags="grading">
+        <button type="button" data-fill-model="deepseek-reasoner">R1</button>
+      </div>
+    </form>
+  `);
+  const { initializeShellControls } = await import(`../../static/js/shell.js?provider-preset=${Date.now()}`);
+  initializeShellControls(new AbortController().signal);
+
+  const officialRadio = document.querySelector("input[value='official']");
+  const urlInput = document.querySelector("[data-provider-base-url='grading']");
+  const modelInput = document.querySelector("[data-provider-model='grading']");
+  const tagButton = document.querySelector("[data-fill-model='deepseek-reasoner']");
+
+  officialRadio.checked = true;
+  officialRadio.dispatchEvent(new Event("change", { bubbles: true }));
+
+  assert.equal(urlInput.value, "https://api.deepseek.com");
+  assert.equal(modelInput.value, "deepseek-chat");
+
+  tagButton.click();
+  assert.equal(modelInput.value, "deepseek-reasoner");
+
+  dom.window.close();
+});
+
