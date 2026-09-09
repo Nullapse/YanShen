@@ -29,21 +29,43 @@ search_evidence 的 query 只改变检索词，访问范围由应用固定。
 def tool_specs(state):
     scope = (state.get("context_plan") or {}).get("rag_query_plan", {}).get("scope")
     definitions = [
-        ("search_evidence", "检索本轮允许范围内的材料、方法知识或复盘证据。可改写查询词再次搜索。",
-         {"query": {"type": "string", "minLength": 1, "maxLength": 500}}, ["query"]),
+        (
+            "search_evidence",
+            "检索本轮允许范围内的材料、方法知识或复盘证据。可改写查询词再次搜索。",
+            {"query": {"type": "string", "minLength": 1, "maxLength": 500}},
+            ["query"],
+        ),
     ]
     if scope not in {"current_attempt", "notes_only"}:
-        definitions.extend([
-            ("load_user_context", "读取本地用户的训练统计、近期作答和薄弱点，用于历史诊断。", {}, []),
-            ("retrieve_candidates", "按本轮筛选条件读取可推荐题目，返回可信题目编号和标题。",
-             {"limit": {"type": "integer", "minimum": 1, "maximum": 8}}, ["limit"]),
-        ])
+        definitions.extend(
+            [
+                ("load_user_context", "读取本地用户的训练统计、近期作答和薄弱点，用于历史诊断。", {}, []),
+                (
+                    "retrieve_candidates",
+                    "按本轮筛选条件读取可推荐题目，返回可信题目编号和标题。",
+                    {"limit": {"type": "integer", "minimum": 1, "maximum": 8}},
+                    ["limit"],
+                ),
+            ]
+        )
     if state.get("subject_ids") and scope != "notes_only":
-        definitions.append(("review_current_attempts", "读取用户本轮选定作答及题目材料、参考答案和报告。无需传入 ID。", {}, []))
+        definitions.append(
+            ("review_current_attempts", "读取用户本轮选定作答及题目材料、参考答案和报告。无需传入 ID。", {}, [])
+        )
     return [
-        {"type": "function", "function": {"name": name, "description": description,
-         "parameters": {"type": "object", "properties": properties,
-                        "required": required, "additionalProperties": False}}}
+        {
+            "type": "function",
+            "function": {
+                "name": name,
+                "description": description,
+                "parameters": {
+                    "type": "object",
+                    "properties": properties,
+                    "required": required,
+                    "additionalProperties": False,
+                },
+            },
+        }
         for name, description, properties, required in definitions
     ]
 
@@ -78,11 +100,17 @@ def execute_tool(state, name, args):
         # Preserve the original task and evidence scope even when the model rewrites a query.
         plan = dict((state.get("context_plan") or {}).get("rag_query_plan") or {})
         context = build_rag_context(
-            conn, state.get("task_type", "diagnosis"), state.get("user_goal", ""),
-            subject_ids=state.get("subject_ids") or [], module=state.get("module") or "overview",
-            filters=state.get("filters") or {}, user_context=state.get("user_context") or {},
-            candidates=state.get("candidate_questions") or [], review_context=state.get("review_context") or {},
-            query_plan=plan, retrieval_query=args["query"].strip(),
+            conn,
+            state.get("task_type", "diagnosis"),
+            state.get("user_goal", ""),
+            subject_ids=state.get("subject_ids") or [],
+            module=state.get("module") or "overview",
+            filters=state.get("filters") or {},
+            user_context=state.get("user_context") or {},
+            candidates=state.get("candidate_questions") or [],
+            review_context=state.get("review_context") or {},
+            query_plan=plan,
+            retrieval_query=args["query"].strip(),
         )
         return {"rag_context": context, "module_context": context.get("module_context") or {}}
 
