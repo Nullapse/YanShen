@@ -95,15 +95,17 @@ def chat_completion(settings, prompt, request_options=None):
     )
 
     try:
-        with urlopen(request, timeout=120) as response:
+        with urlopen(request, timeout=300) as response:
             raw = response.read().decode("utf-8")
     except HTTPError as exc:
         detail = exc.read().decode("utf-8", errors="replace")
         raise AiRequestError(f"API 请求失败：HTTP {exc.code}。{detail[:500]}") from exc
+    except (TimeoutError, TimeoutAsyncError if 'TimeoutAsyncError' in globals() else TimeoutError) as exc:
+        raise AiRequestError("API 请求超时（超过 300 秒），请检查网络或换用响应更快的模型。") from exc
     except URLError as exc:
+        if "timed out" in str(exc.reason).lower():
+            raise AiRequestError("API 连接或响应超时，请检查网络延迟。") from exc
         raise AiRequestError(f"API 连接失败：{exc.reason}") from exc
-    except TimeoutError as exc:
-        raise AiRequestError("API 请求超时，请稍后重试或换用 Codex 手动模式。") from exc
 
     try:
         parsed = json.loads(raw)

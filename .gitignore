@@ -59,7 +59,10 @@ playwright-report/
 test-results/
 .env
 .env.*
+.venv
 
+# Local Fenbi login state; never commit imported cookies or DeviceSid.
+fenbi-session.json
 
 
 # Local project notes and screenshots are kept in the workspace but are not published.
@@ -71,5 +74,4 @@ docs/screenshots/
 docs/interview-project-guide.md
 docs/interview/
 docs/releases/
-
 

@@ -1,5 +1,6 @@
 import re
 
+from .taxonomy import classify_analysis_subtype, classify_essay_theme_type
 from .timeutils import format_beijing_time
 
 ANSWER_GRID_COLUMNS = 25
@@ -214,9 +215,36 @@ def budget_status_label(actual_chars, budget):
     return "符合字数要求，接近上限" if hard_max else "高于建议区间"
 
 
-def revised_answer_word_count_line(actual_chars, word_limit=""):
+def extract_revised_answer_streams(answer_body):
+    """Detect if answer_body contains multi-stream revised answers like 小马哥版 / 白鹭版."""
+    pattern = r"(?m)^###\s+([^\n]+)\n"
+    matches = list(re.finditer(pattern, str(answer_body or "")))
+    if not matches:
+        return []
+    streams = []
+    for i, match in enumerate(matches):
+        title = match.group(1).strip()
+        start = match.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(answer_body)
+        body = answer_body[start:end].strip()
+        streams.append({
+            "title": title,
+            "body": body,
+            "chars": count_cjk_chars(body),
+        })
+    return streams
+
+
+def revised_answer_word_count_line(actual_chars, word_limit="", streams=None):
     budget = word_limit_budget(word_limit)
-    parts = [f"实际字数：{actual_chars}字"]
+    if streams and len(streams) >= 2:
+        stream_parts = []
+        for s in streams:
+            short_name = re.sub(r"[（(].*?[）)]", "", s["title"]).strip()
+            stream_parts.append(f"{short_name}{s['chars']}字")
+        parts = [f"实际字数：{' · '.join(stream_parts)}"]
+    else:
+        parts = [f"实际字数：{actual_chars}字"]
     if budget["suggested_min"]:
         parts.append(f"建议区间：{budget['suggested_min']}—{budget['suggested_max']}字")
     if budget["hard_max_exclusive"]:
@@ -264,14 +292,19 @@ def normalize_revised_answer_word_count(report_text, word_limit=""):
     answer_body = revised_answer_body(section_text)
     if not answer_body:
         return report_text
-    actual_chars = count_cjk_chars(answer_body)
+    streams = extract_revised_answer_streams(answer_body)
     budget = word_limit_budget(word_limit)
     hard_max = budget["hard_max_exclusive"]
-    over_limit = bool(hard_max and actual_chars >= hard_max)
+    if len(streams) >= 2:
+        actual_chars = max(s["chars"] for s in streams)
+        over_limit = bool(hard_max and any(s["chars"] >= hard_max for s in streams))
+    else:
+        actual_chars = count_cjk_chars(answer_body)
+        over_limit = bool(hard_max and actual_chars >= hard_max)
     normalized_section = (
         heading
         + "\n"
-        + revised_answer_word_count_line(actual_chars, word_limit)
+        + revised_answer_word_count_line(actual_chars, word_limit, streams=streams)
         + "\n\n"
         + ("> 系统提示：修改版答案未满足严格硬限制，不能直接作为最终答案使用；请继续压缩。\n\n" if over_limit else "")
         + answer_body
@@ -295,11 +328,20 @@ def revised_answer_word_count_status(report_text, word_limit=""):
             "budget_status": "missing",
             "over_limit": False,
             "over_by": 0,
+            "streams": [],
         }
     _, body_start, body_end = section
     answer_body = revised_answer_body(report_text[body_start:body_end])
-    actual_chars = count_cjk_chars(answer_body)
-    over_by = actual_chars - hard_max + 1 if hard_max and actual_chars >= hard_max else 0
+    streams = extract_revised_answer_streams(answer_body)
+    if len(streams) >= 2:
+        actual_chars = max(s["chars"] for s in streams)
+        over_by = max(
+            (s["chars"] - hard_max + 1 for s in streams if hard_max and s["chars"] >= hard_max),
+            default=0,
+        )
+    else:
+        actual_chars = count_cjk_chars(answer_body)
+        over_by = actual_chars - hard_max + 1 if hard_max and actual_chars >= hard_max else 0
     return {
         "has_revised_answer": bool(answer_body),
         "actual_chars": actual_chars,
@@ -308,6 +350,7 @@ def revised_answer_word_count_status(report_text, word_limit=""):
         "budget_status": budget_status_label(actual_chars, budget),
         "over_limit": over_by > 0,
         "over_by": over_by,
+        "streams": streams,
     }
 
 
@@ -502,18 +545,21 @@ def select_relevant_materials(question, materials):
     return selected or list(materials)
 
 
-REPORT_INSTRUCTIONS = """你是一名严谨的申论批改老师。请基于题目、作答要求、整卷材料、用户答案，以及本批改包实际提供的参考答案进行批改。
+REPORT_INSTRUCTIONS = """你是一名严谨的申论批改老师，融合白鹭、小马哥（小题）和袁东（大作文）的解题方法论，以申论命题人和阅卷人的专业视角严格评判。请基于题目、作答要求、整卷材料、用户答案，以及本批改包实际提供的参考答案进行批改。
 
 批改原则：
 1. 修改版答案必须遵守题目信息中的结构化字数预算。“建议作答区间”只用于指导首轮生成，不是合格下限，也不得为了进入区间而补写套话；“硬限制”才决定能否保存。若标注“低于 N 字”，正文占格必须严格小于 N，等于 N 也算超限。模型填写的字数只作占位，系统会按答题纸规则重新计算并覆盖。
 2. 生成修改版答案前，先在内部提炼共性核心采分点并分配表达预算。每个核心点优先保留主体、对象、动作、方式和关键效果；多份参考答案不能简单相加，差异补充点必须服从总预算，不得挤占核心点。
-3. 采分始终以材料和题目要求为准，所提供的答案仅作为参考，不得机械照搬；不同机构说法冲突时，以材料原文和题干任务为准。
-4. 判定“漏点”前必须先在用户原答案中查找同义表达、近义表达、主谓宾不同但意思相同的表达。只要用户已经表达了同一材料信息或同一措施方向，应判为“命中/部分命中”，不得说完全漏写。
-5. 对用户答案要严格区分“命中、部分命中、未命中”，并在“用户答案对应内容”列引用原答案中的短句；如果找不到对应短句，才可写“未体现”。
-6. 评分要像真实申论批改：重视要点覆盖、材料依据、结构逻辑、表达规范和字数格式。
-7. 修改建议要可操作，指出应补、应删、应合并、应规范表达的位置。
-8. 禁止用重复表达、空泛背景、无材料依据的意义、例证和套话凑字数。生成时应保留安全余量，避免答案贴近硬上限后因标点、空格或手动换行超限。
-9. 字数统一按考试答题纸占格规则估算：汉字、全角标点每个一格；连续英文、半角数字每两个字符一格；标准“——”“……”整体两格，单独“—”“…”也按两格；空格一格；手动换行立即结算本行剩余格并从下一行开始，纯空白行不占格；不自动添加段首缩进。
+3. 采分始终以给定材料和题目任务为唯一客观真理源。所提供的机构/用户参考答案可能存在主观发挥、套话堆砌或漏点，仅供对比纠错参考，绝非真理依据！AI 必须以自身依据材料原词与 Shenlun.skill 规则独立自主推导的客观得分点为准进行评分。禁止被不准确的参考答案误导，禁止将脱离材料的机构套话立为扣分项。
+4. 采分点覆盖法（权威评分规则）：申论踩点加分制——踩到给分，没踩到不给，不存在倒扣分。编造内容该项不得分，不额外倒扣（代价是占用字数与格子空间）。判定命中时：踩到≥80%得满分，40%-80%得一半分，<40%不得分。
+5. 判定“漏点”前必须先在用户原答案中查找同义表达、近义表达、主谓宾不同但意思相同的表达。只要用户已经表达了同一材料信息或同一措施方向，应判为“命中/部分命中”，不得说完全漏写。
+6. 对用户答案要严格区分“命中、部分命中、未命中”，并在“用户答案对应内容”列引用原答案中的短句；如果找不到对应短句，才可写“未体现”。
+7. 评分要像真实申论批改：重视要点覆盖、材料依据、结构逻辑、表达规范和字数格式。
+8. 修改建议要可操作，指出应补、应删、应合并、应规范表达的位置。严格去水，不写“在……过程中”“不断”“进一步”“加大力度”等无采分点废话。
+9. 综合分析题按4子类逻辑组织采分与评判：词句理解类（表层含义→深层内涵→对策实质）、观点评析类（亮明态度→合理性与局限性→结论）、现象分析类（概括现象→深层原因→治理对策）、关系分析类（关系本质→双向互动→每点回扣题干核心词）。
+10. 大作文（综合写作）按袁东框架两轮阅卷：第一轮判定主题立意（单主题/双主题AB型/双主题ABC型/多主题，立意是否精准/偏题/跑题）；第二轮五维打分（立意30%+结构20%+论证20%+素材15%+语言15%）与创新加分。
+11. 禁止用重复表达、空泛背景、无材料依据的意义、例证和套话凑字数。生成时应保留安全余量，避免答案贴近硬上限后因标点、空格或手动换行超限。
+12. 字数统一按考试答题纸占格规则估算：汉字、全角标点每个一格；连续英文、半角数字每两个字符一格；标准“——”“……”整体两格，单独“—”“…”也按两格；空格一格；手动换行立即结算本行剩余格并从下一行开始，纯空白行不占格；不自动添加段首缩进。
 
 请固定输出以下 Markdown 结构：
 
@@ -525,6 +571,7 @@ REPORT_INSTRUCTIONS = """你是一名严谨的申论批改老师。请基于题�
 ## 得分点清单
 - 题型分类：
 - 参考答案融合说明：先说明共性核心点如何提炼，再说明哪些只是差异补充点
+- 机构参考答案审计：客观评价本题各机构（粉笔/中公/华图等）答案的优缺点，指出其脱离材料自创的套话或遗漏的关键采分点
 - 标准采分点：
   1. 采分点名称：共性/差异 + 材料依据 + 规范表达
 
@@ -558,7 +605,13 @@ REPORT_INSTRUCTIONS = """你是一名严谨的申论批改老师。请基于题�
 3. 表达规范建议：
 
 ## 修改版答案
-先写“实际字数：X 字；建议区间：A—B 字；硬限制：低于 N 字；状态：待系统复核”，再给出一版可直接替换的答案。建议区间是首轮生成目标，不是最低要求；不得因正文偏短而添加弱依据内容。如有严格硬限制，答案必须小于上限，不能等于上限。如果题目有文种、称谓、分点或段落要求，必须保留。系统保存报告时会按网格规则重新计算本段正文并覆盖状态行；若首轮硬超限，系统只会要求局部压缩本节一次，不会重写其他报告章节。
+先写“实际字数：X 字；建议区间：A—B 字；硬限制：低于 N 字；状态：待系统复核”，再给出可直接替换的答案。建议区间是首轮生成目标，不是最低要求；不得因正文偏短而添加弱依据内容。如有严格硬限制，答案必须小于上限，不能等于上限。如果题目有文种、称谓、分点或段落要求，必须保留。系统保存报告时会按网格规则重新计算本段正文并覆盖状态行；若首轮硬超限，系统只会要求局部压缩本节一次，不会重写其他报告章节。
+
+### 小马哥版（极简·原词直抄流）
+完全使用材料原词，不自创任何概括词，“材料有什么抄什么”，动宾短语+具体对象+结果成效，单条要点≤40字，严格去水，要点密度高，抗扣分能力最强。
+
+### 白鹭版（近义提炼·轻串联流）
+从材料已有词汇中提炼4/6/8字前置概括小标题，逻辑归并3—5条，每条包含“概括词 + 举措展开 -> 成效”，加入少量轻串联使通顺流畅。
 """
 
 
@@ -612,19 +665,33 @@ def build_grading_package(
         f"- 最低要求：{minimum_requirement}",
         f"- 训练优先级：{question['zhejiang_relevance']}/5",
         f"- 原文完整：{'是' if question['is_full_original'] else '否/待校对'}",
-        "",
-        "## 题目",
-        question["prompt"],
-        "",
-        question["requirements"],
-        "",
-        "## 材料",
-        material_text,
-        "",
-        "## 本次批改参考答案",
-        "",
-        "参考答案使用规则：多份参考答案只能用于提炼共性核心点与材料依据，不能把不同机构的所有要点机械相加；差异补充点应谨慎作为加分提醒，不能导致修改版答案超出字数上限。",
     ]
+
+    q_dict = dict(question)
+    q_type = q_dict.get("question_type")
+    if q_type == "综合分析":
+        subtype, guide = classify_analysis_subtype(q_dict.get("prompt"), q_dict.get("requirements"))
+        parts.append(f"- 综合分析题型细分：{subtype}（解题逻辑：{guide}）")
+    elif q_type == "综合写作":
+        theme_type, guide = classify_essay_theme_type(q_dict.get("prompt"), q_dict.get("requirements"))
+        parts.append(f"- 综合写作主题分析：{theme_type}（分论点方向：{guide}）")
+
+    parts.extend(
+        [
+            "",
+            "## 题目",
+            question["prompt"],
+            "",
+            question["requirements"],
+            "",
+            "## 材料",
+            material_text,
+            "",
+            "## 本次批改参考答案",
+            "",
+            "参考答案使用规则：多份参考答案只能用于提炼共性核心点与材料依据，不能把不同机构的所有要点机械相加；差异补充点应谨慎作为加分提醒，不能导致修改版答案超出字数上限。",
+        ]
+    )
     sample_guidance = limited_reference_guidance(len(references))
     if sample_guidance:
         parts.append(sample_guidance)

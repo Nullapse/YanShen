@@ -1432,6 +1432,56 @@ def markdownish(value, return_to="", source_text="", annotation_scope="grading-a
         if line.startswith("### "):
             close_lists()
             output.append(f"<h3>{inline_markdown(line[4:], return_to)}</h3>")
+        elif line == "## 修改版答案":
+            close_lists()
+            output.append(f"<h2>{inline_markdown(line[3:], return_to)}</h2>")
+            index += 1
+            revised_lines = []
+            while index < len(lines) and not lines[index].strip().startswith("## "):
+                revised_lines.append(lines[index])
+                index += 1
+            stream_indices = [i for i, l in enumerate(revised_lines) if l.strip().startswith("### ")]
+            if len(stream_indices) >= 2:
+                pre_stream_lines = revised_lines[:stream_indices[0]]
+                for p_line in pre_stream_lines:
+                    p_str = p_line.strip()
+                    if p_str:
+                        output.append(f'<p class="revised-answer-meta">{inline_markdown(p_str, return_to)}</p>')
+                tabs_html = []
+                panels_html = []
+                for s_idx, match_idx in enumerate(stream_indices):
+                    header_line = revised_lines[match_idx].strip()
+                    title = header_line.removeprefix("### ").strip()
+                    next_idx = stream_indices[s_idx + 1] if s_idx + 1 < len(stream_indices) else len(revised_lines)
+                    stream_body_lines = revised_lines[match_idx + 1:next_idx]
+                    stream_content_html = markdownish("\n".join(stream_body_lines), return_to, source_text, annotation_scope)
+                    tab_id = f"{annotation_scope}-stream-tab-{s_idx}"
+                    panel_id = f"{annotation_scope}-stream-panel-{s_idx}"
+                    is_active = s_idx == 0
+                    tabs_html.append(
+                        f'<button class="content-tab{" active-tab" if is_active else ""}" id="{tab_id}" '
+                        f'type="button" role="tab" aria-selected="{"true" if is_active else "false"}" '
+                        f'aria-controls="{panel_id}" data-tab-target="{panel_id}">{esc(title)}</button>'
+                    )
+                    panels_html.append(
+                        f'<article class="tab-panel{" active-panel" if is_active else ""}" id="{panel_id}" '
+                        f'role="tabpanel" aria-labelledby="{tab_id}"{" hidden" if not is_active else ""}>'
+                        f'<div class="revised-stream-body">{stream_content_html}</div></article>'
+                    )
+                output.append(
+                    f'<div class="tabbed-content revised-answer-tabs" data-tabs>'
+                    f'<div class="content-tabs" role="tablist" aria-label="修改版答案双流派">{"".join(tabs_html)}</div>'
+                    f'{"".join(panels_html)}</div>'
+                )
+                continue
+            else:
+                lines = lines[:index - len(revised_lines)] + revised_lines + lines[index:]
+                index = index - len(revised_lines)
+                continue
+        elif "机构参考答案审计" in line or "机构参考答案点评" in line:
+            close_lists()
+            heading_text = line.lstrip("#").strip()
+            output.append(f'<h2 class="institution-audit-heading">{inline_markdown(heading_text, return_to)}</h2>')
         elif line.startswith("## "):
             close_lists()
             output.append(f"<h2>{inline_markdown(line[3:], return_to)}</h2>")

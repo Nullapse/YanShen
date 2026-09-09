@@ -222,7 +222,8 @@ def run_grading_job(db_path, job_id, chat_completion_func):
             _update_job(db_path, job_id, "reusing_rubric", 42, "已复用评分基准，正在准备综合批改…")
             consensus = {}
         else:
-            _update_job(db_path, job_id, "building_rubric", 20, "正在独立建立评分基准…")
+            msg = "正在独立建立评分基准（深度推导中，耗时约 1~2 分钟）…" if deep_thinking else "正在独立建立评分基准…"
+            _update_job(db_path, job_id, "building_rubric", 20, msg)
             try:
                 with connect(db_path) as conn:
                     consensus = compact_reference_consensus(conn, references, materials)
@@ -307,12 +308,13 @@ def run_grading_job(db_path, job_id, chat_completion_func):
                 "retrieval_error": str(retrieval_error)[:300],
             }
 
+        msg = "已连接 AI，正在完成采分点分析与综合评分（深度推导中，耗时约 1~2 分钟）…" if deep_thinking else "已连接 AI，正在完成采分点分析与综合评分…"
         _update_job(
             db_path,
             job_id,
             "grading",
             58,
-            "已连接 AI，正在完成采分点分析与综合评分…",
+            msg,
         )
         prompt = build_grading_prompt(
             question,

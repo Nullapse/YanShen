@@ -198,7 +198,7 @@ def build_rubric_prompt(question, materials, references, consensus):
 本题材料：
 {_material_text(materials)}
 
-本题已选择的机构参考答案全文（共 {len(reference_context)} 份，属于本题评分主证据；answer_text、scoring_points、notes 均来自旧批改模式原始上下文）：
+本题已有的参考答案全文（共 {len(reference_context)} 份，仅作为候选对照样本；参考答案可能存在主观套话或漏点，绝非最高评分证据；AI 必须依据题干任务与材料原文独立自主做题，自底向上提炼客观采分点）：
 {json.dumps(reference_context, ensure_ascii=False)}
 {limited_reference_guidance(len(reference_context))}
 
@@ -234,10 +234,10 @@ def build_rubric_prompt(question, materials, references, consensus):
 }}
 
 规则：
-1. 只使用本题机构参考答案中存在的 reference_id。逐份检查全文并把支持当前采分点的 ID 写入 reference_ids；不得仅因本地聚类未聚合就把所有 reference_ids 留空。
-2. material_evidence.quote 必须是本题材料中的连续原文短句。
-3. core 至少由两个不同机构支持，且支持机构数达到机构总数的一半；否则降为 supporting。
-4. 只有一份机构答案时，可把材料直接确认的点标为 material_core，不得声称形成机构共识。
+1. 只使用本题候选参考答案中存在的 reference_id。逐份检查全文并把支持当前采分点的 ID 写入 reference_ids；若某核心点由材料直接支持但参考答案未提及，reference_ids 留空，并标为 material_core。
+2. material_evidence.quote 必须是本题材料中的连续原文短句。最高事实来源是本题材料，任何不在材料中的机构发挥不得立为核心得分点。
+3. core 至少由两个不同机构支持，且支持机构数达到机构总数的一半；否则标为 material_core 或 supporting。
+4. 只有一份参考答案或参考答案存在遗漏/偏差时，坚决以材料原文为准，把材料直接确认的点标为 material_core。评分基准以 AI 自主推导的材料原词为准，不得盲从有缺陷的参考答案。
 5. 评分基准必须能在题目字数预算内完成。先提炼“为完成题目任务不可缺少的语义”，再把例子、修饰、展开说明和非任务要求的泛化成效放入 optional_details；不得要求考生机械写全所有机构答案细节。
 6. required_for_full_score 只用于在建议字数内仍应覆盖的 core/material_core。supporting、disputed 以及仅属补充说明的内容必须为 false，遗漏时不扣主要分。
 7. 合并同一措施或同一机制下的相近细节。所有 required 点的 minimum_expression 加上必要序号和标点，按上述占格规则估算后必须能放入 suggested_max，并保留至少8格安全余量。

@@ -1,8 +1,11 @@
 """Settings, import, export, and local-record management controllers."""
 
+import time
+
 from ..runtime import (
     back_link,
     cgi,
+    chat_completion,
     connect,
     create_import_record,
     esc,
@@ -240,7 +243,11 @@ class SettingsController:
                 </div>
               </div>
             </section>
-            <button class="button primary" type="submit">保存设置</button>
+            <div class="settings-actions-group" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:20px;">
+              <button class="button primary" type="submit" name="settings_action" value="save">保存设置</button>
+              <button class="button secondary" type="submit" name="settings_action" value="test">测试批改 API 连通性</button>
+              <button class="button ghost" type="submit" name="settings_action" value="test_coach">测试教练 API 连通性</button>
+            </div>
             </form>
           </div>
 
@@ -397,6 +404,10 @@ class SettingsController:
                     else "basic",
                 ),
             )
+            if "agent_connection_mode" in form:
+                use_grading_api = 0 if form.get("agent_connection_mode", ["inherit"])[0] == "custom" else 1
+            else:
+                use_grading_api = current_agent["use_grading_api"]
             conn.execute(
                 """
                 UPDATE agent_ai_settings
@@ -405,7 +416,7 @@ class SettingsController:
                  WHERE id = 1
                 """,
                 (
-                    0 if form.get("agent_connection_mode", ["inherit"])[0] == "custom" else 1,
+                    use_grading_api,
                     form.get("agent_provider_name", [current_agent["provider_name"]])[0].strip()
                     or "DeepSeek",
                     form.get("agent_api_base_url", [current_agent["api_base_url"]])[0].strip()
@@ -416,6 +427,76 @@ class SettingsController:
                     agent_temperature,
                 ),
             )
+
+        settings_action = form.get("settings_action", ["save"])[0]
+        if settings_action == "test":
+            target_settings = {
+                "provider_name": form.get("provider_name", ["DeepSeek"])[0].strip() or "DeepSeek",
+                "api_base_url": form.get("api_base_url", ["https://api.deepseek.com"])[0].strip() or "https://api.deepseek.com",
+                "api_key": api_key,
+                "api_key_env": form.get("api_key_env", ["DEEPSEEK_API_KEY"])[0].strip(),
+                "model": form.get("model", ["deepseek-v4-pro"])[0].strip() or "deepseek-v4-pro",
+                "temperature": 0.2,
+            }
+            start_time = time.time()
+            try:
+                content, _ = chat_completion(
+                    target_settings,
+                    "请回复五个字：API连接正常",
+                    request_options={"max_tokens": 50, "thinking": "disabled"},
+                )
+                duration = time.time() - start_time
+                reply = content.strip().replace("\n", " ")
+                self.page_settings([
+                    ("success", f"设置已保存。批改 API 连通测试成功！响应耗时 {duration:.2f} 秒。模型回复：“{reply}”")
+                ])
+                return
+            except Exception as exc:
+                self.page_settings([
+                    ("warning", "设置已保存。"),
+                    ("error", f"批改 API 连接测试失败：{exc}"),
+                ])
+                return
+
+        if settings_action == "test_coach":
+            if use_grading_api:
+                target_settings = {
+                    "provider_name": form.get("provider_name", ["DeepSeek"])[0].strip() or "DeepSeek",
+                    "api_base_url": form.get("api_base_url", ["https://api.deepseek.com"])[0].strip() or "https://api.deepseek.com",
+                    "api_key": api_key,
+                    "api_key_env": form.get("api_key_env", ["DEEPSEEK_API_KEY"])[0].strip(),
+                    "model": form.get("model", ["deepseek-v4-pro"])[0].strip() or "deepseek-v4-pro",
+                    "temperature": 0.2,
+                }
+            else:
+                target_settings = {
+                    "provider_name": form.get("agent_provider_name", [current_agent["provider_name"]])[0].strip() or "DeepSeek",
+                    "api_base_url": form.get("agent_api_base_url", [current_agent["api_base_url"]])[0].strip() or "https://api.deepseek.com",
+                    "api_key": agent_api_key,
+                    "api_key_env": form.get("agent_api_key_env", [current_agent["api_key_env"]])[0].strip(),
+                    "model": form.get("agent_model", [current_agent["model"]])[0].strip() or "deepseek-v4-pro",
+                    "temperature": 0.2,
+                }
+            start_time = time.time()
+            try:
+                content, _ = chat_completion(
+                    target_settings,
+                    "请回复五个字：API连接正常",
+                    request_options={"max_tokens": 50, "thinking": "disabled"},
+                )
+                duration = time.time() - start_time
+                reply = content.strip().replace("\n", " ")
+                self.page_settings([
+                    ("success", f"设置已保存。教练 API 连通测试成功！响应耗时 {duration:.2f} 秒。模型回复：“{reply}”")
+                ])
+                return
+            except Exception as exc:
+                self.page_settings([
+                    ("warning", "设置已保存。"),
+                    ("error", f"教练 API 连接测试失败：{exc}"),
+                ])
+                return
+
         self.page_settings([("success", "设置已保存。")])
 
     def handle_settings_local_records_clear(self):

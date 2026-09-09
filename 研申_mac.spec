@@ -1,6 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import os
+import sys
 from PyInstaller.utils.hooks import collect_submodules
 
 
@@ -21,9 +22,6 @@ OPTIONAL_EVAL_EXCLUDES = [
     "google.cloud",
     "grpc",
     "hf_xet",
-    # Optional local semantic-search acceleration is intentionally excluded
-    # from the desktop release.  The app defaults to its portable feature-hash
-    # retriever and falls back gracefully when these packages are unavailable.
     "fastembed",
     "onnxruntime",
     "tokenizers",
@@ -44,6 +42,14 @@ AGENT_HIDDENIMPORTS = (
     + collect_submodules("openai")
 )
 
+MACOS_HIDDENIMPORTS = (
+    collect_submodules("webview")
+    + collect_submodules("objc")
+    + collect_submodules("WebKit")
+    + collect_submodules("AppKit")
+    + collect_submodules("Foundation")
+)
+
 datas = [
     ("static", "static"),
     ("gongkao/web/templates", "gongkao/web/templates"),
@@ -54,11 +60,8 @@ datas = [
     ("knowledge/saduck_methodology.jsonl", "knowledge"),
     ("knowledge/master_methodology.jsonl", "knowledge"),
     ("data/gongkao_seed.sqlite3", "data"),
-    ("assets/app-icon.ico", "assets"),
-    ("desktop_host/gongkao_desktop_host.exe", "."),
-    ("desktop_host/Microsoft.Web.WebView2.Core.dll", "."),
-    ("desktop_host/Microsoft.Web.WebView2.WinForms.dll", "."),
-    ("desktop_host/WebView2Loader.dll", "."),
+    ("assets/app-icon.png", "assets"),
+    ("assets/app-icon.icns", "assets"),
 ]
 if os.path.exists("evals"):
     datas.append(("evals", "evals"))
@@ -68,7 +71,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=datas,
-    hiddenimports=collect_submodules("tkinter") + collect_submodules("webview") + AGENT_HIDDENIMPORTS,
+    hiddenimports=MACOS_HIDDENIMPORTS + AGENT_HIDDENIMPORTS,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
@@ -89,7 +92,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
-    icon="assets/app-icon.ico",
+    icon="assets/app-icon.icns",
     disable_windowed_traceback=False,
 )
 
@@ -101,4 +104,21 @@ coll = COLLECT(
     upx=True,
     upx_exclude=[],
     name="研申",
+)
+
+app = BUNDLE(
+    coll,
+    name="研申.app",
+    icon="assets/app-icon.icns",
+    bundle_identifier="com.yanshen.app",
+    info_plist={
+        "CFBundleName": "研申",
+        "CFBundleDisplayName": "研申",
+        "CFBundleGetInfoString": "研申 - 智能申论备考与批改评测系统",
+        "CFBundleIdentifier": "com.yanshen.app",
+        "CFBundleVersion": "1.0.0",
+        "CFBundleShortVersionString": "1.0.0",
+        "NSHighResolutionCapable": True,
+        "LSApplicationCategoryType": "public.app-category.education",
+    },
 )

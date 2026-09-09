@@ -2360,6 +2360,8 @@ class ReleaseRuntimeTest(unittest.TestCase):
                 self.assertIn("AI 批改与教练", html)
                 self.assertIn("沿用批改 API", html)
                 self.assertIn("单独设置", html)
+                self.assertIn("测试批改 API 连通性", html)
+                self.assertIn("测试教练 API 连通性", html)
                 body = urlencode(
                     {
                         "mode": "api",
@@ -2381,6 +2383,24 @@ class ReleaseRuntimeTest(unittest.TestCase):
                 request = Request(f"{base}/settings", data=body, method="POST")
                 with urlopen(request, timeout=10) as response:
                     self.assertIn("设置已保存", response.read().decode("utf-8"))
+
+                test_body = urlencode(
+                    {
+                        "mode": "api",
+                        "provider_name": "GradingAI",
+                        "api_base_url": "https://grading.example",
+                        "model": "grading-model",
+                        "temperature": "0.2",
+                        "api_key": "test-key-direct",
+                        "settings_action": "test",
+                    }
+                ).encode("utf-8")
+                test_request = Request(f"{base}/settings", data=test_body, method="POST")
+                with patch("gongkao.web.controllers.settings.chat_completion", return_value=("测试回复OK", "{}")):
+                    with urlopen(test_request, timeout=10) as response:
+                        test_resp_text = response.read().decode("utf-8")
+                        self.assertIn("批改 API 连通测试成功", test_resp_text)
+                        self.assertIn("测试回复OK", test_resp_text)
             finally:
                 server.shutdown()
                 server.server_close()

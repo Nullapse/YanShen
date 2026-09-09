@@ -173,6 +173,20 @@ CREATE TABLE IF NOT EXISTS grading_jobs (
 CREATE INDEX IF NOT EXISTS idx_grading_jobs_attempt
 ON grading_jobs(attempt_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS ai_question_solutions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    model_name TEXT NOT NULL DEFAULT '',
+    xiaomage_answer TEXT NOT NULL DEFAULT '',
+    bailu_answer TEXT NOT NULL DEFAULT '',
+    scoring_points TEXT NOT NULL DEFAULT '',
+    reference_audit TEXT NOT NULL DEFAULT '',
+    raw_response TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(question_id)
+);
+
 CREATE TABLE IF NOT EXISTS grading_report_contexts (
     report_id INTEGER PRIMARY KEY REFERENCES grading_reports(id) ON DELETE CASCADE,
     rubric_id INTEGER REFERENCES grading_rubrics(id) ON DELETE SET NULL,
@@ -670,6 +684,21 @@ CREATE TABLE IF NOT EXISTS agent_context_worker_state (
 );
 
 INSERT OR IGNORE INTO agent_context_worker_state (id) VALUES (1);
+
+CREATE TABLE IF NOT EXISTS ai_question_solutions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    question_id INTEGER NOT NULL REFERENCES questions(id) ON DELETE CASCADE,
+    model_name TEXT NOT NULL DEFAULT '',
+    xiaomage_answer TEXT NOT NULL DEFAULT '',
+    bailu_answer TEXT NOT NULL DEFAULT '',
+    scoring_points TEXT NOT NULL DEFAULT '',
+    reference_audit TEXT NOT NULL DEFAULT '',
+    raw_response TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(question_id)
+);
+CREATE INDEX IF NOT EXISTS idx_ai_question_solutions_question_id ON ai_question_solutions(question_id);
 """
 CURRENT_SCHEMA_ADDITIVE_TABLES = frozenset(
     {
@@ -677,6 +706,7 @@ CURRENT_SCHEMA_ADDITIVE_TABLES = frozenset(
         "agent_context_vectors",
         "agent_context_fts",
         "agent_context_worker_state",
+        "ai_question_solutions",
     }
 )
 

@@ -266,10 +266,21 @@ class GradingController:
                     evidence, result, rubric, validation = [], {}, {}, {}
                 if result.get("dimension_scores"):
                     dimension_cards = []
+                    is_essay = question["question_type"] == "综合写作"
+                    dim_friendly_titles = {
+                        "content": "立意与素材" if is_essay else "内容要点",
+                        "reasoning": "论证深度" if is_essay else "论点论证",
+                        "structure": "框架结构",
+                        "expression": "申论语言" if is_essay else "语言表达",
+                        "format": "卷面格式" if is_essay else "格式规范",
+                        "feasibility": "对策可行性",
+                    }
                     for dimension in result.get("dimension_scores", []):
+                        dim_key = dimension.get("dimension", "")
+                        label = dim_friendly_titles.get(dim_key, dimension.get("label") or dim_key or "评分维度")
                         dimension_cards.append(
                             '<div class="grading-dimension-card">'
-                            f"<span>{esc(dimension.get('label') or dimension.get('dimension') or '评分维度')}</span>"
+                            f"<span>{esc(label)}</span>"
                             f"<strong>{esc(format(float(dimension.get('display_score') or 0), 'g'))}"
                             f"<small>/{esc(format(float(dimension.get('display_max_score') or 0), 'g'))}</small></strong>"
                             f"<p>{esc(dimension.get('reason') or '')}</p>"
@@ -431,6 +442,7 @@ class GradingController:
               <div class="smart-grade-status {"is-error" if payload["status"] in {"failed", "interrupted"} else ""}" data-grading-job data-job-id="{payload["job_id"]}" data-job-status="{esc(payload["status"])}">
                 <div><strong data-grading-job-message>{esc(payload["message"])}</strong><span data-grading-job-progress>{payload["progress"]}%</span></div>
                 <progress max="100" value="{payload["progress"]}" data-grading-job-bar></progress>
+                <p class="muted job-eta-tip" style="margin:6px 0 0;font-size:12px;color:var(--muted);line-height:1.4;">💡 提示：AI 正在执行多步评分与推导，智能批改（含深度思考）通常需 1~3 分钟，请耐心等待勿关闭页面。</p>
                 <p data-grading-job-error>{esc(payload["error"])}</p>
               </div>"""
         report_section = f"""
