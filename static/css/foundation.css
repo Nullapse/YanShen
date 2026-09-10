@@ -4532,10 +4532,10 @@ aside.settings-panel {
 
 .user-redundant-span:hover,
 .user-redundant-span.active-popover-target {
-  background: rgba(239, 68, 68, 0.12);
-  border-bottom-color: #ef4444;
-  color: #991b1b;
-  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+  background: rgba(100, 116, 139, 0.22);
+  border-bottom-color: #64748b;
+  color: #475569;
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.18);
 }
 
 .user-typo-span {

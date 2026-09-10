@@ -743,7 +743,7 @@ def normalize_fenbi_payload(meta_payload, static_payloads=None, source_url="") -
                 "organization": organization,
                 "answer_text": answer,
                 "scoring_points": scoring_points,
-                "notes": f"来自粉笔 URL 自动导入字段 {answer_source}；作为本题粉笔参考答案展示，内容未核验，评分仍以题干和材料为准。",
+                "notes": f"来自粉笔 URL 自动导入字段 {answer_source}；内容未核验；导入后作为本题唯一内容评分来源，AI 仅负责合理划点和语义判分。",
                 "score": score,
                 "is_reviewed": 0,
             }
@@ -1155,7 +1155,7 @@ def draft_from_bridge_payload(payload: dict, source_url: str) -> dict:
             if isinstance(reference, dict):
                 reference["is_reviewed"] = 0
                 reference["organization"] = FENBI_PROVIDER
-                reference["notes"] = "来自粉笔 URL 自动导入；作为本题粉笔参考答案展示，内容未核验，评分仍以题干和材料为准。"
+                reference["notes"] = "来自粉笔 URL 自动导入；内容未核验；导入后作为本题唯一内容评分来源，AI 仅负责合理划点和语义判分。"
         return parsed
     return normalize_fenbi_payload(payload.get("meta", payload), payload.get("static_payloads", []), source_url)
 

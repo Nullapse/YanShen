@@ -235,6 +235,11 @@ def build_combined_grading_prompt(
 ):
     history_meta = history_meta or {}
     reference_context = _full_reference_context(references or [])
+    single_reference_policy = (
+        "本题只有一份粉笔标准答案：它是内容采分点的唯一边界。只能拆分该答案已经写出的语义；材料不得新增采分点或追加必需细节。"
+        if len(reference_context) == 1 and question.get("question_type") != "综合写作"
+        else "按题干、材料和所选参考答案共同核验评分边界。"
+    )
     word_budget = word_limit_budget(question_word_limit_text(question))
     budget_guidance = _word_budget_guidance(word_budget)
     question_context = {
@@ -278,7 +283,7 @@ def build_combined_grading_prompt(
     dimension_score_template = _dimension_score_template(dimension_profile)
     return f"""你正在执行申论单次智能联合批改。请在一次响应中先建立独立评分基准，再分析全部采分点，最后按题型维度综合评分。
 
-你是申论阅卷与诊断老师，不是参考答案作者。最高事实来源是本题题干、作答要求与材料原文。粉笔答案是主要参考和展示标杆，但可能存在套话、偏差或漏点；没有材料依据的内容不得成为主要扣分点。白鹭和小马哥只用于拆点、归并、材料原词与同义表达识别，绝不用于生成完整答案。
+你是申论阅卷与诊断老师，不是参考答案作者。{single_reference_policy} 白鹭和小马哥只用于拆点、归并与同义表达识别，绝不用于生成完整答案。
 【错别字免扣分铁律】：考生采用电脑键盘拼音输入法打字作答，同音错别字、输入法联想失误等非原则性错字属正常录入现象，一律免予扣分，严禁以此作为扣分依据！评分核心在于采分点语义识别与材料提取能力；只要语义表达能识别出采分点（无论是否存在同音错别字），均须判定为命中给分！
 建立 rubric 时不得根据本次作答增删采分点或改变权重；本次作答只能用于 evaluation。
 
@@ -291,7 +296,7 @@ def build_combined_grading_prompt(
 本题材料：
 {_material_text(materials)}
 
-本题已选择的机构参考答案全文（共 {len(reference_context)} 份，仅供候选对比参考；机构答案可能存在套话或漏点，严禁被不准确的机构答案带偏；评分以材料原词与名师方法论自主推导为准）：
+本题已选择的机构参考答案全文（共 {len(reference_context)} 份；只有一份时只能从该答案切分计分点，不得依据材料自主补点）：
 {json.dumps(reference_context, ensure_ascii=False)}
 {limited_reference_guidance(len(reference_context))}
 
@@ -333,7 +338,11 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
     "task_constraints": {{"object": "", "required_structure": [], "format_rules": []}},
     "points": [{{
       "point_key": "point-1",
-      "label": "简短采分点名",
+      "group_key": "group-1",
+      "group_label": "粉笔答案中的一级要点",
+      "group_order": 1,
+      "point_order": 1,
+      "label": "完整给分点名称",
       "canonical_expression": "规范表达",
       "aliases": ["同义表达"],
       "tier": "core|material_core|supporting|disputed",
@@ -344,6 +353,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
       "required_elements": ["不可缺少的语义"],
       "optional_details": ["可省略的例子或修饰"],
       "minimum_expression": "最短完整写法",
+      "reference_quote": "粉笔答案中仅对应当前小点的连续原文",
       "material_evidence": [{{"material_number": 1, "quote": "材料连续原文"}}],
       "reference_ids": [1],
       "confidence": 0.9
@@ -352,7 +362,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
     "conflicts": []
   }},
   "evaluation": {{
-    "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "coverage_ratio": 0.0, "answer_quote": "尽量使用用户答案短且连续的原文", "reason": "覆盖或缺失说明", "confidence": 0.0, "missing_elements": []}}],
+    "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "score_level": "full|mostly|half|slight|none", "coverage_ratio": 0.0, "answer_quote": "尽量使用用户答案短且连续的原文", "reason": "覆盖或缺失说明", "confidence": 0.0, "missing_elements": []}}],
     "dimension_scores": {json.dumps(dimension_score_template, ensure_ascii=False)},
     "holistic_adjustment_reason": "",
     "annotations": [{{"kind": "good|polish|change|delete|add|critical", "severity": "positive|low|medium|high|critical", "quote": "非补充类必须为用户答案连续原文", "anchor": "补充类必须为用户答案连续原文，表示插入在此句之后", "replacement": "", "reason": "", "point_key": ""}}],
@@ -371,6 +381,9 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
 2. rubric.point_key 只使用 point-1、point-2 这类 ASCII 标识；evaluation.point_matches 必须逐字复制对应的 rubric.point_key，不得翻译、改写或另起编号。先逐点分析，再给 dimension_scores。
 3. dimension_scores 必须逐项覆盖固定维度；JSON 中 max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。
 4. 【核心要义对齐原则】：申论参考答案不唯一。只要用户答案表达的动作机制、工作手段、目标成效与采分小点的核心要义一致（近义概括、同义替换），必须判定为 hit 命中，绝不因未出现参考答案字面原词而误判！
+5. 【真实阅卷式划点】：先按粉笔答案识别一级要点组，再把每组合理归并为1—3个完整给分点；20分题通常共5—10个给分点，每点一般1—3分。不得把每个词、地点、案例拆成0.5分碎片，也不得把整组措施合成一个笼统大点。
+6. 【同一状态源】：每个 rubric 点必须提供粉笔答案中的逐字 reference_quote；evaluation 只判该 point_key 的 hit/partial/miss。参考答案着色、用户答案着色和得分都将直接使用这个状态，禁止另设一套判断。
+7. 【合理分档】：同义核心完整必须 hit/full。partial 只用于给分点自身缺少实质语义，并选择 mostly/half/slight；不得因为材料额外细节降分。
 5. 【结构体例刚性扣分】：若题目材料按地区、主体或案例分设（如J县、K县、M县；或总分结构），用户答案若抹去主体、案例归属不清或缺失总述，必须在 structure/结构维度及主体采分点上进行硬扣分（扣1~2分），并在点评中严厉指出，绝不可放水！
 6. 【冗余废话深度排查】：在 redundancies 列表中，列出用户答案中与所有采分要义均无关联的文字（无信息增量套话、超纲细微展开、主观脑补），指出具体占用字数与删减理由。
 7. hit/partial 应提供用户答案中的短连续原文；若同一要点散落在多处，可用“……”连接多个按原文顺序出现的短片段，不得因此改判 miss。annotations 中除 add 外 quote 必须是连续原文。
@@ -440,6 +453,11 @@ def build_grading_prompt(
 ):
     history_meta = history_meta or {}
     reference_context = _full_reference_context(references or [])
+    single_reference_policy = (
+        "本题只有一份粉笔标准答案：它是内容采分点的唯一边界。不得从材料新增采分点或追加标答未写的必需细节。"
+        if len(reference_context) == 1 and question.get("question_type") != "综合写作"
+        else "按已校验评分基准逐点判定。"
+    )
     question_context = {
         key: question.get(key)
         for key in (
@@ -483,7 +501,7 @@ def build_grading_prompt(
     budget_guidance = _word_budget_guidance(question_context["word_budget"])
     essay_guidance = ESSAY_SCORING_GUIDANCE if question.get("question_type") == "综合写作" else ""
     return f"""你正在使用已校验的不等权评分基准执行申论综合批改。你是阅卷与诊断老师，不是参考答案作者；只分析采分点、材料证据、用户作答覆盖和固定维度得分。
-评分只能依据 current_scoring：本题信息、材料、参考答案和评分基准。题干、作答要求和材料原文是最高事实源；粉笔答案是主要参考但不是脱离材料的绝对真理。白鹭和小马哥仅用于拆点、归并、识别材料原词和同义表达。禁止生成、改写、压缩或润色任何完整答案。coaching_context 只用于点评建议，不得影响任何得分。
+评分只能依据 current_scoring：{single_reference_policy} 用户不要求逐字一致，核心动作、对象或效果与 reference_quote 同义就必须判 hit。partial 只适用于 reference_quote 自身包含的核心语义确实只写了一半；严禁因为材料里另有地点、案例、政策名、技术名而降分。白鹭和小马哥仅用于拆点和同义识别。禁止生成、改写、压缩或润色任何完整答案。coaching_context 只用于点评建议，不得影响任何得分。
 
 与旧批改包一致的本题完整信息：
 {json.dumps(question_context, ensure_ascii=False)}
@@ -534,7 +552,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
 <smart_grading_json>
 {{
   "evaluation": {{
-    "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "coverage_ratio": 0.0, "answer_quote": "尽量使用用户答案短且连续的原文", "reason": "覆盖或缺失说明", "confidence": 0.0, "missing_elements": []}}],
+    "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "score_level": "full|mostly|half|slight|none", "coverage_ratio": 0.0, "answer_quote": "尽量使用用户答案短且连续的原文", "reason": "覆盖或缺失说明", "confidence": 0.0, "missing_elements": []}}],
     "dimension_scores": {json.dumps(dimension_score_template, ensure_ascii=False)},
     "holistic_adjustment_reason": "",
     "annotations": [{{"kind": "good|polish|change|delete|add|critical", "severity": "positive|low|medium|high|critical", "quote": "非补充类必须为用户答案连续原文", "anchor": "补充类必须为用户答案连续原文，表示插入在此句之后", "replacement": "", "reason": "", "point_key": ""}}],
@@ -550,13 +568,13 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
 
 规则：
 1. 每个可计分 point_key 必须且只能出现一次，并逐字复制评分基准中的 point_key，不得翻译、改写或另起编号。
-2. 【核心要义对齐原则】：申论参考答案不唯一。只要用户答案所表达的动作机制、工作手段、目标成效与采分小点的核心要义一致（哪怕词句存在近义概括、同义替换），必须判定为 hit 命中，绝不因未出现参考答案字面原词而误判！
+2. 【核心同义即全分】：只要用户答案的核心动作、对象或效果与 reference_quote 同义，必须判 hit，不要求逐字一致。“瞄准细分领域”对应“以细分领域作为切入口”、“打造产业先行区”对应“划定产业先行区”，都必须全分。不得用 reference_quote 没写出的材料细节降为 partial。
 3. 【结构体例刚性扣分】：若题目材料按地区、主体或案例分设（如J县、K县、M县；或总分结构），用户答案若抹去主体、案例归属不清或缺失总述，必须在 structure/结构维度及主体采分点上进行硬扣分（扣1~2分），并在点评中严厉指出，绝不可放水！
 4. 【冗余废话深度排查】：在 redundancies 列表中，列出用户答案中与所有采分要义均无关联的文字（无信息增量套话、超纲细微展开、主观脑补），指出具体占用字数与删减理由。
-5. point_matches 的每项还必须输出 coverage_ratio（0—1）。hit 固定为1，miss固定为0；partial 根据实际覆盖的核心语义给出0.1—0.9，不得把所有 partial 机械写成0.5。
+5. point_matches 按完整给分点判定。核心意思完整为 hit/full=1；部分命中必须选择 mostly=0.75、half=0.5 或 slight=0.25，并明确指出 reference_quote 自身缺少的核心语义；miss/none=0。0.5只是分档刻度，禁止把参考答案每个词机械切成0.5分。
 6. hit/partial 应提供用户答案中的短连续原文；若语义散落在多处，可用“……”连接按顺序出现的多个短片段。
 7. dimension_scores 必须逐项覆盖评分基准 dimensions；max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。
 8. 你是阅卷与诊断老师，不是答案作者。禁止输出、改写、压缩或润色任何完整答案；禁止生成“修改版答案”“名师答案”“小马哥版”或“白鹭版”。白鹭和小马哥只用于拆点、归并、识别材料原词和同义表达。
 9. 不直接输出总分、分数算式、折算分或等级；系统将各维度 score 相加、校准并缩放到原题满分。
-10. 上面的机构参考答案数量大于 0 时，reference_fusion 必须说明实际纳入的机构答案及其共性/差异，严禁写“无参考答案”“无额外参考答案”或“未提供参考答案”。粉笔答案是主要展示标杆，但其中无法由材料支持的发挥不得设为必得分点；材料明确而粉笔遗漏的内容可标记为 material_core，但不得据此另写一份答案。
+10. 只有一份粉笔答案时，reference_fusion 必须明确“仅按唯一粉笔答案切分采分点”。材料明确但粉笔没写的内容不得设为 material_core 内容分，也不得在 reason、missing_elements、annotations 或优化建议中伪装成必写答案。
 """

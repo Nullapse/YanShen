@@ -15,22 +15,41 @@ from .rubric import _default_criteria
 
 
 def _coverage_factor(candidate, status):
+    """Map a teacher-style completion band to an auditable score fraction."""
     if status == "hit":
         return 1.0
     if status == "miss":
         return 0.0
-    raw = candidate.get("coverage_ratio", candidate.get("coverage", 0.5))
+    level = str(candidate.get("score_level") or "").strip().lower()
+    bands = {
+        "mostly": 0.75,
+        "大部分": 0.75,
+        "half": 0.5,
+        "一半": 0.5,
+        "slight": 0.25,
+        "少量": 0.25,
+    }
+    if level in bands:
+        return bands[level]
     try:
-        if isinstance(raw, str) and raw.strip().endswith("%"):
-            value = float(raw.strip()[:-1]) / 100
-        else:
-            value = float(raw)
-            if value > 1:
-                value /= 100
+        raw = float(candidate.get("coverage_ratio", 0.5))
+        if raw > 1:
+            raw /= 100
     except (TypeError, ValueError):
-        value = 0.5
-    value = max(0.1, min(0.9, value))
-    return round(value * 20) / 20
+        raw = 0.5
+    return min((0.25, 0.5, 0.75), key=lambda value: abs(value - raw))
+
+
+def _semantic_overlap(left, right):
+    clean_left = re.sub(r"[^\w]", "", str(left or "").lower())
+    clean_right = re.sub(r"[^\w]", "", str(right or "").lower())
+    if not clean_left or not clean_right:
+        return 0.0
+    if clean_left in clean_right or clean_right in clean_left:
+        return 1.0
+    left_grams = {clean_left[index:index + 2] for index in range(max(0, len(clean_left) - 1))}
+    right_grams = {clean_right[index:index + 2] for index in range(max(0, len(clean_right) - 1))}
+    return len(left_grams & right_grams) / max(1, len(left_grams))
 
 
 def _consistent_point_reason(status, reason, point):
@@ -69,8 +88,8 @@ def _validated_reference_fusion(value, rubric):
     if count == 1:
         source = f"（{organization_text}）" if organization_text else ""
         return (
-            f"本题仅有 1 份机构参考答案{source}，用于辅助核对采分点；"
-            "评分同时依据题干任务与材料原文，不把单份答案视为唯一标准。"
+            f"本题仅有 1 份粉笔参考答案{source}，内容给分点只从该答案合理划分；"
+            "材料仅用于核验明显错误，不新增或扩写扣分条件。"
         )
     prefix = f"本题已纳入 {count} 份机构参考答案"
     if organization_text:
@@ -99,16 +118,36 @@ def validate_grading_result(
     if not isinstance(raw, dict):
         raise ValueError("批改结果不是 JSON 对象")
 
-    points = sorted(
-        [point for point in rubric.get("points", []) if isinstance(point, dict) and point.get("point_key")],
-        key=lambda point: (-float(point.get("weight") or 0), point.get("point_key") or ""),
-    )
+    points = [
+        point for point in rubric.get("points", [])
+        if isinstance(point, dict) and point.get("point_key")
+    ]
     point_by_key = {point["point_key"]: point for point in points}
-    candidates = {
-        str(item.get("point_key") or ""): item
-        for item in (raw.get("point_matches") or [])
+    raw_point_matches = [
+        item for item in (raw.get("point_matches") or [])
         if isinstance(item, dict) and item.get("point_key")
-    }
+    ]
+    candidate_keys = [str(item.get("point_key") or "") for item in raw_point_matches]
+    if len(candidate_keys) != len(set(candidate_keys)):
+        raise ValueError("批改结果包含重复 point_key，无法保证逐点判定唯一")
+    candidates = {str(item.get("point_key") or ""): item for item in raw_point_matches}
+    scoring_mode = rubric.get("scoring_mode") or (
+        "holistic_essay" if rubric.get("question_type") == "综合写作" else "point_based"
+    )
+    blank_answer = not str(answer_text or "").strip()
+    if scoring_mode == "point_based" and not blank_answer:
+        missing_point_keys = [
+            point["point_key"]
+            for point in points
+            if (point.get("coverage_role") or ("required" if point.get("required_for_full_score", True) else "bonus"))
+            in {"required", "alternative"}
+            and point["point_key"] not in candidates
+            and not (point.get("source_point_key") and point["source_point_key"] in candidates)
+        ]
+        if missing_point_keys:
+            raise ValueError(
+                "批改结果缺少必需给分点判定：" + "、".join(missing_point_keys[:6])
+            )
     matches = []
     for point in points:
         candidate = candidates.get(point["point_key"])
@@ -118,6 +157,33 @@ def validate_grading_result(
         status = candidate.get("status")
         if status not in {"hit", "partial", "miss"}:
             status = "miss"
+        missing_elements = [
+            _clean(value, 100)
+            for value in (candidate.get("missing_elements") or [])
+            if _clean(value)
+        ][:6]
+        reference_boundary = point.get("reference_quote") or point.get("canonical_expression") or ""
+        if status == "hit":
+            missing_elements = []
+        elif status == "partial" and reference_boundary:
+            if not missing_elements:
+                raise ValueError(f"给分点 {point['point_key']} 判为部分得分，但未指出粉笔原文中缺失的核心语义")
+            supported_missing = [
+                value for value in missing_elements
+                if _semantic_overlap(value, reference_boundary) >= 0.3
+            ]
+            if not supported_missing:
+                status = "hit"
+                missing_elements = []
+                candidate = {
+                    **candidate,
+                    "reason": "用户表述与粉笔给分点核心意思一致；材料中的额外例子或细节不作为扣分条件。",
+                    "score_level": "full",
+                }
+            else:
+                # Only omissions supported by the exact Fenbi clause may appear
+                # in the report; material-only additions are silently discarded.
+                missing_elements = supported_missing
         quote = _clean(candidate.get("answer_quote"), 240)
         resolution = (
             resolve_answer_evidence(quote, answer_text)
@@ -126,6 +192,10 @@ def validate_grading_result(
         )
         if resolution["status"] == "resolved":
             quote = _clean(resolution.get("quote"), 240)
+        elif scoring_mode == "point_based" and not blank_answer and status in {"hit", "partial"}:
+            raise ValueError(
+                f"给分点 {point['point_key']} 的得分证据无法在用户原文中定位，拒绝生成不一致分数"
+            )
         coverage = _coverage_factor(candidate, status)
         coverage_role = point.get("coverage_role") or (
             "required" if point.get("required_for_full_score", True) else "bonus"
@@ -135,6 +205,10 @@ def validate_grading_result(
                 "point_key": point["point_key"],
                 "status": status,
                 "coverage_ratio": coverage,
+                "score_level": "full" if status == "hit" else (
+                    "none" if status == "miss" else {0.75: "mostly", 0.5: "half", 0.25: "slight"}[coverage]
+                ),
+                "awarded_score": round(float(point.get("weight") or 0) * coverage, 3),
                 "answer_quote": quote,
                 "reason": _consistent_point_reason(status, candidate.get("reason"), point),
                 "weight": round(float(point.get("weight") or 0), 3),
@@ -143,23 +217,16 @@ def validate_grading_result(
                 "evidence_status": resolution["status"],
                 "evidence_spans": resolution.get("spans") or [],
                 "confidence": max(0.0, min(1.0, float(candidate.get("confidence") or 0.7))),
-                "missing_elements": [
-                    _clean(value, 100)
-                    for value in (candidate.get("missing_elements") or [])
-                    if _clean(value)
-                ][:6],
+                "missing_elements": missing_elements,
             }
         )
 
     content_weight = float(
         (QUESTION_TYPE_PROFILES.get(rubric.get("question_type")) or QUESTION_TYPE_PROFILES["归纳概括"])["content"]
     )
-    scoring_mode = rubric.get("scoring_mode") or (
-        "holistic_essay" if rubric.get("question_type") == "综合写作" else "point_based"
-    )
     weighted_coverage = round(
         sum(
-            match["weight"] * match["coverage_ratio"]
+            match["awarded_score"]
             for match in matches
             if match.get("coverage_role") in {"required", "alternative"}
             and not (
@@ -189,7 +256,6 @@ def validate_grading_result(
         if isinstance(item, dict) and item.get("dimension")
     }
     normalized_dimensions = []
-    blank_answer = not str(answer_text or "").strip()
     for dimension, definition in dimension_by_name.items():
         candidate = raw_dimensions.get(dimension)
         if candidate is None and not blank_answer:
@@ -219,7 +285,7 @@ def validate_grading_result(
             if dimension["dimension"] == "content":
                 dimension["score"] = round(content_score, 1)
                 dimension["reason"] = _clean(
-                    dimension.get("reason") or "内容分由必答采分点覆盖确定。",
+                    dimension.get("reason") or "内容分由原子采分点逐点累加确定（命中全分、部分命中半分、未命中零分）。",
                     300,
                 )
                 break

@@ -204,7 +204,7 @@ class SmartGradingTest(unittest.TestCase):
             self.assertEqual(len(calls), 2)
             self.assertNotIn("基础模式正式批改", calls)
             self.assertIn("机构参考答案样本提示", calls[0])
-            self.assertIn("样本不足", calls[0])
+            self.assertIn("需结合题干与材料核验共同采分点", calls[0])
             self.assertEqual([item.get("thinking") for item in chat.request_options], ["disabled", "disabled"])
             self.assertEqual(
                 [item.get("response_format") for item in chat.request_options],
@@ -212,6 +212,10 @@ class SmartGradingTest(unittest.TestCase):
             )
 
             with connect(path) as conn:
+                first_validation = json.loads(conn.execute(
+                    "SELECT validation_json FROM grading_report_contexts WHERE report_id = ?",
+                    (report_id,),
+                ).fetchone()[0])
                 attempt = conn.execute("SELECT * FROM attempts WHERE id = ?", (attempt_id,)).fetchone()
                 settings = conn.execute("SELECT * FROM ai_settings WHERE id = 1").fetchone()
                 second_job, _ = create_grading_job(conn, attempt, settings, reference_ids, "", {})
@@ -226,10 +230,19 @@ class SmartGradingTest(unittest.TestCase):
                 self.assertEqual(conn.execute("SELECT COUNT(*) FROM grading_rubrics").fetchone()[0], 1)
                 self.assertEqual(conn.execute("SELECT status FROM grading_jobs WHERE id = ?", (second_job["id"],)).fetchone()[0], "completed")
                 self.assertEqual(conn.execute("SELECT api_call_count FROM grading_report_contexts WHERE report_id = ?", (second_report_id,)).fetchone()[0], 1)
-                first_validation = json.loads(conn.execute(
-                    "SELECT validation_json FROM grading_report_contexts WHERE report_id = ?",
-                    (report_id,),
-                ).fetchone()[0])
+                self.assertEqual(
+                    conn.execute("SELECT COUNT(*) FROM grading_reports WHERE attempt_id = ?", (attempt_id,)).fetchone()[0],
+                    1,
+                )
+                self.assertIsNone(
+                    conn.execute("SELECT 1 FROM grading_reports WHERE id = ?", (report_id,)).fetchone()
+                )
+                self.assertIsNone(
+                    conn.execute("SELECT 1 FROM grading_report_contexts WHERE report_id = ?", (report_id,)).fetchone()
+                )
+                self.assertIsNone(
+                    conn.execute("SELECT report_id FROM grading_jobs WHERE id = ?", (job["id"],)).fetchone()[0]
+                )
                 second_validation = json.loads(conn.execute(
                     "SELECT validation_json FROM grading_report_contexts WHERE report_id = ?",
                     (second_report_id,),
@@ -480,26 +493,23 @@ class SmartGradingTest(unittest.TestCase):
             "points": [{"point_key": "p1", "weight": 70, "label": "要点"}],
             "criteria": [],
         }
-        result = validate_grading_result(
-            {
-                "point_matches": [{"point_key": "p1", "status": "hit", "answer_quote": "并不存在的原句"}],
-                "dimension_scores": [
-                    {"dimension": "content", "score": 0, "reason": "没有有效证据"},
-                    {"dimension": "structure", "score": 0, "reason": "未评分"},
-                    {"dimension": "expression", "score": 0, "reason": "未评分"},
-                    {"dimension": "format", "score": 0, "reason": "未评分"},
-                ],
-            },
-            rubric,
-            "用户实际答案",
-            [],
-        )
-        self.assertEqual(result["score"], 0)
-        self.assertEqual(result["point_matches"][0]["status"], "hit")
-        self.assertEqual(result["point_matches"][0]["evidence_status"], "unresolved")
-        self.assertEqual(result["score_status"], "provisional")
+        with self.assertRaisesRegex(ValueError, "得分证据无法在用户原文中定位"):
+            validate_grading_result(
+                {
+                    "point_matches": [{"point_key": "p1", "status": "hit", "answer_quote": "并不存在的原句"}],
+                    "dimension_scores": [
+                        {"dimension": "content", "score": 0, "reason": "没有有效证据"},
+                        {"dimension": "structure", "score": 0, "reason": "未评分"},
+                        {"dimension": "expression", "score": 0, "reason": "未评分"},
+                        {"dimension": "format", "score": 0, "reason": "未评分"},
+                    ],
+                },
+                rubric,
+                "用户实际答案",
+                [],
+            )
 
-    def test_partial_matches_use_ai_coverage_instead_of_fixed_half(self):
+    def test_partial_matches_use_teacher_completion_bands(self):
         rubric = {
             "question_type": "归纳概括",
             "display_max_score": 10,
@@ -530,9 +540,11 @@ class SmartGradingTest(unittest.TestCase):
         )
         match = result["point_matches"][0]
         self.assertEqual(match["coverage_ratio"], 0.75)
+        self.assertEqual(match["score_level"], "mostly")
+        self.assertEqual(match["awarded_score"], 52.5)
         self.assertEqual(result["weighted_coverage_score"], 52.5)
         self.assertEqual(result["display_score"], 5.0)
-        self.assertIn("部分命中（覆盖75%）", render_grading_report(result, rubric, []))
+        self.assertIn("大部分得分", render_grading_report(result, rubric, []))
 
     def test_rubric_makes_non_requested_overall_effect_optional(self):
         materials = [{"material_number": 1, "content": "建立夜话机制，密切干群关系，形成良好示范效应。"}]
@@ -598,7 +610,8 @@ class SmartGradingTest(unittest.TestCase):
         self.assertIn("required_for_full_score", rubric_prompt)
         self.assertIn("optional_details", rubric_prompt)
         self.assertIn("coverage_ratio", grading_prompt)
-        self.assertIn("不得把所有 partial 机械写成0.5", grading_prompt)
+        self.assertIn("mostly=0.75、half=0.5 或 slight=0.25", grading_prompt)
+        self.assertIn("0.5只是分档刻度", grading_prompt)
         self.assertIn("禁止生成、改写、压缩或润色任何完整答案", grading_prompt)
         self.assertNotIn('"revised_answer"', grading_prompt)
         self.assertIn("符合真实考场阅卷强度的“得分制”", grading_prompt)
@@ -638,8 +651,9 @@ class SmartGradingTest(unittest.TestCase):
             self.assertIn("机构采分点全文。", prompt)
             self.assertIn("机构答案备注。", prompt)
             self.assertIn("共 1 份", prompt)
-            self.assertIn("本题仅有 1 份机构答案，样本不足", prompt)
-            self.assertIn("可以结合现有机构答案、题干任务和材料原文自行分析", prompt)
+            self.assertIn("唯一参考答案规则", prompt)
+            self.assertIn("内容采分点只能从这份答案", prompt)
+            self.assertIn("核心动作、对象或效果同义即应命中全分", prompt)
 
     def test_internal_score_is_rendered_on_question_point_scale(self):
         self.assertEqual(question_display_max_score({"prompt": "分析原因。（15分）"}), 15)
@@ -673,7 +687,8 @@ class SmartGradingTest(unittest.TestCase):
         self.assertIn("10.5/10.5", report)
         self.assertNotIn("## 维度评分", report)
         self.assertIn("参考答案使用说明", report)
-        self.assertIn("本题仅有 1 份机构参考答案（机构甲）", report)
+        self.assertIn("本题仅有 1 份粉笔参考答案（机构甲）", report)
+        self.assertIn("材料仅用于核验明显错误，不新增或扩写扣分条件", report)
         self.assertNotIn("参考答案融合说明", report)
         self.assertNotIn("共性核心点", result["reference_fusion"])
         self.assertNotIn("无额外参考答案", report)
@@ -965,6 +980,293 @@ class SmartGradingTest(unittest.TestCase):
             self.assertGreater(scores[0], scores[1], question_type)
             self.assertGreater(scores[1], scores[2], question_type)
         self.assertEqual(evaluated, 15)
+
+    def test_long_non_essay_rubric_rejects_two_composite_points(self):
+        reference_text = (
+            "关于W市商业航天的发言提纲。背景：前瞻布局新赛道。经验：一、科学决策，"
+            "掌握产业前沿信息，论证落地条件，划定产业先行区。二、搭建产业链，帮助企业技术升级，"
+            "引入链主和上下游企业。三、打造土地超市，提供灵活用地，建设一站式测试平台。"
+            "四、全域统筹、错位发展，形成核心引领、多点支撑的互补生态。"
+        )
+        question = {
+            "id": 7638,
+            "question_type": "公文写作",
+            "prompt": "介绍W市发展商业航天的创新实践",
+            "requirements": "内容全面，不超过450字",
+            "word_limit": "不超过450字",
+        }
+        references = [{"id": 82928, "organization": "粉笔", "answer_text": reference_text}]
+        materials = [{"material_number": 4, "content": reference_text}]
+        malformed = {
+            "points": [
+                {
+                    "label": "标题与文种",
+                    "canonical_expression": "发言提纲标题",
+                    "tier": "material_core",
+                    "suggested_weight": 20,
+                    "reference_ids": [82928],
+                    "reference_quote": "关于W市商业航天的发言提纲",
+                    "material_evidence": [{"material_number": 4, "quote": "关于W市商业航天的发言提纲"}],
+                },
+                {
+                    "label": "背景与经验",
+                    "canonical_expression": "前瞻布局并形成完整产业生态",
+                    "tier": "material_core",
+                    "suggested_weight": 30,
+                    "reference_ids": [82928],
+                    "reference_quote": "背景：前瞻布局新赛道",
+                    "material_evidence": [{"material_number": 4, "quote": "前瞻布局新赛道"}],
+                },
+            ]
+        }
+        with self.assertRaisesRegex(ValueError, "合理归并"):
+            validate_rubric(malformed, question, materials, references)
+
+    def test_real_report_7638_uses_fenbi_only_teacher_points_and_promotes_material_only_partial(self):
+        reference_text = """关于W市“无中生有”发展商业航天的发言提纲
+
+背景：近年来，商业航天领域正成为全球瞩目的焦点。此前，W市没有相关产业积淀，但敢为人先、前瞻布局新赛道。
+
+经验：一、科学决策选准赛道。综合产业前沿信息和本地制造业优势，论证产业落地基础条件，将商业航天纳入未来产业发展规划，以细分领域作为切入口，划定产业先行区。二、搭建完整产业链条。帮助本地传统制造业企业进行技术升级和产品迭代，跨界加入商业航天产业链，补齐本地配套供给短板；引入链主企业及产业链上下游企业，实现强链补链延链。三、创新要素保障供给。打造“土地超市”，整合土地和存量厂房数据，提供灵活用地期限，快速满足企业用地需求；从零搭建测试验证平台，就近为企业提供全流程“一站式”测试服务。四、注重全域统筹规划。各先行区因地制宜，错位发展，形成“核心引领、多点支撑”的互补产业生态，避免同质化竞争。
+
+结尾：W市通过发挥自身优势，跨界转型，成功培育出极具活力的商业航天产业新生态。"""
+        user_answer = """关于产业发展会议上经验交流的发言提纲
+背景：w市积极布局新赛道，跨界入局商业航天，培育出极具活力的商业航天产业新生态。
+措施：
+1，科学决策。了解行业发展趋势，论证落地基础条件。瞄准细分领域，打造产业先行区。
+2，搭建完整产业链条。政府帮助企业完成产品迭代和技术升级，加入航天产业链，补齐本地配套供给端斑。招揽链主企业和上下游企业，强链补链延链，实现产业积聚。
+3，提供要素保障供给。推出土地超市，整合相关数据。根据企业土地需求锁定地点，根据实际情况提供灵活用地期限，加快投产。打造检测服务平台，提供全过程一站式服务，在家门口完成实验。
+5，做好全域规划。不同区域结合实际，错位发展，形成核心引领，多点支撑格局，避免同质化竞争，形成互补生态。
+结语：w市的做法应当值得大力推广。"""
+        question = {
+            "id": 7638,
+            "question_type": "公文写作",
+            "prompt": "假如你是W市有关部门工作人员，请拟写一份介绍商业航天发展经验的发言提纲。（20分）",
+            "requirements": "内容全面，条理清晰，不超过450字。",
+            "word_limit": "不超过450字",
+        }
+        references = [{"id": 82928, "organization": "粉笔", "answer_text": reference_text}]
+        materials = [{"material_number": 4, "content": reference_text}]
+        point_specs = [
+            ("background", "背景", 1, "敢为人先、前瞻布局新赛道", 1.0),
+            ("decision-basis", "科学决策", 2, "综合产业前沿信息和本地制造业优势，论证产业落地基础条件", 2.0),
+            ("future-plan", "科学决策", 2, "将商业航天纳入未来产业发展规划", 1.2),
+            ("narrow-field", "科学决策", 2, "以细分领域作为切入口", 1.0),
+            ("pilot-zone", "科学决策", 2, "划定产业先行区", 1.0),
+            ("local-upgrade", "产业链", 3, "帮助本地传统制造业企业进行技术升级和产品迭代，跨界加入商业航天产业链，补齐本地配套供给短板", 2.1),
+            ("chain-owner", "产业链", 3, "引入链主企业及产业链上下游企业，实现强链补链延链", 1.8),
+            ("land-support", "创新要素保障供给", 4, "打造“土地超市”，整合土地和存量厂房数据，提供灵活用地期限，快速满足企业用地需求", 1.7),
+            ("test-support", "创新要素保障供给", 4, "从零搭建测试验证平台，就近为企业提供全流程“一站式”测试服务", 1.6),
+            ("regional-plan", "全域统筹", 5, "各先行区因地制宜，错位发展，形成“核心引领、多点支撑”的互补产业生态，避免同质化竞争", 2.6),
+        ]
+        raw_points = []
+        for order, (key, group, group_order, quote, weight) in enumerate(point_specs, 1):
+            raw_points.append({
+                "point_key": key,
+                "group_key": f"group-{group_order}",
+                "group_label": group,
+                "group_order": group_order,
+                "point_order": order,
+                "label": quote[:28],
+                "canonical_expression": quote,
+                "tier": "material_core",
+                "importance": "major",
+                "suggested_weight": weight,
+                "weight_reason": "按阅卷时可一次判断的完整语义单元分配。",
+                "required_for_full_score": True,
+                "required_elements": ["材料中自行扩写的额外条件"],
+                "optional_details": ["北京、西安等材料例子"],
+                "reference_ids": [82928],
+                "reference_quote": quote,
+                "material_evidence": [{"material_number": 4, "quote": quote}],
+            })
+        rubric = validate_rubric(
+            {"points": raw_points}, question, materials, references
+        )
+        self.assertEqual(len([p for p in rubric["points"] if p["coverage_role"] == "required"]), 10)
+        self.assertTrue(all(not p["required_elements"] for p in rubric["points"]))
+        self.assertTrue(all(not p["optional_details"] for p in rubric["points"]))
+        self.assertEqual(
+            [p["group_label"] for p in rubric["points"]],
+            [spec[1] for spec in point_specs],
+        )
+        self.assertAlmostEqual(sum(p["display_weight"] for p in rubric["points"]), 10.0)
+
+        quotes = {
+            "background": "积极布局新赛道",
+            "decision-basis": "了解行业发展趋势，论证落地基础条件",
+            "future-plan": "",
+            "narrow-field": "瞄准细分领域",
+            "pilot-zone": "打造产业先行区",
+            "local-upgrade": "帮助企业完成产品迭代和技术升级，加入航天产业链，补齐本地配套供给端斑",
+            "chain-owner": "招揽链主企业和上下游企业，强链补链延链",
+            "land-support": "推出土地超市，整合相关数据。根据企业土地需求锁定地点，根据实际情况提供灵活用地期限，加快投产",
+            "test-support": "打造检测服务平台，提供全过程一站式服务，在家门口完成实验",
+            "regional-plan": "不同区域结合实际，错位发展，形成核心引领，多点支撑格局，避免同质化竞争，形成互补生态",
+        }
+        matches = []
+        for key, *_ in point_specs:
+            status = "miss" if key == "future-plan" else "hit"
+            item = {
+                "point_key": key,
+                "status": status,
+                "score_level": "none" if status == "miss" else "full",
+                "answer_quote": quotes[key],
+                "reason": "按粉笔答案核心语义判断。",
+                "missing_elements": [],
+            }
+            if key == "decision-basis":
+                item.update(status="partial", score_level="mostly", missing_elements=["本地制造业优势"])
+            if key == "narrow-field":
+                item.update(status="partial", score_level="half", missing_elements=["可回收火箭技术、关键零部件和材料"])
+            if key == "pilot-zone":
+                item.update(status="partial", score_level="half", missing_elements=["梁田区、高新区、惠南区"])
+            matches.append(item)
+        raw_result = {
+            "point_matches": matches,
+            "dimension_scores": [
+                {"dimension": "content", "score": 1, "reason": "该值必须由逐点累计覆盖。"},
+                {"dimension": "format", "score": 14, "reason": "文种基本正确，标题和结尾不够贴合。"},
+                {"dimension": "structure", "score": 19, "reason": "主体层次清楚，序号有跳号。"},
+                {"dimension": "expression", "score": 10, "reason": "表达简洁准确。"},
+            ],
+        }
+        result = validate_grading_result(raw_result, rubric, user_answer, [])
+        by_key = {item["point_key"]: item for item in result["point_matches"]}
+        self.assertEqual(by_key["narrow-field"]["status"], "hit")
+        self.assertEqual(by_key["pilot-zone"]["status"], "hit")
+        self.assertEqual(by_key["decision-basis"]["status"], "partial")
+        self.assertEqual(by_key["future-plan"]["status"], "miss")
+        self.assertGreaterEqual(result["display_score"], 17.0)
+        self.assertLessEqual(result["display_score"], 18.0)
+        report = render_grading_report(result, rubric, [])
+        self.assertIn("| 创新要素保障供给 |", report)
+        self.assertIn("瞄准细分领域", report)
+        self.assertIn("打造产业先行区", report)
+        self.assertNotIn("覆盖50%", report)
+        self.assertIn("逐点累计内容分", report)
+
+    def test_report_7638_scores_atomic_points_and_uses_one_color_status_source(self):
+        reference_text = (
+            "科学决策选准赛道；论证产业落地基础条件；划定产业先行区；"
+            "帮助企业技术升级和产品迭代；引入链主及上下游企业；打造土地超市；"
+            "提供灵活用地期限；搭建测试验证平台；各先行区错位发展；形成互补产业生态。"
+        )
+        user_answer = (
+            "了解行业发展趋势，论证落地基础条件，打造产业先行区。帮助企业完成产品迭代和技术升级，"
+            "招揽链主企业和上下游企业。推出土地超市，提供灵活用地期限。打造检测服务平台。"
+            "不同区域错位发展，形成互补生态。"
+        )
+        labels_and_quotes = [
+            ("科学决策", "科学决策选准赛道", "了解行业发展趋势"),
+            ("论证条件", "论证产业落地基础条件", "论证落地基础条件"),
+            ("先行区", "划定产业先行区", "打造产业先行区"),
+            ("技术迭代", "帮助企业技术升级和产品迭代", "完成产品迭代和技术升级"),
+            ("招引产业链", "引入链主及上下游企业", "招揽链主企业和上下游企业"),
+            ("土地超市", "打造土地超市", "推出土地超市"),
+            ("灵活用地", "提供灵活用地期限", "提供灵活用地期限"),
+            ("测试平台", "搭建测试验证平台", "打造检测服务平台"),
+            ("错位发展", "各先行区错位发展", "不同区域错位发展"),
+            ("互补生态", "形成互补产业生态", "形成互补生态"),
+        ]
+        points = []
+        matches = []
+        for index, (label, reference_quote, answer_quote) in enumerate(labels_and_quotes, 1):
+            key = f"point-{index}"
+            points.append({
+                "point_key": key,
+                "label": label,
+                "canonical_expression": reference_quote,
+                "reference_quote": reference_quote,
+                "weight": 5,
+                "suggested_weight": 1,
+                "required_for_full_score": True,
+                "coverage_role": "required",
+            })
+            matches.append({
+                "point_key": key,
+                "status": "hit",
+                "coverage_ratio": 0.2,  # must be ignored by discrete scoring
+                "answer_quote": answer_quote,
+                "reason": "核心动作与粉笔小点同义命中。",
+            })
+        rubric = {
+            "question_type": "公文写作",
+            "display_max_score": 20,
+            "scoring_mode": "point_based",
+            "selected_references": [{"id": 82928, "organization": "粉笔", "answer_text": reference_text}],
+            "points": points,
+        }
+        result = validate_grading_result(
+            {
+                "point_matches": matches,
+                "dimension_scores": [
+                    {"dimension": "content", "score": 50, "reason": "十个主体措施小点全部命中"},
+                    {"dimension": "format", "score": 15, "reason": "开头结尾尚可规范"},
+                    {"dimension": "structure", "score": 16, "reason": "主体分点完整"},
+                    {"dimension": "expression", "score": 9, "reason": "表达准确"},
+                ],
+            },
+            rubric,
+            user_answer,
+            [],
+        )
+        report = render_grading_report(result, rubric, [])
+        self.assertEqual(result["weighted_coverage_score"], 50.0)
+        self.assertAlmostEqual(result["display_score"], 18.0, places=1)
+        for index in range(1, 11):
+            key = f"point-{index}"
+            self.assertIn(f"|{key}|", report)
+            self.assertNotIn(f"[标答点|miss|", report)
+        self.assertNotIn("覆盖20%", report)
+
+    def test_partial_master_point_and_user_redundancy_share_visible_annotations(self):
+        from gongkao.grading_pipeline.report import build_user_mirrored_answer
+
+        rubric = {
+            "question_type": "归纳概括",
+            "display_max_score": 20,
+            "selected_references": [{"id": 1, "organization": "粉笔", "answer_text": "建立线上课堂，扩大教育覆盖。"}],
+            "points": [{
+                "point_key": "online-class",
+                "label": "线上课堂",
+                "reference_quote": "建立线上课堂，扩大教育覆盖",
+                "weight": 35,
+                "display_weight": 7,
+                "coverage_role": "required",
+            }],
+        }
+        result = {
+            "score": 50,
+            "display_score": 10,
+            "display_max_score": 20,
+            "weighted_coverage_score": 17.5,
+            "content_score": 17.5,
+            "point_matches": [{
+                "point_key": "online-class",
+                "status": "partial",
+                "coverage_ratio": 0.5,
+                "awarded_score": 17.5,
+                "answer_quote": "建立线上课堂",
+                "evidence_spans": [{"start": 0, "end": 6}],
+                "reason": "未体现扩大覆盖。",
+                "missing_elements": ["扩大教育覆盖"],
+            }],
+            "redundancies": [{
+                "quote": "值得大力推广",
+                "wasted_chars": 6,
+                "reason": "空泛表态，无信息增量",
+            }],
+            "dimension_scores": [],
+        }
+        report = render_grading_report(result, rubric, [])
+        self.assertIn("[标答点|partial|", report)
+        self.assertIn("|建立线上课堂，扩大教育覆盖]", report)
+        mirrored = build_user_mirrored_answer(
+            "建立线上课堂，值得大力推广。", result, rubric, 0.2
+        )
+        self.assertIn("[作答点|partial|", mirrored)
+        self.assertIn("[冗余|6字|空泛表态，无信息增量|值得大力推广]", mirrored)
 
     def test_report_ui_has_holistic_score_and_dimension_cards(self):
         server_source = read_server_application(ROOT)

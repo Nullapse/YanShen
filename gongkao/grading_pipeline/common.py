@@ -38,11 +38,11 @@ def _extract_matching_quote(quote, reason, answer_text):
     return ""
 
 
-RUBRIC_VERSION = "rubric-v5"
+RUBRIC_VERSION = "rubric-v7-single-reference-boundary"
 
-RESULT_VERSION = "grading-result-v6"
+RESULT_VERSION = "grading-result-v8-single-reference-boundary"
 
-PIPELINE_VERSION = "smart-grading-v5"
+PIPELINE_VERSION = "smart-grading-v7-single-reference-boundary"
 
 CONSENSUS_MAX_MATERIAL_CLAUSES = 240
 

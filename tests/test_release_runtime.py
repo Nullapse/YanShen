@@ -919,7 +919,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
                         "SELECT * FROM grading_reports WHERE attempt_id = ?", (failed_attempt_id,)
                     ).fetchone()
                 self.assertIsNotNone(short_saved)
-                self.assertIn("状态：符合字数要求，篇幅偏短", short_saved["report_text"])
+                self.assertIn("核心判断：短答案也保留", short_saved["report_text"])
                 self.assertIsNotNone(repaired_saved)
                 self.assertIn("核心判断：必须逐字保留", repaired_saved["report_text"])
                 self.assertIn("1. 也必须逐字保留", repaired_saved["report_text"])
@@ -932,7 +932,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
                 self.assertNotIn("丙" * 250, failed_saved["report_text"])
                 self.assertIn("批改报告", failed_html)
                 self.assertIn("修改版答案超出字数限制", failed_html)
-                self.assertIn("丙" * 250, failed_html)
+                self.assertNotIn("丙" * 250, failed_html)
                 self.assertNotIn("临时报告", failed_html)
             finally:
                 server.shutdown()
@@ -1490,7 +1490,8 @@ class ReleaseRuntimeTest(unittest.TestCase):
         report = (
             "## 名师标杆答案与采分对照\n"
             "1. [标答点|hit|+2分 / 满分2分|准确命中原词|材料2第3段|深化数字转型]\n"
-            "2. [标答点|miss|+0分 / 满分2分|未命中要点|材料4第1段|优化审批流程]"
+            "2. [标答点|partial|+1分 / 满分2分|仅覆盖部分要义|粉笔答案原句|完善服务机制]\n"
+            "3. [标答点|miss|+0分 / 满分2分|未命中要点|材料4第1段|优化审批流程]"
         )
         html = markdownish(report)
         self.assertIn("master-benchmark-legend", html)
@@ -1502,6 +1503,9 @@ class ReleaseRuntimeTest(unittest.TestCase):
         self.assertIn('data-point-eval="准确命中原词"', html)
         self.assertIn('data-point-source="材料2第3段"', html)
         self.assertIn("深化数字转型", html)
+        self.assertIn('class="master-point-span status-partial"', html)
+        self.assertIn('data-point-status="partial"', html)
+        self.assertIn("完善服务机制", html)
         self.assertIn('class="master-point-span status-miss"', html)
         self.assertIn("优化审批流程", html)
 

@@ -609,7 +609,7 @@ class GradingController:
                     report_text,
                     attempt["word_limit"] if attempt else "",
                 )
-                conn.execute(
+                cursor = conn.execute(
                     """
                     INSERT INTO grading_reports (
                         attempt_id, provider, model, report_text, prompt_text, status
@@ -625,6 +625,10 @@ class GradingController:
                             ensure_ascii=False,
                         ),
                     ),
+                )
+                conn.execute(
+                    "DELETE FROM grading_reports WHERE attempt_id = ? AND id <> ?",
+                    (attempt_id, cursor.lastrowid),
                 )
         self.redirect(f"/attempts/{attempt_id}")
 
@@ -807,6 +811,10 @@ class GradingController:
                 (attempt_id, settings["provider_name"], settings["model"], report_text, prompt, stored_raw),
             )
             report_id = cursor.lastrowid
+            conn.execute(
+                "DELETE FROM grading_reports WHERE attempt_id = ? AND id <> ?",
+                (attempt_id, report_id),
+            )
         self.redirect(
             local_url(
                 f"/attempts/{attempt_id}",

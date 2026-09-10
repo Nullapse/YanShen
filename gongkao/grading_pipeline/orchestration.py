@@ -125,12 +125,12 @@ def _build_review_prompt(question, rubric, answer_text, result):
 只输出 <smart_grading_json> 包裹的合法 JSON：
 <smart_grading_json>
 {{"evaluation": {{
-  "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "coverage_ratio": 0.0, "answer_quote": "一段短连续原文，或用……连接按顺序出现的短片段", "reason": "复核依据", "confidence": 0.0, "missing_elements": []}}],
+  "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "score_level": "full|mostly|half|slight|none", "coverage_ratio": 0.0, "answer_quote": "一段短连续原文，或用……连接按顺序出现的短片段", "reason": "复核依据", "confidence": 0.0, "missing_elements": []}}],
   "dimension_scores": [{{"dimension": "", "score": 0.0, "reason": "复核后的维度依据"}}]
 }}}}
 </smart_grading_json>
 
-规则：每个评分基准 point_key 和每个维度必须且只能出现一次；不得输出总分；不得因空格、标点、引号或省略号形式差异把已有语义改判为未命中；综合写作不要求机械覆盖每一则材料案例。
+规则：每个评分基准 point_key 和每个维度必须且只能出现一次；不得输出总分；不得因空格、标点、引号或省略号形式差异把已有语义改判为未命中；综合写作不要求机械覆盖每一则材料案例。非作文题按真实阅卷分档：hit/full=1；partial 只能为 mostly=0.75、half=0.5、slight=0.25；miss/none=0。同义核心完整必须hit，不得用粉笔答案没写的材料细节扣分。
 """
 
 
@@ -465,6 +465,13 @@ def run_grading_job(db_path, job_id, chat_completion_func):
                     run_state.api_calls,
                     latency_ms,
                 ),
+            )
+            # A successful regrade replaces the previous report atomically.
+            # Contexts, feedback and retrieval-index cleanup cascade from the
+            # report deletion; failed grading runs never touch the old report.
+            conn.execute(
+                "DELETE FROM grading_reports WHERE attempt_id = ? AND id <> ?",
+                (attempt["id"], report_id),
             )
         completed_message = (
             "智能批改已生成待复核结果。"

@@ -2,7 +2,7 @@ import json
 import re
 
 from ..agent_modules import FEATURE_HASH_MODEL, _cosine, _embed_text
-from ..grading import limited_reference_guidance, word_limit_budget
+from ..grading import limited_reference_guidance, normalize_reference_answer_text, word_limit_budget
 from .common import (
     ANSWER_GRID_RULES,
     CONSENSUS_MAX_MATERIAL_CLAUSES,
@@ -70,6 +70,7 @@ def compact_reference_consensus(conn, references, materials, similarity_threshol
             clusters.append({"representative": clause["text"], "vector": vector, "items": [clause]})
 
     organization_count = len(references)
+    single_reference_scoring = organization_count == 1 and question.get("question_type") != "综合写作"
     core_threshold = max(2, (organization_count + 1) // 2)
     cluster_candidates = []
     for index, cluster in enumerate(clusters, start=1):
@@ -181,9 +182,17 @@ def build_rubric_prompt(question, materials, references, consensus):
     effective_word_limit = question_word_limit_text(question)
     word_budget = word_limit_budget(effective_word_limit)
     budget_guidance = _word_budget_guidance(word_budget)
+    profile = QUESTION_TYPE_PROFILES.get(question.get("question_type")) or QUESTION_TYPE_PROFILES["归纳概括"]
+    content_display_max = round(profile["content"] * question_display_max_score(question) / 100, 1)
+    single_reference_policy = (
+        "本题只有一份粉笔参考答案。该答案是内容采分点的唯一边界：只能切分其中已经写出的语义，"
+        "材料只用于排除明显无依据内容，绝对不得从材料新增采分点，也不得给参考答案小点追加地点、案例、政策名称或技术名称。"
+        if len(reference_context) == 1 and question.get("question_type") != "综合写作"
+        else "多份参考答案仅作候选解释，题干与材料用于核验评分边界。"
+    )
     return f"""你正在为一道申论题建立可缓存、可审计的评分基准。只建立本题评分基准，不批改用户答案。
 
-最高事实来源是本题题干与材料。机构答案只是候选解释。没有本题材料依据的内容不得成为主要扣分点。
+{single_reference_policy}
 
 题目ID：{question.get("id")}
 题型：{question.get("question_type")}
@@ -198,7 +207,7 @@ def build_rubric_prompt(question, materials, references, consensus):
 本题材料：
 {_material_text(materials)}
 
-本题已有的参考答案全文（共 {len(reference_context)} 份，仅作为候选对照样本；参考答案可能存在主观套话或漏点，绝非最高评分证据；AI 必须依据题干任务与材料原文独立自主做题，自底向上提炼客观采分点）：
+本题已有的参考答案全文（共 {len(reference_context)} 份；只有一份时，它就是内容采分点的唯一切分来源，不得自行扩写）：
 {json.dumps(reference_context, ensure_ascii=False)}
 {limited_reference_guidance(len(reference_context))}
 
@@ -212,14 +221,18 @@ def build_rubric_prompt(question, materials, references, consensus):
   "equal_weight_reason": "仅当三个以上计分点确实应等权时填写具体理由，否则留空",
   "points": [
     {{
-      "label": "简短采分点名",
+      "group_key": "group-1",
+      "group_label": "参考答案中的一级要点，如科学决策选准赛道",
+      "group_order": 1,
+      "point_order": 1,
+      "label": "完整、可快速识别的给分点名称",
       "canonical_expression": "规范表达",
       "core_mechanism": "该小点的核心动作机制与动宾要义（考生表述机制一致即可得分，不拘泥于特定字面）",
       "aliases": ["同义表达"],
       "tier": "core|material_core|supporting|disputed",
       "importance": "critical|major|supporting",
       "suggested_weight": 0.0,
-      "weight_reason": "该点相对权重的材料与任务依据",
+      "weight_reason": "该给分点为何值1—3分；所有内容点建议分合计应接近本题内容分{content_display_max}分",
       "coverage_role": "required|alternative|bonus",
       "is_structural": false,
       "alternative_group": "同组替代论据标识；无则为空",
@@ -227,6 +240,7 @@ def build_rubric_prompt(question, materials, references, consensus):
       "required_elements": ["该点不可缺少的语义成分"],
       "optional_details": ["受字数限制可省略的例子、修饰或效果"],
       "minimum_expression": "在答题纸上表达该点的最短完整写法",
+      "reference_quote": "该小点在粉笔参考答案中的最小连续原文；材料新增点可留空",
       "material_evidence": [{{"material_number": 1, "quote": "必须逐字来自上面的本题材料"}}],
       "reference_ids": [1],
       "confidence": 0.0
@@ -236,15 +250,15 @@ def build_rubric_prompt(question, materials, references, consensus):
 }}
 
 规则：
-1. 只使用本题候选参考答案中存在的 reference_id。逐份检查全文并把支持当前采分点的 ID 写入 reference_ids；若某核心点由材料直接支持但参考答案未提及，reference_ids 留空，并标为 material_core。
-2. material_evidence.quote 必须是本题材料中的连续原文短句。最高事实来源是本题材料，任何不在材料中的机构发挥不得立为核心得分点。
-3. core 至少由两个不同机构支持，且支持机构数达到机构总数的一半；否则标为 material_core 或 supporting。
-4. 只有一份参考答案或参考答案存在遗漏/偏差时，坚决以材料原文为准，把材料直接确认的点标为 material_core。评分基准以 AI 自主推导的材料原词为准，不得盲从有缺陷的参考答案。
+1. 只使用本题参考答案中存在的 reference_id。只有一份参考答案时，每一个内容计分点都必须来自该答案的 reference_quote；材料提到但参考答案没写的内容不得设为计分点。
+2. material_evidence.quote 只用于核验粉笔给分点是否明显有材料依据。只有一份参考答案时，材料不能扩写该点，也不能提供新的必写细节。
+3. 多份参考答案时，core 至少由两个不同机构支持且达到机构总数的一半；只有一份时，以该答案的完整语义结构合理划点。
+4. 只有一份参考答案时，禁止创建 material_core 内容分，禁止依据材料自主补题或扩写标答。材料只用于发现并剔除参考答案中明显无依据的内容；材料新增信息最多写入非计分说明。
 5. 评分基准必须能在题目字数预算内完成。先提炼“为完成题目任务不可缺少的语义”，再把例子、修饰、展开说明和非任务要求的泛化成效放入 optional_details；不得要求考生机械写全所有机构答案细节。
 6. required_for_full_score 只用于在建议字数内仍应覆盖的 core/material_core。supporting、disputed 以及仅属补充说明的内容必须为 false，遗漏时不扣主要分。
-7. 评分基准遵循【微语义小点（Micro-Rubric）原则】：非综合写作的小题，必须按真实考场阅卷标准拆解为 8—18 个微语义小点，每个小点代表一个独立的动作机制、核心举措、主体归属或关键成效；严禁把一个包含多个举措的大案例粗放打包成单个宏观点。
-8. 结构体例刚性约束：若题目任务或材料包含明确的组织结构（如按地区/案例/主体分设：J县、K县、M县；或总分结构），各主体归属与分类小标题必须设为具有扣分权重的独立采分点（并标记 is_structural: true），严禁设为不扣分的 bonus，确保考生若抹去主体时得到刚性结构扣分。
-9. disputed 不计分。小题有效采分点保持在 8—18 个微小点；综合写作控制在 4—10 个立意与论据组。所有 required 点的 minimum_expression 加上必要序号和标点，按占格规则估算后必须能放入 suggested_max，并保留安全余量。
+7. 评分基准遵循【真实阅卷老师合理划点原则】：非综合写作通常划分为5—10个完整给分点，每点一般值1—3分。一个给分点应是一项完整措施、原因、问题或成效，可以合理归并紧密关联的动作；禁止把每个词、地点、案例拆成0.5分碎片，也禁止把整组措施打包成一个笼统大点。
+8. 按粉笔答案原有顺序填写 group_key、group_label、group_order 和 point_order。一级标题用于组织展示，不必机械单独给内容分；其下必须有对应的完整给分点。评分表不得按权重重新排序。
+9. disputed 不计分。20分非作文题通常5—10个给分点，10分题通常3—6个，允许根据答案结构小幅浮动。任一给分点不得占内容分的35%以上；标题、背景、结尾不能替代主体内容。suggested_weight 使用0.5分刻度表达相对分值，不得给每个词机械分配0.5分。
 10. 只要上面机构参考答案数量大于 0，就不得声称“无参考答案”或“未提供参考答案”；本地候选聚类只是辅助信息，不得替代对答案全文的核对。
 11. 综合写作不得把每一则具体材料案例都设为必答点。中心立意可以是 required；不同材料案例应作为同一 alternative_group 下的可替代论据；一般升华、科技手段等只能是 bonus。
 12. 每个计分点必须填写 suggested_weight 和 weight_reason；不要机械等权。若三个以上计分点确实等权，必须在顶层 equal_weight_reason 说明它们为何对完成题目任务同等重要。
@@ -430,12 +444,45 @@ def _weight_reason(candidate, importance):
     )
 
 
+
+def _validated_reference_quote(candidate, reference_ids, references_by_id):
+    """Bind one rubric point to the exact Fenbi/reference clause it colors."""
+    references = [references_by_id[value] for value in reference_ids if value in references_by_id]
+    if not references:
+        references = list(references_by_id.values())
+    bodies = [normalize_reference_answer_text(reference.get("answer_text")) for reference in references]
+
+    raw_candidates = []
+    direct = candidate.get("reference_quote")
+    if direct:
+        raw_candidates.append(str(direct).strip())
+    raw_candidates.extend(
+        str(value).strip()
+        for value in (candidate.get("reference_quotes") or [])
+        if str(value or "").strip()
+    )
+    raw_candidates.extend(
+        str(value or "").strip()
+        for value in (
+            candidate.get("minimum_expression"),
+            candidate.get("canonical_expression"),
+            *(candidate.get("required_elements") or []),
+        )
+        if str(value or "").strip()
+    )
+    for quote in raw_candidates:
+        normalized_quote = normalize_reference_answer_text(quote)
+        if normalized_quote and any(normalized_quote in body for body in bodies):
+            return _clean(normalized_quote, 220)
+    return ""
+
 def validate_rubric(raw, question, materials, references, question_feedback=None):
     if not isinstance(raw, dict) or not isinstance(raw.get("points"), list):
         raise ValueError("评分基准缺少 points 数组")
     references = dedupe_references(references)
     references_by_id = {int(reference["id"]): reference for reference in references}
     organization_count = len(references)
+    single_reference_scoring = organization_count == 1 and question.get("question_type") != "综合写作"
     core_threshold = max(2, (organization_count + 1) // 2)
     invalid_keys = {
         row.get("point_key")
@@ -515,6 +562,10 @@ def validate_rubric(raw, question, materials, references, question_feedback=None
                 "supporting": 1.0,
             }[importance]
         point = {
+            "group_key": _clean(candidate.get("group_key"), 80),
+            "group_label": _clean(candidate.get("group_label"), 80),
+            "group_order": int(candidate.get("group_order") or 0),
+            "point_order": int(candidate.get("point_order") or 0),
             "label": _clean(candidate.get("label") or candidate.get("canonical_expression"), 60),
             "canonical_expression": _clean(candidate.get("canonical_expression") or candidate.get("label"), 180),
             "aliases": [_clean(value, 80) for value in (candidate.get("aliases") or []) if _clean(value)][:8],
@@ -534,6 +585,8 @@ def validate_rubric(raw, question, materials, references, question_feedback=None
                 candidate.get("minimum_expression") or candidate.get("canonical_expression") or candidate.get("label"),
                 120,
             ),
+            "reference_quote": _validated_reference_quote(candidate, reference_ids, references_by_id),
+            "is_structural": bool(candidate.get("is_structural")),
             "importance": importance,
             "weight_reason": _weight_reason(candidate, importance),
             "score_role": "required"
@@ -543,6 +596,27 @@ def validate_rubric(raw, question, materials, references, question_feedback=None
             "alternative_group": alternative_group,
             "suggested_weight": suggested_weight,
         }
+        if single_reference_scoring:
+            # The sole Fenbi answer defines the complete scoring boundary.  Do
+            # not let material-derived examples silently become requirements.
+            if not point["reference_quote"]:
+                point["tier"] = "disputed"
+                point["required_for_full_score"] = False
+                point["score_role"] = "disputed"
+                point["coverage_role"] = "bonus"
+                point["suggested_weight"] = 0
+            else:
+                point["canonical_expression"] = point["reference_quote"]
+                point["minimum_expression"] = point["reference_quote"]
+                point["required_elements"] = []
+                point["optional_details"] = []
+                if not point["is_structural"]:
+                    point["tier"] = "core"
+                    point["required_for_full_score"] = True
+                    point["score_role"] = "required"
+                    point["coverage_role"] = "required"
+                    if not point["suggested_weight"]:
+                        point["suggested_weight"] = 1.0
         if not point["label"] or not point["canonical_expression"]:
             continue
         supplied_key = _clean(candidate.get("point_key"), 80)
@@ -569,6 +643,35 @@ def validate_rubric(raw, question, materials, references, question_feedback=None
     ]
     if not scoreable:
         raise ValueError("评分基准没有通过材料校验的有效采分点")
+    if question.get("question_type") != "综合写作":
+        longest_reference = max(
+            (len(re.sub(r"\s+", "", normalize_reference_answer_text(ref.get("answer_text")))) for ref in references),
+            default=0,
+        )
+        display_max = question_display_max_score(question)
+        if longest_reference >= 100:
+            minimum_points = 5 if display_max >= 15 else 3
+            maximum_points = 12 if display_max >= 15 else 8
+            if not (minimum_points <= len(scoreable) <= maximum_points):
+                raise ValueError(
+                    f"非作文题共有 {len(scoreable)} 个计分点，应合理归并为 {minimum_points}—{maximum_points} 个完整给分点"
+                )
+        if longest_reference >= 60:
+            raw_total = sum(point["suggested_weight"] for point in scoreable) or 1
+            largest_share = max(point["suggested_weight"] for point in scoreable) / raw_total
+            if largest_share > 0.35:
+                raise ValueError("存在权重超过内容分35%的笼统大点，必须拆成更合理的完整给分点")
+            reference_bound = [point for point in scoreable if point.get("reference_quote")]
+            if references and len(reference_bound) < min(4, len(scoreable)):
+                raise ValueError("粉笔参考答案与给分点绑定不足，必须为主体给分点提供逐字 reference_quote")
+            if single_reference_scoring:
+                bound_quotes = [point["reference_quote"] for point in reference_bound]
+                if len(bound_quotes) != len(set(bound_quotes)):
+                    raise ValueError("多个给分点绑定了同一段粉笔原文，必须划分为互不重复的评分依据")
+                grouped = {point.get("group_key") for point in scoreable if point.get("group_key")}
+                numbered_sections = re.findall(r"(?:^|[。；])\s*[一二三四五六七八九十]+、", normalize_reference_answer_text(references[0].get("answer_text")))
+                if numbered_sections and len(grouped) < min(len(numbered_sections), 3):
+                    raise ValueError("评分基准没有保留粉笔答案的主要要点组结构")
     if (
         len(scoreable) >= 3
         and len({round(point["suggested_weight"], 4) for point in scoreable}) == 1
@@ -577,16 +680,40 @@ def validate_rubric(raw, question, materials, references, question_feedback=None
         raise ValueError("三个及以上采分点被平均分配，但未说明等权理由")
     profile = QUESTION_TYPE_PROFILES.get(question.get("question_type")) or QUESTION_TYPE_PROFILES["归纳概括"]
     base_total = sum(point["suggested_weight"] for point in scoreable) or 1
-    for point in points:
-        point["weight"] = (
-            round(profile["content"] * point["suggested_weight"] / base_total, 3) if point["suggested_weight"] else 0
-        )
+    display_scale = question_display_max_score(question) / 100
+    if question.get("question_type") != "综合写作" and display_scale > 0:
+        total_half_units = max(len(scoreable), round(profile["content"] * display_scale * 2))
+        exact_units = [total_half_units * point["suggested_weight"] / base_total for point in scoreable]
+        units = [max(1, int(value)) for value in exact_units]
+        while sum(units) < total_half_units:
+            index = max(range(len(units)), key=lambda i: exact_units[i] - units[i])
+            units[index] += 1
+        while sum(units) > total_half_units:
+            candidates = [i for i, value in enumerate(units) if value > 1]
+            if not candidates:
+                break
+            index = max(candidates, key=lambda i: units[i] - exact_units[i])
+            units[index] -= 1
+        for point in points:
+            point["weight"] = 0
+            point["display_weight"] = 0
+        for point, half_units in zip(scoreable, units):
+            point["display_weight"] = half_units / 2
+            point["weight"] = round(point["display_weight"] / display_scale, 3)
+    else:
+        for point in points:
+            point["weight"] = (
+                round(profile["content"] * point["suggested_weight"] / base_total, 3)
+                if point["suggested_weight"] else 0
+            )
+            point["display_weight"] = round(float(point.get("weight") or 0) * display_scale, 1)
     weighted_total = round(sum(point["weight"] for point in points), 3)
     if scoreable and abs(weighted_total - profile["content"]) > 0.001:
         scoreable[-1]["weight"] = round(
             scoreable[-1]["weight"] + profile["content"] - weighted_total,
             3,
         )
+        scoreable[-1]["display_weight"] = round(scoreable[-1]["weight"] * display_scale, 1)
     mapped_reference_ids = sorted({value for point in points for value in point.get("reference_ids", [])})
     return {
         "schema_version": RUBRIC_VERSION,
