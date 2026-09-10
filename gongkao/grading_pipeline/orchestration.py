@@ -4,14 +4,6 @@ import threading
 
 from ..agent_modules import FEATURE_HASH_MODEL
 from ..db import connect
-from ..grading import (
-    build_revised_answer_retry_prompt,
-    compact_revised_answer_linebreaks,
-    normalize_revised_answer_word_count,
-    parse_revised_answer_repair,
-    replace_revised_answer_body,
-    revised_answer_word_count_status,
-)
 from .calibration import load_calibration_policy
 from .common import (
     PIPELINE_VERSION,
@@ -114,7 +106,7 @@ def _smart_response_parts(response, expects_rubric):
 
 def _build_review_prompt(question, rubric, answer_text, result):
     essay_guidance = ESSAY_SCORING_GUIDANCE if question.get("question_type") == "综合写作" else ""
-    return f"""你正在复核一份申论智能评分中的结构化冲突。只纠正采分点状态、证据短引文和维度分，不重写点评或修改版答案。
+    return f"""你正在复核一份申论智能评分中的结构化冲突。只纠正采分点状态、证据短引文和维度分，不生成或改写任何完整答案。
 
 题目信息：
 {json.dumps({key: question.get(key) for key in ('question_type', 'prompt', 'requirements', 'word_limit')}, ensure_ascii=False)}
@@ -414,36 +406,18 @@ def run_grading_job(db_path, job_id, chat_completion_func):
             )
         effective_word_limit = question_word_limit_text(question)
         result["word_limit"] = effective_word_limit
-        result["revised_answer"] = compact_revised_answer_linebreaks(
-            result.get("revised_answer") or "",
-            effective_word_limit,
-        )
+        result.pop("revised_answer", None)
         result["answer_snapshot"] = attempt.get("answer_text") or ""
         report_text = render_grading_report(result, rubric, evidence)
-        report_text = normalize_revised_answer_word_count(report_text, effective_word_limit)
-        status = revised_answer_word_count_status(report_text, effective_word_limit)
-        if status["over_limit"] and run_state.can_call():
-            _update_job(db_path, job_id, "repairing_answer", 90, "修改版答案超出硬限制，正在局部压缩…")
-            retry_prompt = build_revised_answer_retry_prompt(prompt, report_text, effective_word_limit)
-            run_state.reserve_model_call(
-                "revised_answer_compression",
-                f"修改版答案超过字数硬上限 {status['over_by']} 字",
-            )
-            repair_response, repair_raw = _call_grading_model(
-                chat_completion_func,
-                settings,
-                retry_prompt,
-                False,
-            )
-            raw_parts.append(repair_raw)
-            repaired_answer = parse_revised_answer_repair(repair_response)
-            if repaired_answer:
-                result["revised_answer"] = repaired_answer
-                report_text = render_grading_report(result, rubric, evidence)
-                report_text = replace_revised_answer_body(
-                    report_text, repaired_answer, effective_word_limit
-                )
-        status = revised_answer_word_count_status(report_text, effective_word_limit)
+        status = {
+            "has_revised_answer": False,
+            "actual_chars": 0,
+            "max_chars": 0,
+            "budget_status": "not_applicable",
+            "over_limit": False,
+            "over_by": 0,
+            "streams": [],
+        }
         latency_ms = run_state.latency_ms()
         validation = {
             "errors": result.get("validation_errors") or [],
@@ -493,13 +467,9 @@ def run_grading_job(db_path, job_id, chat_completion_func):
                 ),
             )
         completed_message = (
-            f"智能批改完成，修改版答案超出字数限制 {status['over_by']} 字。"
-            if status["over_limit"]
-            else (
-                "智能批改已生成待复核结果。"
-                if result.get("score_status") == "provisional"
-                else "智能批改完成。"
-            )
+            "智能批改已生成待复核结果。"
+            if result.get("score_status") == "provisional"
+            else "智能批改完成。"
         )
         _update_job(db_path, job_id, "completed", 100, completed_message, report_id=report_id, retryable=0)
         logging.info(
@@ -676,8 +646,6 @@ def apply_report_feedback(conn, report_id, point_key, corrected_status, correcte
     result["score_status"] = "stale"
     result["feedback_applied"] = True
     report_text = render_grading_report(result, rubric, evidence)
-    question = conn.execute("SELECT word_limit FROM questions WHERE id = ?", (report["question_id"],)).fetchone()
-    report_text = normalize_revised_answer_word_count(report_text, question["word_limit"] if question else "")
     conn.execute("UPDATE grading_reports SET report_text = ? WHERE id = ?", (report_text, report_id))
     conn.execute(
         "UPDATE grading_report_contexts SET result_json = ?, validation_json = ? WHERE report_id = ?",

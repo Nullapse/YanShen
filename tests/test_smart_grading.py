@@ -347,7 +347,7 @@ class SmartGradingTest(unittest.TestCase):
             self.assertFalse(options["deep_thinking"])
             self.assertFalse(validation["deep_thinking"])
 
-    def test_over_limit_repair_is_saved_as_formal_report(self):
+    def test_ai_supplied_revised_answer_is_ignored_without_repair_call(self):
         with tempfile.TemporaryDirectory() as directory:
             path, _, attempt_id, reference_ids = self.make_database(directory)
             calls = []
@@ -380,7 +380,7 @@ class SmartGradingTest(unittest.TestCase):
                 report_id = run_grading_job(path, job["id"], overflowing_chat)
 
             self.assertIsNotNone(report_id)
-            self.assertEqual(len(calls), 3)
+            self.assertEqual(len(calls), 2)
             with connect(path) as conn:
                 failed_job = conn.execute("SELECT * FROM grading_jobs WHERE id = ?", (job["id"],)).fetchone()
                 saved_report = conn.execute(
@@ -392,15 +392,17 @@ class SmartGradingTest(unittest.TestCase):
                     (report_id,),
                 ).fetchone()[0])
             self.assertEqual(failed_job["status"], "completed")
-            self.assertIn("超出字数限制", failed_job["message"])
+            self.assertNotIn("超出字数限制", failed_job["message"])
             self.assertEqual(failed_job["report_id"], report_id)
             self.assertIsNotNone(saved_report)
             self.assertEqual(saved_report["status"], "ok")
-            self.assertIn("乙" * 250, saved_report["report_text"])
-            self.assertTrue(validation["word_count_status"]["over_limit"])
+            self.assertNotIn("甲" * 250, saved_report["report_text"])
+            self.assertNotIn("乙" * 250, saved_report["report_text"])
+            self.assertIn("机构甲参考答案", saved_report["report_text"])
+            self.assertFalse(validation["word_count_status"]["over_limit"])
             self.assertEqual(
                 [item["purpose"] for item in validation["api_calls"]],
-                ["rubric_generation", "grading", "revised_answer_compression"],
+                ["rubric_generation", "grading"],
             )
             payload = grading_job_payload(failed_job)
             self.assertFalse(payload["preview_available"])
@@ -597,8 +599,8 @@ class SmartGradingTest(unittest.TestCase):
         self.assertIn("optional_details", rubric_prompt)
         self.assertIn("coverage_ratio", grading_prompt)
         self.assertIn("不得把所有 partial 机械写成0.5", grading_prompt)
-        self.assertIn("修改版答案目标为 315—336 格", grading_prompt)
-        self.assertIn("最终结果必须严格低于 350 格", grading_prompt)
+        self.assertIn("禁止生成、改写、压缩或润色任何完整答案", grading_prompt)
+        self.assertNotIn('"revised_answer"', grading_prompt)
         self.assertIn("符合真实考场阅卷强度的“得分制”", grading_prompt)
         self.assertIn("普通“写到了”不能进入此档", grading_prompt)
         self.assertIn('"max_score": 70.0', grading_prompt)

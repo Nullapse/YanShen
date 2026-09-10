@@ -43,12 +43,9 @@ from ..db import connect, init_db, prepare_user_database
 from ..grading import (
     build_ai_prompt,
     build_grading_package,
-    build_revised_answer_retry_prompt,
     count_cjk_chars,
     normalize_revised_answer_word_count,
-    parse_revised_answer_repair,
     referenced_material_numbers,
-    replace_revised_answer_body,
     revised_answer_word_count_status,
     select_relevant_materials,
     should_use_whole_paper_materials,
@@ -1491,7 +1488,8 @@ def _is_table_separator(line):
 
 
 def markdownish(value, return_to="", source_text="", annotation_scope="grading-annotation"):
-    lines = (value or "").splitlines()
+    safe_value = str(value or "").replace("&emsp;", "　").replace("&ensp;", " ").replace("&nbsp;", " ")
+    lines = safe_value.splitlines()
     output = []
     in_list = False
     in_ol = False
@@ -1560,10 +1558,10 @@ def markdownish(value, return_to="", source_text="", annotation_scope="grading-a
         if line.startswith("### "):
             close_lists()
             output.append(f"<h3>{inline_markdown(line[4:], return_to)}</h3>")
-        elif line in ("## 修改版答案", "## 名师修改版范文", "## 名师标杆答案与采分对照"):
+        elif line in ("## 修改版答案", "## 名师修改版范文", "## 名师标杆答案与采分对照") or line.endswith("参考答案与采分对照") or line.endswith("参考答案"):
             close_lists()
             output.append(f"<h2>{inline_markdown(line[3:], return_to)}</h2>")
-            if line == "## 名师标杆答案与采分对照":
+            if line == "## 名师标杆答案与采分对照" or line.endswith("参考答案与采分对照"):
                 output.append(
                     '<div class="master-benchmark-legend">'
                     '<div class="legend-items">'

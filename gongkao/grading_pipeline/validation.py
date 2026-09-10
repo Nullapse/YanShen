@@ -402,7 +402,6 @@ def validate_grading_result(
         "overall_summary": _clean(raw.get("overall_summary"), 360)
         or ("空白答案，未完成作答。" if blank_answer else "请结合维度得分与采分点分析查看。"),
         "summary": raw.get("summary") if isinstance(raw.get("summary"), dict) else {},
-        "revised_answer": str(raw.get("revised_answer") or "").strip(),
         "score": score,
         "display_score": display_score,
         "display_max_score": int(display_max_score) if display_max_score.is_integer() else display_max_score,

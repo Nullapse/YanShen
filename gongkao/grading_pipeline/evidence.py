@@ -278,7 +278,7 @@ def build_combined_grading_prompt(
     dimension_score_template = _dimension_score_template(dimension_profile)
     return f"""你正在执行申论单次智能联合批改。请在一次响应中先建立独立评分基准，再分析全部采分点，最后按题型维度综合评分。
 
-最高事实来源是本题题干与材料。机构答案只是候选解释，可能存在套话或漏点。没有本题材料依据的内容不得成为主要扣分点。
+你是申论阅卷与诊断老师，不是参考答案作者。最高事实来源是本题题干、作答要求与材料原文。粉笔答案是主要参考和展示标杆，但可能存在套话、偏差或漏点；没有材料依据的内容不得成为主要扣分点。白鹭和小马哥只用于拆点、归并、材料原词与同义表达识别，绝不用于生成完整答案。
 【错别字免扣分铁律】：考生采用电脑键盘拼音输入法打字作答，同音错别字、输入法联想失误等非原则性错字属正常录入现象，一律免予扣分，严禁以此作为扣分依据！评分核心在于采分点语义识别与材料提取能力；只要语义表达能识别出采分点（无论是否存在同音错别字），均须判定为命中给分！
 建立 rubric 时不得根据本次作答增删采分点或改变权重；本次作答只能用于 evaluation。
 
@@ -361,8 +361,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
     "material_reading": ["材料信息 -> 可转化要点 -> 答案表达"],
     "optimization_suggestions": ["具体建议"],
     "personalized_findings": [{{"finding": "跨题共性现象", "root_cause": "导致该现象的具体作答机制/原因", "next_step": "下一步针对这个原因练什么", "evidence_ids": [""], "confidence": "stage|recurring"}}],
-    "summary": {{"verdict": "不含分数的整体判断", "strengths": ["主要优点"], "weaknesses": ["主要问题"]}},
-    "revised_answer": "可直接替换的修改版答案正文"
+    "summary": {{"verdict": "不含分数的整体判断", "strengths": ["主要优点"], "weaknesses": ["主要问题"]}}
   }}
 }}
 </smart_grading_json>
@@ -376,7 +375,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
 6. 【冗余废话深度排查】：在 redundancies 列表中，列出用户答案中与所有采分要义均无关联的文字（无信息增量套话、超纲细微展开、主观脑补），指出具体占用字数与删减理由。
 7. hit/partial 应提供用户答案中的短连续原文；若同一要点散落在多处，可用“……”连接多个按原文顺序出现的短片段，不得因此改判 miss。annotations 中除 add 外 quote 必须是连续原文。
 8. coaching context（跨题、知识、历史证据）只用于建议和 personalized_findings，绝不能影响 point_matches 或 dimension_scores。
-9. 修改版答案以 suggested_min—suggested_max 为目标，低于硬上限并预留至少8格。
+9. 只判断用户作答是否符合字数与格式要求；参考答案和批改诊断不计入用户作答字数。不得输出任何完整替代答案。
 10. 只输出上述单个 JSON 块，不输出 Markdown 或额外解释。
 """
 
@@ -483,8 +482,8 @@ def build_grading_prompt(
     dimension_score_template = _dimension_score_template(dimension_profile)
     budget_guidance = _word_budget_guidance(question_context["word_budget"])
     essay_guidance = ESSAY_SCORING_GUIDANCE if question.get("question_type") == "综合写作" else ""
-    return f"""你正在使用已校验的不等权评分基准执行申论综合批改。先分析全部采分点，再按评分基准中的固定维度综合评分。
-评分只能依据 current_scoring：本题信息、材料、参考答案和评分基准。coaching_context 只用于点评建议，不得影响任何得分。
+    return f"""你正在使用已校验的不等权评分基准执行申论综合批改。你是阅卷与诊断老师，不是参考答案作者；只分析采分点、材料证据、用户作答覆盖和固定维度得分。
+评分只能依据 current_scoring：本题信息、材料、参考答案和评分基准。题干、作答要求和材料原文是最高事实源；粉笔答案是主要参考但不是脱离材料的绝对真理。白鹭和小马哥仅用于拆点、归并、识别材料原词和同义表达。禁止生成、改写、压缩或润色任何完整答案。coaching_context 只用于点评建议，不得影响任何得分。
 
 与旧批改包一致的本题完整信息：
 {json.dumps(question_context, ensure_ascii=False)}
@@ -510,7 +509,8 @@ coaching_context（跨题、知识和历史最小证据）：
 
 历史证据状态：{json.dumps(history_meta, ensure_ascii=False)}
 
-本题修改版答案占格要求：{budget_guidance}
+本次用户作答占格要求：{budget_guidance}
+{ANSWER_GRID_RULES}
 
 同题人工纠错校准：
 {json.dumps(feedback_calibration, ensure_ascii=False)}
@@ -543,8 +543,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
     "material_reading": ["材料信息 -> 可转化要点 -> 答案表达"],
     "optimization_suggestions": ["具体建议"],
     "personalized_findings": [{{"finding": "跨题共性现象", "root_cause": "导致该现象的具体作答机制/原因", "next_step": "下一步针对这个原因练什么", "evidence_ids": [""], "confidence": "stage|recurring"}}],
-    "summary": {{"verdict": "不含分数的整体判断", "strengths": ["主要优点"], "weaknesses": ["主要问题"]}},
-    "revised_answer": "可直接替换的修改版答案正文"
+    "summary": {{"verdict": "不含分数的整体判断", "strengths": ["主要优点"], "weaknesses": ["主要问题"]}}
   }}
 }}
 </smart_grading_json>
@@ -557,7 +556,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
 5. point_matches 的每项还必须输出 coverage_ratio（0—1）。hit 固定为1，miss固定为0；partial 根据实际覆盖的核心语义给出0.1—0.9，不得把所有 partial 机械写成0.5。
 6. hit/partial 应提供用户答案中的短连续原文；若语义散落在多处，可用“……”连接按顺序出现的多个短片段。
 7. dimension_scores 必须逐项覆盖评分基准 dimensions；max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。
-8. 修改版答案必须按结构化 word_budget 生成，以 suggested_min—suggested_max 为目标，并至少预留8格安全余量。{ANSWER_GRID_RULES}
+8. 你是阅卷与诊断老师，不是答案作者。禁止输出、改写、压缩或润色任何完整答案；禁止生成“修改版答案”“名师答案”“小马哥版”或“白鹭版”。白鹭和小马哥只用于拆点、归并、识别材料原词和同义表达。
 9. 不直接输出总分、分数算式、折算分或等级；系统将各维度 score 相加、校准并缩放到原题满分。
-10. 上面的机构参考答案数量大于 0 时，reference_fusion 必须说明实际纳入的机构答案及其共性/差异，严禁写“无参考答案”“无额外参考答案”或“未提供参考答案”。
+10. 上面的机构参考答案数量大于 0 时，reference_fusion 必须说明实际纳入的机构答案及其共性/差异，严禁写“无参考答案”“无额外参考答案”或“未提供参考答案”。粉笔答案是主要展示标杆，但其中无法由材料支持的发挥不得设为必得分点；材料明确而粉笔遗漏的内容可标记为 material_core，但不得据此另写一份答案。
 """

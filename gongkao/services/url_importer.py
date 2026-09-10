@@ -732,7 +732,10 @@ def normalize_fenbi_payload(meta_payload, static_payloads=None, source_url="") -
             chosen = materials
         q_materials = "\n\n".join(f"{item['title']}\n{item['content']}" for item in chosen)
         answer, answer_source = _reference_answer_text(value, question)
-        organization = _first_text(value, ("organization", "orgName", "sourceName", "provider")) or FENBI_PROVIDER
+        # A Fenbi solution URL contributes exactly one reference answer per
+        # question. Keep its source identity stable even when upstream payloads
+        # expose generic provider labels such as “参考答案”.
+        organization = FENBI_PROVIDER
         reference = None
         if answer:
             scoring_points = _first_text(value, ("scoringPoints", "scorePoints", "keyPoints", "keywords", "points"))
@@ -740,7 +743,7 @@ def normalize_fenbi_payload(meta_payload, static_payloads=None, source_url="") -
                 "organization": organization,
                 "answer_text": answer,
                 "scoring_points": scoring_points,
-                "notes": f"来自粉笔 URL 自动导入字段 {answer_source}，仅作候选对照；当前未核验。",
+                "notes": f"来自粉笔 URL 自动导入字段 {answer_source}；作为本题粉笔参考答案展示，内容未核验，评分仍以题干和材料为准。",
                 "score": score,
                 "is_reviewed": 0,
             }
@@ -767,7 +770,7 @@ def normalize_fenbi_payload(meta_payload, static_payloads=None, source_url="") -
             "reference_answer": reference,
             "source_url": source_url,
             "source_kind": info.source_kind,
-            "source_note": "由粉笔 URL 自动导入；参考答案为未核验候选，仅供 AI 独立解题后的对照审计。",
+            "source_note": "由粉笔 URL 自动导入；每题仅保存一份粉笔参考答案，AI 只做评分与诊断。",
         })
 
     if not questions:
@@ -1142,7 +1145,7 @@ def draft_from_bridge_payload(payload: dict, source_url: str) -> dict:
             "source_url": info.source_url,
             "source_kind": info.source_kind,
             "source_provider": info.provider,
-            "import_note": "由浏览器页面文字自动导入；参考答案未核验，AI 必须独立解题。",
+            "import_note": "由浏览器页面文字自动导入；粉笔参考答案用于报告展示，AI 只做评分与诊断。",
         })
         for question in parsed.get("questions", []):
             question["source_url"] = info.source_url
@@ -1151,7 +1154,8 @@ def draft_from_bridge_payload(payload: dict, source_url: str) -> dict:
             reference = question.get("reference_answer")
             if isinstance(reference, dict):
                 reference["is_reviewed"] = 0
-                reference["notes"] = "来自粉笔 URL 自动导入，仅作候选对照；当前未核验。"
+                reference["organization"] = FENBI_PROVIDER
+                reference["notes"] = "来自粉笔 URL 自动导入；作为本题粉笔参考答案展示，内容未核验，评分仍以题干和材料为准。"
         return parsed
     return normalize_fenbi_payload(payload.get("meta", payload), payload.get("static_payloads", []), source_url)
 

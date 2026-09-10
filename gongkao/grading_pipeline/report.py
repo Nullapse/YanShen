@@ -1,5 +1,6 @@
 import re
 
+from ..grading import normalize_reference_answer_text
 from .contracts import GradingEvidence, GradingResult
 
 CONTENT_WEIGHTS = {
@@ -85,6 +86,29 @@ def _format_point_data(point_def, match, display_scale):
     }
 
 
+def _valid_reference_answers(rubric):
+    references = []
+    for reference in rubric.get("selected_references") or []:
+        answer_text = normalize_reference_answer_text(reference.get("answer_text"))
+        organization = str(
+            reference.get("canonical_organization") or reference.get("organization") or ""
+        ).strip()
+        if not answer_text or answer_text in {"未提供文本", "无", "暂无", "（未提供文本）"}:
+            continue
+        references.append({**reference, "organization": organization or "参考答案", "answer_text": answer_text})
+    return references
+
+
+def _primary_reference_answer(rubric):
+    references = _valid_reference_answers(rubric)
+    if not references:
+        return None
+    return next(
+        (reference for reference in references if "粉笔" in reference.get("organization", "")),
+        references[0],
+    )
+
+
 def _build_master_annotated_answer(result, rubric, display_scale) -> str:
     rubric_points = rubric.get("points") or []
     point_by_key = {p.get("point_key"): p for p in rubric_points if p.get("point_key")}
@@ -97,29 +121,19 @@ def _build_master_annotated_answer(result, rubric, display_scale) -> str:
         if k and k not in match_by_key and idx < len(point_matches):
             match_by_key[k] = point_matches[idx]
 
-    revised_text = str(result.get("revised_answer") or "").strip()
+    primary_reference = _primary_reference_answer(rubric)
+    reference_text = normalize_reference_answer_text(
+        primary_reference.get("answer_text") if primary_reference else ""
+    )
+    if not reference_text:
+        return "（本题未选择可用的粉笔参考答案）"
 
-    # Fallback when no revised_text is provided
-    if not revised_text or revised_text == "（未生成有效修改版答案）":
-        if not rubric_points:
-            return "（暂无标杆答案）"
-        fallback_lines = []
-        for idx, p in enumerate(rubric_points, 1):
-            pkey = p.get("point_key")
-            mdata = match_by_key.get(pkey) or {}
-            info = _format_point_data(p, mdata, display_scale)
-            label = p.get("label") or f"要点{idx}"
-            canon = p.get("canonical_expression") or label
-            fallback_lines.append(
-                f"{idx}. [标答点|{info['status']}|{info['score_str']}|{info['my_eval']}|{info['material_source']}|{info.get('point_key', pkey)}|{canon}]"
-            )
-        return "\n\n".join(fallback_lines) if fallback_lines else "（暂无标杆答案）"
+    # The benchmark body is always the imported institution answer. AI metadata is
+    # attached only as render-time tags and never becomes part of the answer text.
+    if "[标答点|" in reference_text:
+        return reference_text
 
-    # Case 1: If tags already present
-    if "[标答点|" in revised_text:
-        return revised_text
-
-    # Case 2: Format revised_text into Shenlun standard layout and micro-slice every scoring clause
+    revised_text = reference_text
     user_answer = str(result.get("answer_snapshot") or rubric.get("answer_snapshot") or "").strip()
 
     def clean_text(s):
@@ -287,7 +301,7 @@ def _build_master_annotated_answer(result, rubric, display_scale) -> str:
                 f"[标答点|{clause_status}|{info['score_str']}|{info['my_eval']}|{info['material_source']}|{pkey}|{s_str}]"
             )
 
-        annotated_paras.append(f"&emsp;&emsp;{''.join(para_units)}")
+        annotated_paras.append(f"　　{''.join(para_units)}")
 
     return "\n\n".join(annotated_paras)
 
@@ -505,6 +519,32 @@ def render_grading_report(
     }
     is_essay = rubric.get("question_type") == "综合写作"
 
+    point_matches = result.get("point_matches") or []
+    if point_matches:
+        lines.extend(
+            [
+                "",
+                "## 采分点判断",
+                "| 采分点 | 判断 | 用户答案对应内容 | 得分原因 |",
+                "| --- | --- | --- | --- |",
+            ]
+        )
+        for match in point_matches:
+            point = point_by_key.get(match.get("point_key")) or {}
+            status = match.get("status") or "miss"
+            ratio = float(match.get("coverage_ratio") or 0)
+            status_text = status_labels.get(status, "未命中")
+            if status == "partial":
+                status_text += f"（覆盖{int(round(ratio * 100))}%）"
+            lines.append(
+                "| {label} | {status} | {quote} | {reason} |".format(
+                    label=str(point.get("label") or match.get("point_key") or "采分点").replace("|", "／"),
+                    status=status_text,
+                    quote=str(match.get("answer_quote") or "未体现").replace("|", "／"),
+                    reason=str(match.get("reason") or "按材料依据与语义覆盖判断。").replace("|", "／"),
+                )
+            )
+
     if is_essay:
         # 大作文：保留并强化逐字逐句原文批注，以及修改版范文
         lines.extend(["", "## 作文逐句精批"])
@@ -542,33 +582,38 @@ def render_grading_report(
         if not result.get("annotations"):
             lines.append("- 本次未生成通过原文校验的可视化批注。")
 
+        primary_reference = _primary_reference_answer(rubric)
+        primary_org = primary_reference.get("organization") if primary_reference else "粉笔"
+        primary_text = primary_reference.get("answer_text") if primary_reference else "（本题未选择可用的粉笔参考答案）"
         lines.extend(
             [
                 "",
-                "## 名师修改版范文",
+                f"## {primary_org}参考答案",
                 "",
-                result.get("revised_answer") or "（未生成有效修改版答案）",
+                primary_text,
             ]
         )
     else:
-        # 小题：踩分点分析、原文批注与修改版答案三合一合并为「名师标杆答案与采分对照」
-        master_annotated_body = _build_master_annotated_answer(result, rubric, display_scale) or "（暂无标杆答案）"
+        primary_reference = _primary_reference_answer(rubric)
+        primary_org = primary_reference.get("organization") if primary_reference else "粉笔"
+        master_annotated_body = _build_master_annotated_answer(result, rubric, display_scale)
         lines.extend(
             [
                 "",
-                "## 名师标杆答案与采分对照",
+                f"## {primary_org}参考答案与采分对照",
                 "",
                 master_annotated_body,
             ]
         )
 
+    primary_key = (
+        primary_reference.get("id"),
+        primary_reference.get("organization"),
+        primary_reference.get("answer_text"),
+    ) if primary_reference else None
     valid_refs = [
-        ref
-        for ref in (rubric.get("selected_references") or [])
-        if ref.get("answer_text")
-        and ref.get("answer_text").strip()
-        and ref.get("answer_text").strip() not in ("未提供文本", "无", "暂无", "（未提供文本）")
-        and (ref.get("organization") or "").strip() not in ("参考答案", "")
+        ref for ref in _valid_reference_answers(rubric)
+        if (ref.get("id"), ref.get("organization"), ref.get("answer_text")) != primary_key
     ]
     if valid_refs:
         lines.extend(["", "## 机构参考答案对照"])

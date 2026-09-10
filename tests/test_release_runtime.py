@@ -841,7 +841,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
                 server.server_close()
                 thread.join(timeout=5)
 
-    def test_api_grade_repairs_only_hard_overflow_once_and_preserves_other_sections(self):
+    def test_api_grade_never_calls_ai_to_repair_generated_answers(self):
         with tempfile.TemporaryDirectory() as directory:
             user_db = Path(directory) / "api-word-budget.sqlite3"
             prepare_user_database(user_db, SEED)
@@ -895,7 +895,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
                 ) as completion:
                     with urlopen(Request(f"{base_url}/attempts/{overflow_attempt_id}/grade", data=b"", method="POST"), timeout=10):
                         pass
-                    self.assertEqual(completion.call_count, 2)
+                    self.assertEqual(completion.call_count, 1)
 
                 with patch(
                     "gongkao.web.controllers.grading.chat_completion",
@@ -906,7 +906,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
                 ) as completion:
                     with urlopen(Request(f"{base_url}/attempts/{failed_attempt_id}/grade", data=b"", method="POST"), timeout=10) as response:
                         failed_html = response.read().decode("utf-8")
-                    self.assertEqual(completion.call_count, 2)
+                    self.assertEqual(completion.call_count, 1)
 
                 with connect(user_db) as conn:
                     short_saved = conn.execute(
@@ -923,12 +923,13 @@ class ReleaseRuntimeTest(unittest.TestCase):
                 self.assertIsNotNone(repaired_saved)
                 self.assertIn("核心判断：必须逐字保留", repaired_saved["report_text"])
                 self.assertIn("1. 也必须逐字保留", repaired_saved["report_text"])
-                self.assertIn(repaired_body, repaired_saved["report_text"])
-                self.assertNotIn("甲" * 250, repaired_saved["report_text"])
-                self.assertIn("localized revised-answer repair", repaired_saved["raw_response"])
+                self.assertIn("甲" * 250, repaired_saved["report_text"])
+                self.assertNotIn(repaired_body, repaired_saved["report_text"])
+                self.assertNotIn("localized revised-answer repair", repaired_saved["raw_response"])
                 self.assertIsNotNone(failed_saved)
                 self.assertEqual(failed_saved["status"], "ok")
-                self.assertIn("丙" * 250, failed_saved["report_text"])
+                self.assertIn("甲" * 250, failed_saved["report_text"])
+                self.assertNotIn("丙" * 250, failed_saved["report_text"])
                 self.assertIn("批改报告", failed_html)
                 self.assertIn("修改版答案超出字数限制", failed_html)
                 self.assertIn("丙" * 250, failed_html)
@@ -981,7 +982,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
                         "SELECT COUNT(*) FROM grading_reports WHERE attempt_id = ?", (rejected_id,)
                     ).fetchone()[0]
                 self.assertEqual(accepted_count, 1)
-                self.assertEqual(rejected_count, 0)
+                self.assertEqual(rejected_count, 1)
             finally:
                 server.shutdown()
                 server.server_close()
@@ -1705,14 +1706,14 @@ class ReleaseRuntimeTest(unittest.TestCase):
         self.assertIn("data-attempt-note-status", script_source)
         self.assertIn("navigator.sendBeacon", script_source)
         self.assertIn(".attempt-note-panel", style_source)
-        self.assertIn("build_revised_answer_retry_prompt", server_source)
+        self.assertNotIn("build_revised_answer_retry_prompt", server_source)
         self.assertIn("report_answer_snapshot(", server_source)
         self.assertIn(
             "markdownish(display_report_text, report_return_to, report_source_text",
             server_source,
         )
-        self.assertIn("parse_revised_answer_repair", server_source)
-        self.assertIn("replace_revised_answer_body", server_source)
+        self.assertNotIn("parse_revised_answer_repair", server_source)
+        self.assertNotIn("replace_revised_answer_body", server_source)
         self.assertIn("revised_answer_word_count_status", server_source)
         self.assertIn("report-word-limit-warning", server_source)
         self.assertNotIn("AI 局部压缩后仍超出字数限制", server_source)

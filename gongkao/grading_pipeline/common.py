@@ -1,3 +1,4 @@
+import html as html_lib
 import json
 import re
 from hashlib import sha256
@@ -97,9 +98,9 @@ def _word_budget_guidance(budget):
     minimum = int(budget.get("minimum") or 0)
     parts = []
     if suggested_min and suggested_max:
-        parts.append(f"修改版答案目标为 {suggested_min}—{suggested_max} 格")
+        parts.append(f"用户作答建议区间为 {suggested_min}—{suggested_max} 格")
     if hard_max:
-        parts.append(f"最终结果必须严格低于 {hard_max} 格，等于 {hard_max} 也超限")
+        parts.append(f"用户作答必须严格低于 {hard_max} 格，等于 {hard_max} 也超限")
     elif minimum:
         parts.append(f"题目要求不少于 {minimum} 格")
     if not parts:
@@ -135,9 +136,9 @@ def _full_reference_context(references):
         {
             "reference_id": int(reference["id"]),
             "organization": _canonical_organization(reference),
-            "answer_text": str(reference.get("answer_text") or "").strip(),
-            "scoring_points": str(reference.get("scoring_points") or "").strip(),
-            "notes": str(reference.get("notes") or "").strip(),
+            "answer_text": html_lib.unescape(str(reference.get("answer_text") or "")).replace("\xa0", " ").replace("\u2003", " ").strip(),
+            "scoring_points": html_lib.unescape(str(reference.get("scoring_points") or "")).replace("\xa0", " ").replace("\u2003", " ").strip(),
+            "notes": html_lib.unescape(str(reference.get("notes") or "")).replace("\xa0", " ").replace("\u2003", " ").strip(),
         }
         for reference in dedupe_references(references)
     ]

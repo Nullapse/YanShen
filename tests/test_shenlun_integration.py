@@ -128,12 +128,13 @@ class ShenlunIntegrationTest(unittest.TestCase):
         self.assertIn("综合分析题型细分：词句理解类", package)
         self.assertIn("Shenlun.skill 名师做题法与批改铁律", package)
         self.assertIn("错别字免扣分铁律", package)
-        self.assertIn("名师标答与参考答案对照", package)
+        self.assertIn("AI 仅评分诊断", package)
 
     def test_report_instructions_contains_typo_exemption(self):
         from gongkao.grading import REPORT_INSTRUCTIONS
         self.assertIn("错别字免扣分铁律", REPORT_INSTRUCTIONS)
-        self.assertIn("名师标答与参考答案对照", REPORT_INSTRUCTIONS)
+        self.assertIn("不是参考答案作者", REPORT_INSTRUCTIONS)
+        self.assertIn("禁止生成、改写、压缩", REPORT_INSTRUCTIONS)
 
     def test_render_grading_report_displays_reference_answers(self):
         from gongkao.grading_pipeline.report import render_grading_report
@@ -142,7 +143,6 @@ class ShenlunIntegrationTest(unittest.TestCase):
             "display_score": 75,
             "display_max_score": 100,
             "overall_summary": "表现良好",
-            "revised_answer": "### 小马哥版\n1. 措施一。\n### 白鹭版\n一、小标题。展开。",
             "reference_audit": "机构答案自创成语过多，缺少材料原词。",
         }
         rubric = {
@@ -154,12 +154,49 @@ class ShenlunIntegrationTest(unittest.TestCase):
             "points": [],
         }
         report = render_grading_report(result, rubric, [])
-        self.assertIn("## 机构参考答案对照", report)
-        self.assertIn("### 参考答案 · 粉笔", report)
+        self.assertIn("## 粉笔参考答案与采分对照", report)
         self.assertIn("粉笔参考答案", report)
+        self.assertNotIn("小马哥版", report)
+        self.assertNotIn("白鹭版", report)
+        self.assertIn("## 机构参考答案对照", report)
         self.assertIn("### 参考答案 · 中公", report)
         self.assertIn("名师解题逻辑 vs 机构参考答案对照审计", report)
         self.assertIn("机构答案自创成语过多", report)
+
+
+    def test_benchmark_count_excludes_diagnostics_and_decodes_entities(self):
+        from gongkao.grading import count_cjk_chars, normalize_revised_answer_word_count
+        from gongkao.web.runtime import markdownish
+
+        report = (
+            "## 名师标杆答案与采分对照\n"
+            "实际字数：999字\n\n"
+            "[标答点|hit|+2分 / 满分2分|很长的作答诊断|很长的材料出处|point-1|科学决策。]"
+        )
+        normalized = normalize_revised_answer_word_count(report, "50字以内")
+        self.assertIn("实际字数：5字", normalized)
+        self.assertEqual(
+            count_cjk_chars("[标答点|hit|+2分|诊断|出处|point-1|科学决策。]"),
+            count_cjk_chars("科学决策。"),
+        )
+        html = markdownish("## 粉笔参考答案与采分对照\n&emsp;&emsp;科学决策。")
+        self.assertNotIn("&amp;emsp;", html)
+        self.assertNotIn("&emsp;", html)
+
+    def test_smart_prompt_forbids_complete_answer_generation(self):
+        from gongkao.grading_pipeline.evidence import build_grading_prompt
+
+        prompt = build_grading_prompt(
+            {"id": 1, "question_type": "归纳概括", "prompt": "概括做法", "requirements": "准确", "word_limit": "200字以内"},
+            [{"material_number": 1, "content": "完善机制。"}],
+            {"id": 1, "answer_text": "完善机制。"},
+            {"points": [], "criteria": [], "word_budget": {}},
+            [],
+            references=[{"id": 1, "organization": "粉笔", "answer_text": "完善机制。"}],
+        )
+        self.assertIn("不是参考答案作者", prompt)
+        self.assertIn("禁止生成、改写、压缩或润色任何完整答案", prompt)
+        self.assertNotIn('"revised_answer"', prompt)
 
     def test_relay_base_url_normalization_and_headers(self):
         from gongkao.ai import build_chat_url, DEFAULT_USER_AGENT

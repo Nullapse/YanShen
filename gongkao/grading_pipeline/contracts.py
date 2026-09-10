@@ -67,7 +67,6 @@ class GradingResult(TypedDict, total=False):
     optimization_suggestions: list[str]
     reference_fusion: str
     overall_summary: str
-    revised_answer: str
     score: float
     display_score: float
     display_max_score: float | int

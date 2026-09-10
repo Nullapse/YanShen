@@ -11,7 +11,6 @@ from ..runtime import (
     attempt_grading_references,
     build_ai_prompt,
     build_grading_package,
-    build_revised_answer_retry_prompt,
     chat_completion,
     connect,
     count_cjk_chars,
@@ -36,10 +35,8 @@ from ..runtime import (
     nonnegative_int,
     normalize_revised_answer_word_count,
     parse_qs,
-    parse_revised_answer_repair,
     pre,
     re,
-    replace_revised_answer_body,
     report_answer_snapshot,
     return_path_from_form,
     return_path_from_query,
@@ -334,7 +331,6 @@ class GradingController:
                     "request_retry": "请求失败后重试",
                     "schema_repair": "修复返回结构",
                     "independent_review": "独立复核",
-                    "revised_answer_compression": "压缩超字数修改稿",
                 }
                 call_items = []
                 for call in validation.get("api_calls") or []:
@@ -613,21 +609,6 @@ class GradingController:
                     report_text,
                     attempt["word_limit"] if attempt else "",
                 )
-                status = revised_answer_word_count_status(
-                    report_text,
-                    attempt["word_limit"] if attempt else "",
-                )
-                if status["over_limit"]:
-                    self.page_attempt_detail(
-                        f"/attempts/{attempt_id}",
-                        [
-                            (
-                                "error",
-                                f"修改版答案未低于字数硬限制，至少还需压缩 {status['over_by']} 字，已拒绝保存。手工报告不会自动调用 API 返修。",
-                            )
-                        ],
-                    )
-                    return
                 conn.execute(
                     """
                     INSERT INTO grading_reports (
@@ -812,41 +793,10 @@ class GradingController:
                 prompt,
                 {"thinking": "enabled" if use_deep_thinking else "disabled"},
             )
-            report_text = normalize_revised_answer_word_count(
-                report_text,
-                question["word_limit"] or "",
-            )
             stored_raw = raw
-            status = revised_answer_word_count_status(
-                report_text,
-                question["word_limit"] or "",
-            )
-            if status["over_limit"]:
-                retry_prompt = build_revised_answer_retry_prompt(
-                    prompt,
-                    report_text,
-                    question["word_limit"] or "",
-                )
-                repair_response, repair_raw = chat_completion(
-                    settings,
-                    retry_prompt,
-                    {"thinking": "disabled"},
-                )
-                repaired_answer = parse_revised_answer_repair(repair_response)
-                stored_raw = f"{raw}\n\n--- localized revised-answer repair ---\n{repair_raw}"
-                if repaired_answer:
-                    report_text = replace_revised_answer_body(
-                        report_text,
-                        repaired_answer,
-                        question["word_limit"] or "",
-                    )
         except (AiConfigError, AiRequestError) as exc:
             self.page_attempt_detail(f"/attempts/{attempt_id}", [("error", str(exc))])
             return
-        status = revised_answer_word_count_status(
-            report_text,
-            question["word_limit"] or "",
-        )
         with connect(self.db_path) as conn:
             cursor = conn.execute(
                 """

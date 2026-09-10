@@ -605,7 +605,9 @@ def validate_rubric(raw, question, materials, references, question_feedback=None
         "selected_references": [
             {
                 "reference_id": int(reference["id"]),
+                "id": int(reference["id"]),
                 "organization": _canonical_organization(reference),
+                "answer_text": str(reference.get("answer_text") or "").strip(),
             }
             for reference in references
         ],
