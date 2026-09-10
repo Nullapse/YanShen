@@ -29,9 +29,11 @@ from .persistence import load_job_context as _load_job_context
 from .persistence import update_job as _update_job
 from .report import render_grading_report
 from .rubric import (
+    build_fenbi_tree_rubric,
     build_rubric_prompt,
     compact_reference_consensus,
     extract_tagged_json,
+    fenbi_tree_available,
     manual_grading_basis,
     validate_rubric,
 )
@@ -210,7 +212,27 @@ def run_grading_job(db_path, job_id, chat_completion_func):
 
         deep_thinking = bool(options.get("deep_thinking"))
 
-        if reused:
+        if fenbi_tree_available(references):
+            if reused and rubric and rubric.get("scoring_mode") == "fenbi_tree":
+                _update_job(db_path, job_id, "reusing_rubric", 42, "已复用粉笔踩分树，正在准备逐点批改…")
+                consensus = {}
+            else:
+                _update_job(db_path, job_id, "building_rubric", 20, "正在固化粉笔踩分树…")
+                rubric = build_fenbi_tree_rubric(question, references)
+                cached_row, rubric = _save_rubric_to_db(
+                    db_path,
+                    question,
+                    references,
+                    materials,
+                    settings,
+                    question_feedback,
+                    rubric,
+                    consensus={},
+                    prevalidated=True,
+                )
+                consensus = {}
+                reused = False
+        elif reused:
             _update_job(db_path, job_id, "reusing_rubric", 42, "已复用评分基准，正在准备综合批改…")
             consensus = {}
         else:

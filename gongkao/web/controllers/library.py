@@ -62,6 +62,45 @@ from ...services.url_importer import (
 )
 
 
+def fenbi_score_tree_html(raw_tree):
+    """Render a stored Fenbi score-analysis tree as a compact nested list."""
+
+    try:
+        tree = json.loads(raw_tree) if isinstance(raw_tree, str) else raw_tree
+    except (TypeError, json.JSONDecodeError):
+        return ""
+    if not isinstance(tree, dict):
+        return ""
+
+    def render_node(node):
+        children = [child for child in (node.get("children") or []) if isinstance(child, dict)]
+        full_mark = node.get("full_mark")
+        if full_mark is not None:
+            try:
+                full_mark = float(full_mark)
+            except (TypeError, ValueError):
+                full_mark = None
+        score_suffix = f"（{full_mark:g}分）" if full_mark else ""
+        comment = str(node.get("comment") or "").strip()
+        html = (
+            "<li>"
+            f"<strong>{esc(node.get('name') or '得分分析')}</strong> {esc(score_suffix)}"
+        )
+        if comment:
+            html += f'<div class="muted" style="font-size:0.82rem;margin:0.2rem 0 0.35rem;">{esc(comment)}</div>'
+        if children:
+            html += "<ul>" + "".join(render_node(child) for child in children) + "</ul>"
+        html += "</li>"
+        return html
+
+    return (
+        '<section class="fenbi-score-tree" style="margin-top:1rem;padding:1rem;border:1px solid var(--line, #e2e8f0);border-radius:8px;background:var(--bg-card, #ffffff);">'
+        '<h3 style="margin:0 0 0.5rem;">粉笔踩分树</h3>'
+        f'<ul style="margin:0;padding-left:1.2rem;">{render_node(tree)}</ul>'
+        "</section>"
+    )
+
+
 class LibraryController:
     def page_index(self, query):
         page = requested_page(query)
@@ -738,6 +777,13 @@ class LibraryController:
             saved_annotations=material_annotations,
         )
         refs_html = tabbed_references(references, f"question-{question_id}")
+        score_tree_html = ""
+        for reference in references:
+            reference = dict(reference)
+            if reference.get("score_tree_json"):
+                score_tree_html = fenbi_score_tree_html(reference["score_tree_json"])
+                if score_tree_html:
+                    break
 
         solve_error = query.get("solve_error", [""])[0]
         solve_error_banner = ""
@@ -827,6 +873,7 @@ class LibraryController:
               <summary><span>参考答案</span><small>{len(references)} 份，作答后再看</small></summary>
               <div class="reference-disclosure-body">
                 {refs_html}
+                {score_tree_html}
                 <div style="margin-top: 1rem; padding: 1rem; border: 1px solid var(--line, #e2e8f0); border-radius: 6px; background: var(--bg-card, #ffffff);">
                   <strong style="display:block;margin-bottom:0.5rem;font-size:0.92rem;">+ 录入新参考答案</strong>
                   <p class="muted" style="font-size: 0.82rem; margin-bottom: 0.75rem;">录入机构（华图、粉笔、中公等）或个人答案。AI 评分将以真题材料和名师体系为主，对参考答案进行客观审计纠错。</p>
@@ -1368,7 +1415,7 @@ class LibraryController:
           <div class="url-import-head">
             <div class="url-import-kicker"><span class="url-import-kicker-dot"></span><span>Fenbi · URL Import</span></div>
             <h2 class="url-import-title">从 URL 自动录入</h2>
-            <p class="url-import-description">粘贴粉笔套卷解析页 URL，应用会自动抓取完整材料、题目和候选参考答案。参考答案不准确时，AI 仍以原始材料和 Shenlun.skill 独立作答。</p>
+            <p class="url-import-description">粘贴粉笔套卷解析页或练习页 URL。练习页未提交时，应用会自动填写占位答案并提交，以获取每道题的粉笔踩分树；已提交页面会直接读取踩分树。参考答案与踩分树仅供批改对照。</p>
           </div>
           <div class="url-import-url-row">
             <label class="url-import-field-label" for="url-import-input">来源页面 URL</label>
@@ -1487,7 +1534,11 @@ class LibraryController:
                 credentials = parse_fenbi_credentials(cookie_text, device_id)
             else:
                 credentials = FENBI_CREDENTIALS.load()
-            result = fetch_source_draft(source.source_url, credentials=credentials)
+            result = fetch_source_draft(
+                source.source_url,
+                credentials=credentials,
+                auto_submit=data.get("auto_submit", True) is not False,
+            )
         except UrlImportError as exc:
             self.send_json({"ok": False, "error": str(exc)}, status=400)
             return

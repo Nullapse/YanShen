@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS reference_answers (
     canonical_organization TEXT NOT NULL DEFAULT '',
     answer_text TEXT NOT NULL,
     scoring_points TEXT NOT NULL DEFAULT '',
+    score_tree_json TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
     import_id INTEGER REFERENCES imports(id) ON DELETE SET NULL,
     is_reviewed INTEGER NOT NULL DEFAULT 0,
@@ -609,6 +610,7 @@ REQUIRED_SCHEMA_TABLES = frozenset(
 REQUIRED_SCHEMA_COLUMNS = {
     "questions": frozenset({"content_hash"}),
     "attempts": frozenset({"answer_format_json"}),
+    "reference_answers": frozenset({"score_tree_json"}),
     "agent_context_chunks": frozenset({"content_hash"}),
     "agent_context_vectors": frozenset({"content_hash"}),
     "agent_context_dense_vectors": frozenset({"content_hash"}),
@@ -632,6 +634,7 @@ REQUIRED_SCHEMA_COLUMNS = {
 CURRENT_SCHEMA_ADDITIVE_COLUMNS = {
     "questions": (("content_hash", "TEXT NOT NULL DEFAULT ''"),),
     "attempts": (("answer_format_json", "TEXT NOT NULL DEFAULT '[]'"),),
+    "reference_answers": (("score_tree_json", "TEXT NOT NULL DEFAULT ''"),),
     "agent_context_chunks": (("content_hash", "TEXT NOT NULL DEFAULT ''"),),
     "agent_context_vectors": (("content_hash", "TEXT NOT NULL DEFAULT ''"),),
     "agent_context_dense_vectors": (
@@ -997,6 +1000,17 @@ def _remove_obsolete_seed_questions(conn, current_codes):
         if conn.execute("SELECT 1 FROM paper_favorites WHERE paper_id = ? LIMIT 1", (paper_id,)).fetchone():
             continue
         conn.execute("DELETE FROM papers WHERE id = ?", (paper_id,))
+
+
+def prune_builtin_papers(conn):
+    """Remove non-imported built-in seed papers while preserving personal data.
+
+    URL-imported papers use source_kind ``fenbi_*`` and are left untouched.
+    Built-in questions that already have attempts, favorites, training items or
+    agent runs are also preserved so this cleanup never destroys user history.
+    """
+
+    _remove_obsolete_seed_questions(conn, set())
 
 
 def sync_seed_content(db_path, seed_path):

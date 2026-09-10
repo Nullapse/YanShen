@@ -555,12 +555,14 @@ def add_paper_question(conn, paper_id: int, question_data: Dict[str, Any] | None
     ref_ans = ""
     ref_org = (data.get("reference_org") or data.get("ref_organization") or "参考答案").strip()
     ref_scoring_points = (data.get("scoring_points") or "").strip()
+    ref_score_tree = data.get("score_tree")
     ref_notes = (data.get("reference_notes") or "").strip()
     ref_is_reviewed = int(data.get("reference_is_reviewed", 1) or 0)
     if isinstance(ref_value, dict):
         ref_ans = (ref_value.get("answer_text") or ref_value.get("answerText") or ref_value.get("content") or "").strip()
         ref_org = (ref_value.get("organization") or ref_value.get("orgName") or ref_org).strip()
         ref_scoring_points = (ref_value.get("scoring_points") or ref_value.get("scoringPoints") or ref_scoring_points).strip()
+        ref_score_tree = ref_value.get("score_tree") or ref_score_tree
         ref_notes = (ref_value.get("notes") or ref_notes).strip()
         ref_is_reviewed = int(ref_value.get("is_reviewed", ref_is_reviewed) or 0)
     elif isinstance(ref_value, str):
@@ -574,6 +576,7 @@ def add_paper_question(conn, paper_id: int, question_data: Dict[str, Any] | None
             ref_org,
             ref_ans,
             scoring_points=ref_scoring_points,
+            score_tree=ref_score_tree,
             notes=ref_notes,
             is_reviewed=ref_is_reviewed,
         )
@@ -587,6 +590,7 @@ def add_question_reference_answer(
     organization: str,
     answer_text: str,
     scoring_points: str = "",
+    score_tree=None,
     notes: str = "",
     score: int | None = None,
     is_reviewed: int = 1,
@@ -598,17 +602,23 @@ def add_question_reference_answer(
     ans = (answer_text or "").strip()
     if not ans:
         raise ValueError("参考答案正文不能为空")
+    score_tree_json = (
+        json.dumps(score_tree, ensure_ascii=False, separators=(",", ":"))
+        if isinstance(score_tree, (dict, list))
+        else ""
+    )
 
     conn.execute(
         """
         INSERT INTO reference_answers (
             question_id, organization, canonical_organization, answer_text,
-            scoring_points, notes, is_reviewed
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            scoring_points, score_tree_json, notes, is_reviewed
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(question_id, organization) DO UPDATE SET
             canonical_organization = excluded.canonical_organization,
             answer_text = excluded.answer_text,
             scoring_points = excluded.scoring_points,
+            score_tree_json = excluded.score_tree_json,
             notes = excluded.notes,
             is_reviewed = excluded.is_reviewed,
             updated_at = CURRENT_TIMESTAMP
@@ -619,6 +629,7 @@ def add_question_reference_answer(
             canonical_org,
             ans,
             (scoring_points or "").strip(),
+            score_tree_json,
             (notes or "").strip(),
             1 if is_reviewed else 0,
         ),

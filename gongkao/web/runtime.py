@@ -39,7 +39,7 @@ from ..agent_store import (
     recent_runs,
 )
 from ..ai import AiConfigError, AiRequestError, chat_completion, masked_key, resolve_api_key
-from ..db import connect, init_db, prepare_user_database
+from ..db import connect, init_db, prepare_user_database, prune_builtin_papers
 from ..grading import (
     build_ai_prompt,
     build_grading_package,

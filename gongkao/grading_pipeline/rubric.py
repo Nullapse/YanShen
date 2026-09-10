@@ -148,6 +148,173 @@ def compact_reference_consensus(conn, references, materials, similarity_threshol
     }
 
 
+def _score_tree_from_reference(reference):
+    reference = _row_dict(reference)
+    raw = reference.get("score_tree_json") or reference.get("score_tree")
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+    return None
+
+
+def fenbi_tree_available(references):
+    return any(_score_tree_from_reference(reference) for reference in dedupe_references(references))
+
+
+def _tree_number(value):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0.0
+    return number if number > 0 else 0.0
+
+
+def _fenbi_tree_points(tree):
+    points = []
+
+    def visit(node, ancestors):
+        name = _clean(node.get("name"), 220)
+        full_mark = _tree_number(node.get("full_mark") or node.get("fullMark"))
+        children = node.get("children") or []
+        if not children:
+            if full_mark:
+                points.append(
+                    {
+                        "node": node,
+                        "name": name or "未命名采分点",
+                        "full_mark": full_mark,
+                        "ancestors": list(ancestors),
+                    }
+                )
+            return full_mark
+
+        child_total = 0.0
+        for child in children:
+            child_total += visit(child, ancestors + [name])
+        residual = round(full_mark - child_total, 4)
+        if residual > 0.0001:
+            if not ancestors and name in {"得分分析", ""}:
+                label = "发展等级/综合表达"
+            else:
+                label = f"{name or '其他'}（其他）"
+            points.append(
+                {
+                    "node": node,
+                    "name": label,
+                    "full_mark": residual,
+                    "ancestors": list(ancestors),
+                }
+            )
+            return full_mark
+        return child_total
+
+    visit(tree, [])
+    return points
+
+
+def build_fenbi_tree_rubric(question, references):
+    """Build a fixed rubric directly from the Fenbi score-analysis tree."""
+
+    question = _row_dict(question)
+    references = dedupe_references(references)
+    reference = next(
+        (item for item in references if _score_tree_from_reference(item)),
+        None,
+    )
+    if reference is None:
+        raise ValueError("本题没有可用的粉笔踩分树")
+    tree = _score_tree_from_reference(reference)
+    display_max = float(question_display_max_score(question) or 100)
+    points = []
+    for index, item in enumerate(_fenbi_tree_points(tree), start=1):
+        node = item["node"]
+        full_mark = item["full_mark"]
+        node_id = node.get("id")
+        point_key = f"fenbi-{node_id}" if node_id is not None else f"fenbi-point-{index}"
+        group_label = item["ancestors"][-1] if item["ancestors"] else "得分分析"
+        comment = _clean(node.get("comment"), 600)
+        importance = "critical" if full_mark >= 3 else ("major" if full_mark >= 1 else "supporting")
+        weight = round(full_mark / max(display_max, 1) * 100, 4)
+        points.append(
+            {
+                "point_key": point_key,
+                "group_key": f"fenbi-group-{max(1, len(item['ancestors']))}",
+                "group_label": group_label,
+                "group_order": len(item["ancestors"]),
+                "point_order": index,
+                "label": item["name"],
+                "canonical_expression": item["name"],
+                "aliases": [],
+                "tier": "core",
+                "importance": importance,
+                "suggested_weight": weight,
+                "weight": weight,
+                "display_weight": round(full_mark, 2),
+                "weight_reason": comment[:240] or "粉笔踩分树原分值。",
+                "required_for_full_score": True,
+                "required_elements": [],
+                "optional_details": [],
+                "minimum_expression": item["name"],
+                "reference_quote": item["name"],
+                "material_evidence": [],
+                "reference_ids": [int(reference["id"])],
+                "confidence": 1.0,
+                "score_role": "required",
+                "coverage_role": "required",
+                "alternative_group": "",
+                "is_structural": False,
+                "source_comment": comment,
+            }
+        )
+
+    if not points:
+        raise ValueError("粉笔踩分树没有可用的计分点")
+
+    dimensions = [
+        {
+            "criterion_id": "content-1",
+            "dimension": "content",
+            "description": "粉笔踩分树逐点判分",
+            "weight": 100,
+        }
+    ]
+    return {
+        "schema_version": RUBRIC_VERSION,
+        "question_id": int(question.get("id") or 0),
+        "max_score": 100,
+        "display_max_score": display_max,
+        "score_is_estimated": question_score_is_estimated(question),
+        "question_type": question.get("question_type") or "",
+        "word_limit": question_word_limit_text(question),
+        "scoring_mode": "fenbi_tree",
+        "selected_reference_count": len(references),
+        "selected_references": [
+            {
+                "reference_id": int(item["id"]),
+                "id": int(item["id"]),
+                "organization": _canonical_organization(item),
+                "answer_text": str(item.get("answer_text") or "").strip(),
+            }
+            for item in references
+        ],
+        "mapped_reference_ids": [int(reference["id"])],
+        "reference_mapping_status": "mapped",
+        "task_constraints": {},
+        "word_budget": word_limit_budget(question.get("word_limit") or ""),
+        "points": points,
+        "equal_weight_reason": "",
+        "dimensions": dimensions,
+        "criteria": dimensions,
+        "conflicts": [],
+        "source": "fenbi_score_tree",
+    }
+
+
 def manual_grading_basis(conn, question, materials, references):
     question = _row_dict(question)
     materials = [_row_dict(row) for row in materials]
@@ -165,6 +332,11 @@ def manual_grading_basis(conn, question, materials, references):
     ).fetchone()
     if row:
         return {"kind": "cached_rubric", "rubric": json.loads(row["rubric_json"])}
+    if fenbi_tree_available(references):
+        return {
+            "kind": "fenbi_tree",
+            "rubric": build_fenbi_tree_rubric(question, references),
+        }
     # The local sentence clusters are retrieval hints for the AI rubric builder,
     # not verified scoring points.  Never expose them as a manual grading basis.
     return {"kind": "uncached"}

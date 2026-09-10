@@ -716,16 +716,29 @@ def build_grading_package(
         parts.append("本次未提供参考答案，请仅依据题目、作答要求和材料进行批改。")
 
     if grading_basis:
-        if grading_basis.get("kind") == "cached_rubric":
-            parts.extend(["", "## AI 智能评分基准"])
+        if grading_basis.get("kind") in {"cached_rubric", "fenbi_tree"}:
             rubric = grading_basis.get("rubric") or {}
-            parts.append("以下为本题在智能批改中生成、已缓存并通过材料引文校验的评分基准；仍须核对用户答案中的同义表达。")
-            for index, point in enumerate(rubric.get("points") or [], start=1):
-                evidence = "；".join(item.get("quote") or "" for item in point.get("material_evidence") or [])
-                parts.append(
-                    f"{index}. [{point.get('tier')}] {point.get('label')}：{point.get('canonical_expression')}"
-                    f"；材料依据：{evidence or '不足'}；支持机构数：{point.get('support_org_count', 0)}"
-                )
+            if rubric.get("scoring_mode") == "fenbi_tree" or rubric.get("source") == "fenbi_score_tree":
+                parts.extend(["", "## 粉笔踩分树（固定评分标准）"])
+                parts.append("以下踩分树来自粉笔得分详情，已作为唯一评分标准写入系统；AI 只逐点判断，不重新划点或重算权重。")
+                for index, point in enumerate(rubric.get("points") or [], start=1):
+                    score = point.get("display_weight", point.get("weight"))
+                    parts.append(
+                        f"{index}. {point.get('label')}（{score}分）"
+                    )
+                    if point.get("reference_quote"):
+                        parts.append(f"   粉笔依据：{point['reference_quote']}")
+                    if point.get("source_comment"):
+                        parts.append(f"   判分说明：{point['source_comment']}")
+            else:
+                parts.extend(["", "## AI 智能评分基准"])
+                parts.append("以下为本题在智能批改中生成、已缓存并通过材料引文校验的评分基准；仍须核对用户答案中的同义表达。")
+                for index, point in enumerate(rubric.get("points") or [], start=1):
+                    evidence = "；".join(item.get("quote") or "" for item in point.get("material_evidence") or [])
+                    parts.append(
+                        f"{index}. [{point.get('tier')}] {point.get('label')}：{point.get('canonical_expression')}"
+                        f"；材料依据：{evidence or '不足'}；支持机构数：{point.get('support_org_count', 0)}"
+                    )
         else:
             parts.extend(
                 [

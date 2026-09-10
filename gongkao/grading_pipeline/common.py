@@ -38,11 +38,11 @@ def _extract_matching_quote(quote, reason, answer_text):
     return ""
 
 
-RUBRIC_VERSION = "rubric-v7-single-reference-boundary"
+RUBRIC_VERSION = "rubric-v8-fenbi-score-tree"
 
-RESULT_VERSION = "grading-result-v8-single-reference-boundary"
+RESULT_VERSION = "grading-result-v9-fenbi-score-tree"
 
-PIPELINE_VERSION = "smart-grading-v7-single-reference-boundary"
+PIPELINE_VERSION = "smart-grading-v8-fenbi-score-tree"
 
 CONSENSUS_MAX_MATERIAL_CLAUSES = 240
 
@@ -132,16 +132,28 @@ def _canonical_organization(reference):
 
 
 def _full_reference_context(references):
-    return [
-        {
-            "reference_id": int(reference["id"]),
-            "organization": _canonical_organization(reference),
-            "answer_text": html_lib.unescape(str(reference.get("answer_text") or "")).replace("\xa0", " ").replace("\u2003", " ").strip(),
-            "scoring_points": html_lib.unescape(str(reference.get("scoring_points") or "")).replace("\xa0", " ").replace("\u2003", " ").strip(),
-            "notes": html_lib.unescape(str(reference.get("notes") or "")).replace("\xa0", " ").replace("\u2003", " ").strip(),
-        }
-        for reference in dedupe_references(references)
-    ]
+    output = []
+    for reference in dedupe_references(references):
+        score_tree = None
+        raw_score_tree = reference.get("score_tree_json") or reference.get("score_tree")
+        if isinstance(raw_score_tree, dict):
+            score_tree = raw_score_tree
+        elif isinstance(raw_score_tree, str) and raw_score_tree.strip():
+            try:
+                score_tree = json.loads(raw_score_tree)
+            except json.JSONDecodeError:
+                score_tree = None
+        output.append(
+            {
+                "reference_id": int(reference["id"]),
+                "organization": _canonical_organization(reference),
+                "answer_text": html_lib.unescape(str(reference.get("answer_text") or "")).replace("\xa0", " ").replace("\u2003", " ").strip(),
+                "scoring_points": html_lib.unescape(str(reference.get("scoring_points") or "")).replace("\xa0", " ").replace("\u2003", " ").strip(),
+                "notes": html_lib.unescape(str(reference.get("notes") or "")).replace("\xa0", " ").replace("\u2003", " ").strip(),
+                "score_tree": score_tree,
+            }
+        )
+    return output
 
 
 def question_display_max_score(question):
@@ -261,6 +273,7 @@ def rubric_source_hash(question, materials, references):
                     "id": reference.get("id"),
                     "organization": _canonical_organization(reference),
                     "answer_text": reference.get("answer_text"),
+                    "score_tree_json": reference.get("score_tree_json") or "",
                 }
                 for reference in dedupe_references(references)
             ],

@@ -196,11 +196,20 @@ class GradingController:
             custom_reference_answer,
             grading_basis,
         )
-        package_basis_note = (
-            "当前批改包已包含智能批改生成并经材料引文校验的 AI 评分基准。"
-            if cache_info["cached"]
-            else "本题尚未生成 AI 智能评分基准。批改包不会再导出本地聚类候选；Codex 会依据题目、材料和参考答案重新提炼采分点。"
-        )
+        rubric_source = ""
+        if grading_basis.get("kind") == "fenbi_tree":
+            package_basis_note = "当前批改包已包含粉笔得分详情生成的固定踩分树，AI 只逐点判断，不重新划点或重算权重。"
+        elif grading_basis.get("kind") == "cached_rubric":
+            rubric = grading_basis.get("rubric") or {}
+            rubric_source = rubric.get("source") or rubric.get("scoring_mode") or ""
+            if cache_info["cached"] and rubric_source in {"fenbi_score_tree", "fenbi_tree"}:
+                package_basis_note = "当前批改包已包含粉笔得分详情生成的固定踩分树，AI 只逐点判断，不重新划点或重算权重。"
+            elif cache_info["cached"]:
+                package_basis_note = "当前批改包已包含智能批改生成并经材料引文校验的 AI 评分基准。"
+            else:
+                package_basis_note = "本题尚未生成 AI 智能评分基准。批改包不会再导出本地聚类候选；Codex 会依据题目、材料和参考答案重新提炼采分点。"
+        else:
+            package_basis_note = "本题尚未生成 AI 智能评分基准。批改包不会再导出本地聚类候选；Codex 会依据题目、材料和参考答案重新提炼采分点。"
         refs_html = tabbed_references(refs, f"attempt-{attempt_id}")
         material_annotations = {row["material_number"]: row for row in annotations if row["target_type"] == "material"}
         annotation_by_type = {

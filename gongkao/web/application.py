@@ -19,12 +19,14 @@ from .runtime import (
     BaseHTTPRequestHandler,
     Path,
     ThreadingHTTPServer,
+    connect,
     dispatch_get,
     dispatch_post,
     json,
     logging,
     mimetypes,
     parse_qs,
+    prune_builtin_papers,
     prepare_user_database,
     quote,
     safe_static_path,
@@ -190,6 +192,9 @@ class LoggingHTTPServer(ThreadingHTTPServer):
 def create_server(host="127.0.0.1", port=5000, db_path=None):
     resolved_db_path = Path(db_path) if db_path else user_db_path()
     prepare_user_database(resolved_db_path, seed_db_path())
+    if resolved_db_path.resolve() == user_db_path().resolve():
+        with connect(resolved_db_path) as conn:
+            prune_builtin_papers(conn)
     server = LoggingHTTPServer((host, port), Handler)
     server.app_context = ApplicationContext.create(resolved_db_path, ROOT)
     if db_path is None:

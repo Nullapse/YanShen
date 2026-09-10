@@ -405,6 +405,14 @@ def _safe_int(value, default=0):
         return default
 
 
+def _safe_score(value, default=0.0):
+    try:
+        number = float(str(value if value is not None else default).strip())
+        return number if number == number else default
+    except (TypeError, ValueError):
+        return default
+
+
 def _material_number(value, default):
     number = _safe_int(value, 0)
     return number if number > 0 else default
@@ -616,7 +624,7 @@ def _static_objects(meta_payload, static_payloads):
     return objects
 
 
-def normalize_fenbi_payload(meta_payload, static_payloads=None, source_url="") -> dict:
+def normalize_fenbi_payload(meta_payload, static_payloads=None, source_url="", score_trees=None) -> dict:
     """Normalize a Fenbi API response plus its static JSON files.
 
     Fenbi has changed field names between exercise types.  This function uses
@@ -704,6 +712,7 @@ def normalize_fenbi_payload(meta_payload, static_payloads=None, source_url="") -
         if not isinstance(value, dict):
             value = {"content": value}
         question = _infer_question_node(value)
+        source_global_id = str(_first(value, ("globalId", "key"), "") or _first(question, ("globalId", "id", "questionId"), "") or "").strip()
         prompt = _first_text(question, ("prompt", "stem", "questionText", "questionContent", "content", "title"))
         if not prompt:
             prompt = _first_text(value, ("prompt", "stem", "questionText", "questionContent", "content", "title"))
@@ -739,14 +748,18 @@ def normalize_fenbi_payload(meta_payload, static_payloads=None, source_url="") -
         reference = None
         if answer:
             scoring_points = _first_text(value, ("scoringPoints", "scorePoints", "keyPoints", "keywords", "points"))
+            score_tree = (score_trees or {}).get(source_global_id)
             reference = {
                 "organization": organization,
                 "answer_text": answer,
                 "scoring_points": scoring_points,
-                "notes": f"来自粉笔 URL 自动导入字段 {answer_source}；内容未核验；导入后作为本题唯一内容评分来源，AI 仅负责合理划点和语义判分。",
+                "notes": f"来自粉笔 URL 自动导入字段 {answer_source}；内容未核验；导入后作为本题唯一内容评分来源。",
                 "score": score,
                 "is_reviewed": 0,
             }
+            if score_tree:
+                reference["score_tree"] = score_tree
+                reference["notes"] += " 已采集粉笔踩分树。"
         number = _safe_int(
             _first(value, ("questionNumber", "question_number", "number", "no", "order"), "")
             or _first(question, ("questionNumber", "question_number", "number", "no", "order"), ""),
@@ -769,6 +782,7 @@ def normalize_fenbi_payload(meta_payload, static_payloads=None, source_url="") -
             "material_numbers": material_numbers,
             "reference_answer": reference,
             "source_url": source_url,
+            "source_global_id": source_global_id,
             "source_kind": info.source_kind,
             "source_note": "由粉笔 URL 自动导入；每题仅保存一份粉笔参考答案，AI 只做评分与诊断。",
         })
@@ -797,6 +811,7 @@ def normalize_fenbi_payload(meta_payload, static_payloads=None, source_url="") -
             "materials": len(materials),
             "questions": len(questions),
             "candidate_references": reference_count,
+            "score_tree_count": sum(1 for question in questions if question.get("reference_answer", {}).get("score_tree")),
         },
         "import_note": "URL 自动导入完成。粉笔参考答案未视为事实，AI 解题时必须以原始材料和 Shenlun.skill 独立推导。",
     }
@@ -944,6 +959,52 @@ def _read_url(url: str, *, timeout=20, max_bytes=MAX_FETCH_BYTES, credentials=No
         return data, response.headers.get_content_type() if response.headers else ""
 
 
+def _post_fenbi_json(url: str, payload, credentials=None, referer="", timeout=30) -> dict:
+    """Post a JSON payload to a Fenbi host using only filtered local cookies."""
+
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower().rstrip(".")
+    if not (host == FENBI_API_HOST or host.endswith(".fenbi.com")):
+        raise UrlImportError("只允许向粉笔域名提交登录态请求")
+    headers = {
+        "Accept": "application/json, text/plain, */*",
+        "Content-Type": "application/json",
+        "User-Agent": "GongkaoPaperImporter/1.0",
+    }
+    cookie_header = _cookie_header_for_url(credentials, url)
+    if cookie_header:
+        headers["Cookie"] = cookie_header
+    if referer and (urlparse(referer).hostname or "").lower().endswith(".fenbi.com"):
+        headers["Referer"] = referer
+    if host == FENBI_API_HOST:
+        headers["Origin"] = "https://spa.fenbi.com"
+    request = Request(
+        url,
+        data=json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            raw = response.read(MAX_FETCH_BYTES + 1)
+            if len(raw) > MAX_FETCH_BYTES:
+                raise UrlImportError("粉笔提交响应过大，已停止读取")
+            text = raw.decode("utf-8-sig", "replace")
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError:
+                return {"_raw": text}
+    except HTTPError as exc:
+        raw = exc.read(MAX_FETCH_BYTES + 1)
+        text = raw.decode("utf-8-sig", "replace")
+        try:
+            body = json.loads(text)
+        except json.JSONDecodeError:
+            body = {"_raw": text}
+        body["_http_status"] = exc.code
+        return body
+
+
 def _extract_static_urls(meta: dict, base_url: str, routecs: str = "") -> list[str]:
     if not isinstance(meta, dict):
         return []
@@ -985,6 +1046,132 @@ def _extract_static_urls(meta: dict, base_url: str, routecs: str = "") -> list[s
     return urls
 
 
+def _fenbi_static_payloads(meta, base_url: str, routecs: str, credentials=None) -> list[dict]:
+    if not isinstance(meta, dict):
+        return []
+    payloads = []
+    for static_url in _extract_static_urls(meta, base_url, routecs):
+        static_data, _ = _read_url(static_url, credentials=credentials, referer=base_url)
+        payloads.append(json.loads(static_data.decode("utf-8-sig")))
+    return payloads
+
+
+def _fenbi_common_params(device_id: str) -> dict:
+    return {
+        "kav": "125",
+        "av": "127",
+        "hav": "125",
+        "app": "web",
+        "apcid": "0",
+        "gav": "2",
+        "deviceId": str(device_id or "").strip(),
+    }
+
+
+def _normalise_fenbi_score_tree(node) -> dict | None:
+    if not isinstance(node, dict):
+        return None
+    children = []
+    for child in node.get("children") or []:
+        normalized = _normalise_fenbi_score_tree(child)
+        if normalized:
+            children.append(normalized)
+    return {
+        "id": node.get("id"),
+        "name": html_to_text(node.get("name") or ""),
+        "score": _safe_score(node.get("score"), 0.0),
+        "full_mark": _safe_score(node.get("fullMark"), 0.0),
+        "comment": html_to_text(node.get("comment") or ""),
+        "show": node.get("show") is not False,
+        "children": children,
+    }
+
+
+def extract_fenbi_score_trees(payload) -> dict[str, dict]:
+    """Extract all Fenbi score-analysis trees from a getSolution payload."""
+
+    data = _unwrap(payload)
+    if not isinstance(data, dict):
+        return {}
+    user_answers = data.get("userAnswers")
+    if not isinstance(user_answers, dict):
+        return {}
+    trees = {}
+    for key, user_answer in user_answers.items():
+        if not isinstance(user_answer, dict):
+            continue
+        analysis = user_answer.get("analysisVO")
+        if not isinstance(analysis, dict):
+            continue
+        tree = _normalise_fenbi_score_tree(analysis.get("scoreAnalysisVO"))
+        if not tree:
+            continue
+        trees[str(key)] = tree
+        question_id = analysis.get("questionId")
+        if question_id is not None:
+            trees[str(question_id)] = tree
+    return trees
+
+
+def _auto_submit_fenbi_exercise(
+    info: SourceInfo,
+    credentials: dict | None,
+    original_source_url: str,
+    examcatid: str,
+    exercise_payload: dict,
+) -> bool:
+    """Submit short placeholder answers to unlock every Fenbi score tree."""
+
+    exercise = _unwrap(exercise_payload)
+    if not isinstance(exercise, dict) or not exercise.get("updateUserAnswerUrl") or not exercise.get("submitUrl"):
+        return False
+    status = exercise.get("status")
+    if status not in (0, None):
+        return False
+    static_urls = _extract_static_urls(exercise, original_source_url, info.routecs)
+    if not static_urls:
+        return False
+    static_data, _ = _read_url(static_urls[0], credentials=credentials, referer=info.source_url)
+    static_payload = json.loads(static_data.decode("utf-8-sig"))
+    questions = static_payload.get("questions") or []
+    updates = []
+    for index, question in enumerate(questions, start=1):
+        if not isinstance(question, dict):
+            continue
+        global_id = str(_first(question, ("globalId", "key", "id"), "") or "").strip()
+        if not global_id:
+            continue
+        question_type = _safe_int(_first(question, ("type",), 21), 21)
+        answer_type = 204 if question_type in {21, 22, 23, 24, 25} else 203
+        updates.append(
+            {
+                "key": global_id,
+                "time": 0,
+                "answer": {
+                    "answer": f"研申导入占位作答 {index}",
+                    "type": answer_type,
+                },
+            }
+        )
+    if not updates:
+        return False
+
+    device_id = str((credentials or {}).get("device_id") or "").strip()
+    common = _fenbi_common_params(device_id)
+    common["routecs"] = info.routecs
+    update_url = exercise["updateUserAnswerUrl"] + ("&" if "?" in exercise["updateUserAnswerUrl"] else "?") + urlencode(common)
+    response = _post_fenbi_json(update_url, updates, credentials=credentials, referer=info.source_url)
+    if response.get("_http_status") in {409, 400} or response.get("code") not in (None, 1):
+        return False
+
+    submit_common = dict(common)
+    if examcatid:
+        submit_common["examcatid"] = examcatid
+    submit_url = exercise["submitUrl"] + ("&" if "?" in exercise["submitUrl"] else "?") + urlencode(submit_common)
+    _post_fenbi_json(submit_url, {}, credentials=credentials, referer=info.source_url)
+    return True
+
+
 def _credential_required_result(info: SourceInfo, message: str) -> dict:
     return {
         "ok": False,
@@ -999,7 +1186,7 @@ def _credential_required_result(info: SourceInfo, message: str) -> dict:
     }
 
 
-def fetch_source_draft(source_url: str, credentials: dict | None = None) -> dict:
+def fetch_source_draft(source_url: str, credentials: dict | None = None, auto_submit: bool = True) -> dict:
     """Fetch a Fenbi paper with the user's local session and normalize it."""
 
     info = parse_source_url(source_url)
@@ -1007,7 +1194,43 @@ def fetch_source_draft(source_url: str, credentials: dict | None = None) -> dict
         raise UrlImportError("暂不支持此来源")
     try:
         device_id = str((credentials or {}).get("device_id") or "").strip()
-        api_url = build_fenbi_solution_api_url(info, device_id)
+        examcatid = (parse_qs(urlparse(source_url).query).get("examcatid") or [""])[0]
+        solution_info = info
+        exercise_payload = None
+        exercise_static_payloads = []
+        if info.source_kind == "fenbi_exercise":
+            exercise_api = build_fenbi_solution_api_url(info, device_id)
+            exercise_data, _ = _read_url(exercise_api, credentials=credentials, referer=info.source_url)
+            exercise_payload = json.loads(exercise_data.decode("utf-8-sig"))
+            exercise = _unwrap(exercise_payload)
+            exercise_static_payloads = _fenbi_static_payloads(
+                exercise,
+                source_url,
+                info.routecs,
+                credentials,
+            )
+            if auto_submit and isinstance(exercise, dict) and exercise.get("status") in {0, None}:
+                try:
+                    _auto_submit_fenbi_exercise(
+                        info,
+                        credentials,
+                        source_url,
+                        examcatid,
+                        exercise_payload,
+                    )
+                    time.sleep(1)
+                except (UrlImportError, URLError, TimeoutError, json.JSONDecodeError):
+                    pass
+            solution_info = SourceInfo(
+                source_url=info.source_url,
+                provider=info.provider,
+                source_kind="fenbi_solution",
+                key=info.key,
+                routecs=info.routecs,
+                requires_browser_session=True,
+            )
+
+        api_url = build_fenbi_solution_api_url(solution_info, device_id)
         data, _ = _read_url(api_url, credentials=credentials, referer=info.source_url)
         payload = json.loads(data.decode("utf-8-sig"))
         if isinstance(payload, dict):
@@ -1018,12 +1241,29 @@ def fetch_source_draft(source_url: str, credentials: dict | None = None) -> dict
             ):
                 return _credential_required_result(info, api_message)
         meta = _unwrap(payload)
-        static_payloads = []
-        if isinstance(meta, dict):
-            for static_url in _extract_static_urls(meta, info.source_url, info.routecs):
-                static_data, _ = _read_url(static_url, credentials=credentials, referer=info.source_url)
-                static_payloads.append(json.loads(static_data.decode("utf-8-sig")))
-        draft = normalize_fenbi_payload(payload, static_payloads, info.source_url)
+        static_payloads = _fenbi_static_payloads(
+            meta,
+            info.source_url,
+            info.routecs,
+            credentials,
+        )
+        score_trees = extract_fenbi_score_trees(payload)
+        try:
+            draft = normalize_fenbi_payload(
+                payload,
+                static_payloads,
+                info.source_url,
+                score_trees=score_trees,
+            )
+        except UrlImportError as exc:
+            if info.source_kind != "fenbi_exercise" or not exercise_payload or not exercise_static_payloads:
+                raise
+            draft = normalize_fenbi_payload(
+                exercise_payload,
+                exercise_static_payloads,
+                info.source_url,
+                score_trees=score_trees,
+            )
         return {"ok": True, "draft": draft, "source": info.as_dict(), "requires_browser_bridge": False}
     except HTTPError as exc:
         if exc.code in {401, 403, 453}:
@@ -1157,7 +1397,13 @@ def draft_from_bridge_payload(payload: dict, source_url: str) -> dict:
                 reference["organization"] = FENBI_PROVIDER
                 reference["notes"] = "来自粉笔 URL 自动导入；内容未核验；导入后作为本题唯一内容评分来源，AI 仅负责合理划点和语义判分。"
         return parsed
-    return normalize_fenbi_payload(payload.get("meta", payload), payload.get("static_payloads", []), source_url)
+    score_trees = extract_fenbi_score_trees(payload.get("analysis_payload", payload.get("meta", payload)))
+    return normalize_fenbi_payload(
+        payload.get("meta", payload),
+        payload.get("static_payloads", []),
+        source_url,
+        score_trees=score_trees,
+    )
 
 
 def public_import_summary(result: dict) -> dict:

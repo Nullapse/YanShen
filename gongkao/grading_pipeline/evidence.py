@@ -393,11 +393,21 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
 """
 
 
-def _save_rubric_to_db(db_path, question, references, materials, settings, feedback, parsed, consensus=None):
+def _save_rubric_to_db(
+    db_path,
+    question,
+    references,
+    materials,
+    settings,
+    feedback,
+    parsed,
+    consensus=None,
+    prevalidated=False,
+):
     consensus = consensus or {}
     ref_hash = reference_set_hash(references)
     source_hash = rubric_source_hash(question, materials, references)
-    rubric = validate_rubric(parsed, question, materials, references, feedback)
+    rubric = parsed if prevalidated else validate_rubric(parsed, question, materials, references, feedback)
     rubric["source_hash"] = source_hash
     rubric["reference_set_hash"] = ref_hash
     rubric["consensus_summary"] = {
@@ -453,11 +463,18 @@ def build_grading_prompt(
 ):
     history_meta = history_meta or {}
     reference_context = _full_reference_context(references or [])
-    single_reference_policy = (
-        "本题只有一份粉笔标准答案：它是内容采分点的唯一边界。不得从材料新增采分点或追加标答未写的必需细节。"
-        if len(reference_context) == 1 and question.get("question_type") != "综合写作"
-        else "按已校验评分基准逐点判定。"
-    )
+    fenbi_tree = rubric.get("scoring_mode") == "fenbi_tree"
+    if fenbi_tree:
+        single_reference_policy = (
+            "本题评分标准已由粉笔踩分树固化。只能逐点判断 hit/partial/miss，"
+            "禁止新增、删除、合并、拆散或重算任何采分点，禁止依据材料补充必写细节。"
+        )
+    else:
+        single_reference_policy = (
+            "本题只有一份粉笔标准答案：它是内容采分点的唯一边界。不得从材料新增采分点或追加标答未写的必需细节。"
+            if len(reference_context) == 1 and question.get("question_type") != "综合写作"
+            else "按已校验评分基准逐点判定。"
+        )
     question_context = {
         key: question.get(key)
         for key in (
@@ -500,7 +517,14 @@ def build_grading_prompt(
     dimension_score_template = _dimension_score_template(dimension_profile)
     budget_guidance = _word_budget_guidance(question_context["word_budget"])
     essay_guidance = ESSAY_SCORING_GUIDANCE if question.get("question_type") == "综合写作" else ""
-    return f"""你正在使用已校验的不等权评分基准执行申论综合批改。你是阅卷与诊断老师，不是参考答案作者；只分析采分点、材料证据、用户作答覆盖和固定维度得分。
+    scoring_mode_label = "粉笔固定踩分树" if fenbi_tree else "已校验的不等权评分基准"
+    fenbi_tree_instruction = (
+        "【固定踩分树】：下面的 points 是唯一可判分点，weight/display_weight/full_mark 已经固化；"
+        "禁止重新划点、合点、拆点或重算权重，point_key 必须原样使用。\n"
+        if fenbi_tree
+        else ""
+    )
+    return f"""你正在使用{scoring_mode_label}执行申论综合批改。你是阅卷与诊断老师，不是参考答案作者；只分析采分点、材料证据、用户作答覆盖和固定维度得分。
 评分只能依据 current_scoring：{single_reference_policy} 用户不要求逐字一致，核心动作、对象或效果与 reference_quote 同义就必须判 hit。partial 只适用于 reference_quote 自身包含的核心语义确实只写了一半；严禁因为材料里另有地点、案例、政策名、技术名而降分。白鹭和小马哥仅用于拆点和同义识别。禁止生成、改写、压缩或润色任何完整答案。coaching_context 只用于点评建议，不得影响任何得分。
 
 与旧批改包一致的本题完整信息：
@@ -509,7 +533,7 @@ def build_grading_prompt(
 本题材料：
 {_material_text(materials)}
 
-系统校验后的评分基准：
+{fenbi_tree_instruction}系统校验后的评分基准：
 {json.dumps(rubric, ensure_ascii=False)}
 
 本题已选择的机构参考答案全文（共 {len(reference_context)} 份，属于 current_scoring 主证据，旧批改模式中的答案、采分点和备注均完整保留）：

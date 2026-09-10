@@ -250,45 +250,58 @@ def validate_grading_result(
     if not dimension_by_name or round(sum(item["max_score"] for item in dimension_by_name.values()), 4) != 100:
         raise ValueError("评分维度满分未闭合到100分")
 
-    raw_dimensions = {
-        str(item.get("dimension") or ""): item
-        for item in (raw.get("dimension_scores") or [])
-        if isinstance(item, dict) and item.get("dimension")
-    }
-    normalized_dimensions = []
-    for dimension, definition in dimension_by_name.items():
-        candidate = raw_dimensions.get(dimension)
-        if candidate is None and not blank_answer:
-            raise ValueError(f"批改结果缺少 {dimension} 维度得分")
-        try:
-            score = 0.0 if blank_answer else float(candidate.get("score"))
-        except (TypeError, ValueError):
-            raise ValueError(f"{dimension} 维度得分不是有效数字")
-        if score != score or score < 0 or score > definition["max_score"]:
-            raise ValueError(f"{dimension} 维度得分超出有效范围")
-        normalized_dimensions.append(
+    if scoring_mode == "fenbi_tree":
+        content_score = 0.0 if blank_answer else round(weighted_coverage, 1)
+        normalized_dimensions = [
             {
-                **definition,
-                "score": round(score, 1),
-                "reason": "空白答案。" if blank_answer else _clean(candidate.get("reason"), 300),
+                "dimension": "content",
+                "label": "粉笔踩分树",
+                "max_score": 100.0,
+                "score": round(content_score, 1),
+                "reason": "空白答案。" if blank_answer else "按粉笔踩分树逐点判定。",
             }
-        )
+        ]
+        adjustment_reason = _clean(raw.get("holistic_adjustment_reason"), 360)
+    else:
+        raw_dimensions = {
+            str(item.get("dimension") or ""): item
+            for item in (raw.get("dimension_scores") or [])
+            if isinstance(item, dict) and item.get("dimension")
+        }
+        normalized_dimensions = []
+        for dimension, definition in dimension_by_name.items():
+            candidate = raw_dimensions.get(dimension)
+            if candidate is None and not blank_answer:
+                raise ValueError(f"批改结果缺少 {dimension} 维度得分")
+            try:
+                score = 0.0 if blank_answer else float(candidate.get("score"))
+            except (TypeError, ValueError):
+                raise ValueError(f"{dimension} 维度得分不是有效数字")
+            if score != score or score < 0 or score > definition["max_score"]:
+                raise ValueError(f"{dimension} 维度得分超出有效范围")
+            normalized_dimensions.append(
+                {
+                    **definition,
+                    "score": round(score, 1),
+                    "reason": "空白答案。" if blank_answer else _clean(candidate.get("reason"), 300),
+                }
+            )
 
-    content_score = next(
-        (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
-        0.0,
-    )
-    adjustment_reason = _clean(raw.get("holistic_adjustment_reason"), 360)
-    if not blank_answer and scoring_mode == "point_based":
-        content_score = min(content_weight, weighted_coverage)
-        for dimension in normalized_dimensions:
-            if dimension["dimension"] == "content":
-                dimension["score"] = round(content_score, 1)
-                dimension["reason"] = _clean(
-                    dimension.get("reason") or "内容分由原子采分点逐点累加确定（命中全分、部分命中半分、未命中零分）。",
-                    300,
-                )
-                break
+        content_score = next(
+            (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
+            0.0,
+        )
+        adjustment_reason = _clean(raw.get("holistic_adjustment_reason"), 360)
+        if not blank_answer and scoring_mode == "point_based":
+            content_score = min(content_weight, weighted_coverage)
+            for dimension in normalized_dimensions:
+                if dimension["dimension"] == "content":
+                    dimension["score"] = round(content_score, 1)
+                    dimension["reason"] = _clean(
+                        dimension.get("reason") or "内容分由原子采分点逐点累加确定（命中全分、部分命中半分、未命中零分）。",
+                        300,
+                    )
+                    break
 
     valid_evidence_ids = {card.get("evidence_id") for card in evidence if card.get("role") == "personalization"}
     history_stable = (
@@ -378,33 +391,44 @@ def validate_grading_result(
             )
 
     raw_score = round(sum(item["score"] for item in normalized_dimensions), 1)
-    score, score_calibration = apply_score_calibration(raw_score, calibration_policy)
-    if blank_answer:
-        score = 0.0
-        score_calibration["adjustment"] = 0.0
-    if raw_score > 0 and score != raw_score:
-        remaining = round(score - raw_score, 1)
-        if remaining < 0:
-            total = sum(item["score"] for item in normalized_dimensions) or 1
-            for dimension in normalized_dimensions:
-                share = remaining * dimension["score"] / total
-                dimension["score"] = round(max(0.0, dimension["score"] + share), 1)
-        else:
-            headroom = sum(item["max_score"] - item["score"] for item in normalized_dimensions) or 1
-            for dimension in normalized_dimensions:
-                share = remaining * (dimension["max_score"] - dimension["score"]) / headroom
-                dimension["score"] = round(min(dimension["max_score"], dimension["score"] + share), 1)
-        difference = round(score - sum(item["score"] for item in normalized_dimensions), 1)
-        if difference:
-            for dimension in normalized_dimensions:
-                candidate = round(dimension["score"] + difference, 1)
-                if 0 <= candidate <= dimension["max_score"]:
-                    dimension["score"] = candidate
-                    break
-        content_score = next(
-            (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
-            0.0,
-        )
+    if scoring_mode == "fenbi_tree":
+        score = 0.0 if blank_answer else round(weighted_coverage, 1)
+        score_calibration = {
+            "raw_score": round(score, 1),
+            "score": round(score, 1),
+            "adjustment": 0.0,
+            "calibrated": False,
+            "reason": "粉笔踩分树逐点判分，不做整体校准。",
+        }
+        content_score = score
+    else:
+        score, score_calibration = apply_score_calibration(raw_score, calibration_policy)
+        if blank_answer:
+            score = 0.0
+            score_calibration["adjustment"] = 0.0
+        if raw_score > 0 and score != raw_score:
+            remaining = round(score - raw_score, 1)
+            if remaining < 0:
+                total = sum(item["score"] for item in normalized_dimensions) or 1
+                for dimension in normalized_dimensions:
+                    share = remaining * dimension["score"] / total
+                    dimension["score"] = round(max(0.0, dimension["score"] + share), 1)
+            else:
+                headroom = sum(item["max_score"] - item["score"] for item in normalized_dimensions) or 1
+                for dimension in normalized_dimensions:
+                    share = remaining * (dimension["max_score"] - dimension["score"]) / headroom
+                    dimension["score"] = round(min(dimension["max_score"], dimension["score"] + share), 1)
+            difference = round(score - sum(item["score"] for item in normalized_dimensions), 1)
+            if difference:
+                for dimension in normalized_dimensions:
+                    candidate = round(dimension["score"] + difference, 1)
+                    if 0 <= candidate <= dimension["max_score"]:
+                        dimension["score"] = candidate
+                        break
+            content_score = next(
+                (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
+                0.0,
+            )
 
     review_reasons = []
     for match in matches:

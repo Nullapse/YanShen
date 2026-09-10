@@ -21,6 +21,7 @@ from gongkao.grading_pipeline.orchestration import (
     validate_grading_result,
     validate_rubric,
 )
+from gongkao.grading_pipeline.rubric import build_fenbi_tree_rubric, fenbi_tree_available
 from gongkao.statistics import build_training_statistics
 from tests.asset_bundle import (
     read_server_application,
@@ -1276,6 +1277,75 @@ class SmartGradingTest(unittest.TestCase):
         self.assertIn("待重新批改", server_source)
         self.assertIn(".grading-score-overview", stylesheet)
         self.assertIn(".grading-dimension-card", stylesheet)
+
+    def test_fenbi_score_tree_rubric_scores_by_official_points(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path, question_id, attempt_id, reference_ids = self.make_database(directory)
+            with connect(path) as conn:
+                conn.execute(
+                    "UPDATE reference_answers SET score_tree_json = ? WHERE id = ?",
+                    (
+                        json.dumps(
+                            {
+                                "name": "得分分析",
+                                "full_mark": 20,
+                                "children": [
+                                    {"id": 1, "name": "线上课堂", "full_mark": 14, "children": []},
+                                    {"id": 2, "name": "政策宣传", "full_mark": 6, "children": []},
+                                ],
+                            },
+                            ensure_ascii=False,
+                        ),
+                        reference_ids[0],
+                    ),
+                )
+                conn.execute(
+                    "UPDATE questions SET prompt = prompt || '（20分）' WHERE id = ?",
+                    (question_id,),
+                )
+                question = conn.execute("SELECT * FROM questions WHERE id = ?", (question_id,)).fetchone()
+                references = conn.execute(
+                    "SELECT * FROM reference_answers WHERE question_id = ? ORDER BY id",
+                    (question_id,),
+                ).fetchall()
+            self.assertTrue(fenbi_tree_available(references))
+            rubric = build_fenbi_tree_rubric(question, references)
+            self.assertEqual(rubric["scoring_mode"], "fenbi_tree")
+            self.assertEqual(sum(point["display_weight"] for point in rubric["points"]), 20)
+
+            matches = [
+                {
+                    "point_key": point["point_key"],
+                    "status": "hit",
+                    "score_level": "full",
+                    "answer_quote": point["label"],
+                    "reason": "完整覆盖",
+                }
+                for point in rubric["points"]
+            ]
+            raw = {
+                "evaluation": {
+                    "point_matches": matches,
+                    "dimension_scores": [{"dimension": "content", "score": 0, "reason": ""}],
+                    "holistic_adjustment_reason": "",
+                    "annotations": [],
+                    "redundancies": [],
+                    "reference_fusion": "",
+                    "material_reading": [],
+                    "optimization_suggestions": [],
+                    "personalized_findings": [],
+                    "summary": {},
+                }
+            }
+            result = validate_grading_result(
+                raw,
+                rubric,
+                "数字平台让村民办事更加方便，政策查询更加及时。",
+                [],
+                calibration_policy=None,
+            )
+            self.assertAlmostEqual(result["score"], 100.0)
+            self.assertAlmostEqual(result["display_score"], 20.0)
 
     def test_schema3_database_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
