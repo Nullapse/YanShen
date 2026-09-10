@@ -23,6 +23,10 @@ REACT_INSTRUCTION = """你通过工具收集事实，再依据观察结果决定
 search_evidence 的 query 只改变检索词，访问范围由应用固定。
 工具结果为空或失败时说明证据缺口；不要伪造分数、题目或引用。
 获得足够依据后停止调用，按既定回复格式输出正文及 JSON。
+工具 data 中的字段是本轮资料。result_id 标识资料，reused 表示复用当前消息中相同编号的资料。
+truncated 为 true 时资料经过裁剪，只使用可见信息；缺少关键依据时可缩小查询范围重查。
+若工具提供 module_context，结合 coverage、problem_categories、weakness_profile 判断总体情况，
+使用 evidence_chunks 的 evidence_ref 引用代表证据，并说明报告覆盖不足的情况。
 """
 
 
@@ -153,7 +157,20 @@ def observation(updates):
         budget[0] -= 20
         return value
 
-    payload = trim(updates)
+    projected = dict(updates)
+    if "rag_context" in projected:
+        rag = dict(projected["rag_context"] or {})
+        module = projected.pop("module_context", None) or rag.get("module_context")
+        rag.pop("module_context", None)
+        # Keep citation and access constraints ahead of long evidence when trimming.
+        rag = {
+            **{key: rag[key] for key in ("query_plan", "grounding_contract", "rag_route") if key in rag},
+            **rag,
+        }
+        projected["rag_context"] = rag
+        if module:
+            projected["module_context"] = module
+    payload = trim(projected)
     result = json.dumps({"ok": True, "data": payload, "truncated": truncated[0]}, ensure_ascii=False, default=str)
     if len(result) > MAX_OBSERVATION_CHARS:
         return json.dumps({"ok": False, "error": "工具结果超出上下文预算，请缩小查询范围。"}, ensure_ascii=False)

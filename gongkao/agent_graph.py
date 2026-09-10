@@ -5,11 +5,11 @@ import time
 from contextlib import ExitStack
 from typing import Any, Dict, TypedDict
 
+from .agent_context import pack_messages, receipt, result_id, stable_prefix
 from .agent_modules import classify_module_heuristic
 from .agent_prompts import (
     AGENT_PROMPT_VERSION,
     build_agent_messages,
-    build_module_messages,
     wants_concise_response,
     with_conversation_history,
     with_long_term_memories,
@@ -70,6 +70,10 @@ class AgentState(TypedDict, total=False):
     deadline: float
     pending_calls: list[Dict[str, Any]]
     tool_cache: Dict[str, Any]
+    base_messages: list[Any]
+    result_store: Dict[str, str]
+    message_fingerprints: list[str]
+    prefix_history_removed: int
     stop_reason: str
 
 
@@ -214,6 +218,16 @@ def _response_usage(response):
                 break
     if "total_tokens" not in normalized and normalized:
         normalized["total_tokens"] = normalized.get("input_tokens", 0) + normalized.get("output_tokens", 0)
+    metadata = getattr(response, "response_metadata", None) or {}
+    raw = metadata.get("token_usage") or metadata.get("usage") or {}
+    details = usage.get("input_token_details") or {}
+    raw_details = raw.get("prompt_tokens_details") or usage.get("prompt_tokens_details") or {}
+    cached = details.get("cache_read", raw_details.get("cached_tokens", raw.get("prompt_cache_hit_tokens")))
+    if type(cached) is int and cached >= 0:
+        normalized["cached_input_tokens"] = cached
+        total = normalized.get("input_tokens", 0)
+        if total > 0 and cached <= total:
+            normalized["cache_hit_ratio"] = round(cached / total, 4)
     return normalized
 
 
@@ -324,9 +338,26 @@ def _graph_for(settings, db_path, stack=None):
         plan = normalize_query_plan(
             None, state.get("user_goal", ""), state["task_type"], state.get("subject_ids") or [], module
         )
+        messages = build_agent_messages(
+            state["task_type"], state.get("user_goal", ""), {}, [], {}, {}, _response_style(state)
+        )
+        messages[0] = ("system", messages[0][1] + "\n" + REACT_INSTRUCTION)
+        messages[-1] = ("human", messages[-1][1] + "\n本轮范围：" + json.dumps(plan, ensure_ascii=False))
+        messages = with_conversation_history(
+            messages,
+            state.get("conversation_messages") or [],
+            state.get("conversation_summary") or "",
+            state.get("user_goal") or "",
+        )
+        messages = with_long_term_memories(messages, state.get("long_term_memories") or [])
+        prefix, removed = stable_prefix(messages, tool_specs({**state, "context_plan": {"rag_query_plan": plan}}))
         return {
             "module": module,
             "context_plan": {"module": module, "rag_query_plan": plan},
+            "base_messages": prefix,
+            "prefix_history_removed": removed,
+            "result_store": {},
+            "message_fingerprints": [],
             "react_messages": [],
             "pending_calls": [],
             "model_calls": 0,
@@ -343,43 +374,22 @@ def _graph_for(settings, db_path, stack=None):
                 "final_text": "本轮分析达到运行预算，请缩小问题范围后重试。",
                 "stop_reason": "budget",
             }
-        if state.get("module_context"):
-            messages = build_module_messages(
-                state.get("user_goal", ""),
-                state.get("user_context", {}),
-                state["module_context"],
-                state.get("rag_context", {}),
-                _response_style(state),
-            )
-        else:
-            messages = build_agent_messages(
-                state["task_type"],
-                state.get("user_goal", ""),
-                state.get("user_context", {}),
-                state.get("candidate_questions", []),
-                state.get("review_context", {}),
-                state.get("rag_context", {}),
-                _response_style(state),
-            )
-        messages = with_conversation_history(
-            messages,
-            state.get("conversation_messages") or [],
-            state.get("conversation_summary") or "",
-            state.get("user_goal") or "",
-        )
-        messages = with_long_term_memories(messages, state.get("long_term_memories") or [])
         final_round = state["model_calls"] == MAX_MODEL_CALLS - 1 or state["tool_calls_count"] >= MAX_TOOL_CALLS
-        messages.insert(
-            1,
-            (
-                "system",
-                REACT_INSTRUCTION
-                + ("\n已到最后一轮，请依据现有资料回复并明确证据缺口，停止调用工具。" if final_round else ""),
-            ),
+        specs = tool_specs(state)
+        messages, context_metrics = pack_messages(
+            state["base_messages"], state["react_messages"], specs, state["result_store"], final_round
         )
-        messages.extend(state["react_messages"])
+        fingerprints = context_metrics.pop("message_fingerprints")
+        previous = state.get("message_fingerprints") or []
+        shared = 0
+        for old, new in zip(previous, fingerprints):
+            if old != new:
+                break
+            shared += 1
+        context_metrics.update(shared_prefix_messages=shared, prefix_history_removed=state["prefix_history_removed"])
+        started = time.monotonic()
         try:
-            response = llm.bind_tools(tool_specs(state), tool_choice="none" if final_round else "auto").invoke(
+            response = llm.bind_tools(specs, tool_choice="none" if final_round else "auto").invoke(
                 messages, timeout=min(45, remaining)
             )
         except Exception as exc:
@@ -402,11 +412,14 @@ def _graph_for(settings, db_path, stack=None):
                 "tool_names": [c.get("name") for c in calls],
                 "token_usage": _response_usage(response),
                 "prompt_version": AGENT_PROMPT_VERSION,
+                "context": context_metrics,
+                "latency_ms": round((time.monotonic() - started) * 1000),
             },
         )
         update = {
             "react_messages": [*state["react_messages"], response],
             "model_calls": state["model_calls"] + 1,
+            "message_fingerprints": fingerprints,
             "pending_calls": calls,
         }
         if calls and not final_round:
@@ -435,6 +448,7 @@ def _graph_for(settings, db_path, stack=None):
         working = dict(state)
         transcript = list(state["react_messages"])
         cache = dict(state["tool_cache"])
+        store = dict(state["result_store"])
         count = state["tool_calls_count"]
         updates = {}
         for call in state["pending_calls"]:
@@ -456,12 +470,15 @@ def _graph_for(settings, db_path, stack=None):
                 try:
                     # Cache updates as well as observations so revisiting a query restores its evidence contract.
                     if key in cache:
-                        change, result = cache[key]
+                        change, identifier = cache[key]
+                        result = store[identifier]
                         status = "cached"
                     else:
                         change = execute_tool(working, name, args)
                         result = observation(change)
-                        cache[key] = (change, result)
+                        identifier = result_id(result)
+                        store[identifier] = result
+                        cache[key] = (change, identifier)
                     working.update(change)
                     updates.update(change)
                 except ValueError as exc:
@@ -472,16 +489,20 @@ def _graph_for(settings, db_path, stack=None):
                         {"ok": False, "error": "工具读取失败，可调整查询或说明资料暂不可用。"}, ensure_ascii=False
                     )
                     status = "error"
-            transcript.append(ToolMessage(content=result, tool_call_id=call["id"], name=name))
+            identifier = result_id(result)
+            store[identifier] = result
+            transcript.append(ToolMessage(content=receipt(identifier), tool_call_id=call["id"], name=name))
             _record_step(
                 state["db_path"],
                 state["run_id"],
                 "tool",
                 name,
                 {"call_id": call["id"], "arguments": args},
-                {"status": status, "observation": result},
+                {"status": status, "result_id": identifier, "observation_chars": len(result)},
             )
-        updates.update(react_messages=transcript, tool_calls_count=count, tool_cache=cache, pending_calls=[])
+        updates.update(
+            react_messages=transcript, tool_calls_count=count, tool_cache=cache, result_store=store, pending_calls=[]
+        )
         return updates
 
     def persist_node(state):
