@@ -17,6 +17,7 @@ def call(name="load_user_context", args=None, identifier="c1"):
 
 class ReactGraphTests(unittest.TestCase):
     def run_graph(self, responses, execute=None, **overrides):
+        prepared = overrides.pop("prepared", ({}, {}))
         client = Mock()
         client.bind_tools.return_value = client
         client.invoke.side_effect = responses
@@ -36,6 +37,7 @@ class ReactGraphTests(unittest.TestCase):
             patch("gongkao.agent_graph.connect", return_value=nullcontext(Mock())),
             patch("gongkao.agent_graph.complete_run") as complete,
             patch("gongkao.agent_graph._record_step"),
+            patch("gongkao.agent_graph.prepare_selected_evidence", return_value=prepared),
             patch(
                 "gongkao.agent_graph.execute_tool",
                 side_effect=execute or (lambda s, n, a: {"user_context": {"summary": {"attempt_count": 2}}}),

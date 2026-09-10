@@ -24,6 +24,7 @@ from .agent_react import (
     observation,
     tool_specs,
 )
+from .agent_selected import prepare_selected_evidence
 from .agent_store import add_step, complete_run, create_run, fail_run
 from .agent_tools import (
     input_summary,
@@ -73,7 +74,9 @@ class AgentState(TypedDict, total=False):
     evidence_catalog: Dict[str, Any]
     search_observation: Dict[str, Any]
     source_detail: Dict[str, Any]
+    selected_evidence: Dict[str, Any]
     base_messages: list[Any]
+    tool_definitions: list[Any]
     result_store: Dict[str, str]
     message_fingerprints: list[str]
     prefix_history_removed: int
@@ -337,10 +340,17 @@ def _graph_for(settings, db_path, stack=None):
     )
 
     def prepare_node(state):
+        deadline = time.monotonic() + MAX_RUN_SECONDS
         module = classify_module_heuristic(state.get("user_goal", ""), state.get("module", ""))
         plan = normalize_query_plan(
             None, state.get("user_goal", ""), state["task_type"], state.get("subject_ids") or [], module
         )
+        selected, catalog = {}, {}
+        if plan.get("scope") == "current_attempt" and state.get("subject_ids"):
+            with connect(state["db_path"]) as conn:
+                selected, catalog = prepare_selected_evidence(
+                    conn, {**state, "module": module, "context_plan": {"rag_query_plan": plan}}
+                )
         messages = build_agent_messages(
             state["task_type"],
             state.get("user_goal", ""),
@@ -349,9 +359,11 @@ def _graph_for(settings, db_path, stack=None):
             {},
             {"rag_route": route_from_plan(plan)},
             _response_style(state),
+            system_suffix=REACT_INSTRUCTION,
         )
-        messages[0] = ("system", messages[0][1] + "\n" + REACT_INSTRUCTION)
         messages[-1] = ("human", messages[-1][1] + "\n本轮范围：" + json.dumps(plan, ensure_ascii=False))
+        if selected:
+            messages[-1] = ("human", messages[-1][1] + "\n已选对象的原文资料：" + json.dumps(selected, ensure_ascii=False))
         messages = with_conversation_history(
             messages,
             state.get("conversation_messages") or [],
@@ -359,12 +371,15 @@ def _graph_for(settings, db_path, stack=None):
             state.get("user_goal") or "",
         )
         messages = with_long_term_memories(messages, state.get("long_term_memories") or [])
-        prefix, removed = stable_prefix(messages, tool_specs({**state, "context_plan": {"rag_query_plan": plan}}))
+        specs = tool_specs({**state, "module": module, "context_plan": {"rag_query_plan": plan}})
+        prefix, removed = stable_prefix(messages, specs)
         return {
             "module": module,
             "context_plan": {"module": module, "rag_query_plan": plan},
-            "evidence_catalog": {},
+            "evidence_catalog": catalog,
+            "selected_evidence": selected,
             "base_messages": prefix,
+            "tool_definitions": specs,
             "prefix_history_removed": removed,
             "result_store": {},
             "message_fingerprints": [],
@@ -373,7 +388,7 @@ def _graph_for(settings, db_path, stack=None):
             "model_calls": 0,
             "tool_calls_count": 0,
             "tool_cache": {},
-            "deadline": time.monotonic() + MAX_RUN_SECONDS,
+            "deadline": deadline,
         }
 
     def model_node(state):
@@ -385,7 +400,7 @@ def _graph_for(settings, db_path, stack=None):
                 "stop_reason": "budget",
             }
         final_round = state["model_calls"] == MAX_MODEL_CALLS - 1 or state["tool_calls_count"] >= MAX_TOOL_CALLS
-        specs = tool_specs(state)
+        specs = state["tool_definitions"]
         messages, context_metrics = pack_messages(
             state["base_messages"], state["react_messages"], specs, state["result_store"], final_round
         )

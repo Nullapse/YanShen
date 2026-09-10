@@ -90,3 +90,38 @@ class ContextTests(unittest.TestCase):
         self.assertEqual(second, third[: len(second)])
         self.assertEqual(sum(m.content.count("UNIQUE_DATA_MARKER") for m in third), 1)
         self.assertEqual(tool.call_count, 1)
+
+    def test_static_instructions_precede_changed_task_data(self):
+        from gongkao.agent_prompts import build_agent_messages
+
+        first = build_agent_messages("diagnosis", "分析概括", {"marker": "first-user"}, [], {},
+                                     {"marker": "first-rag"})
+        second = build_agent_messages("diagnosis", "分析表达", {"marker": "second-user"}, [], {},
+                                      {"marker": "second-rag"})
+        self.assertEqual(first[0], second[0])
+        self.assertIn("RAG 证据约束", first[0][1])
+        self.assertIn("回复末尾附上如下 JSON", first[0][1])
+        self.assertNotIn("first-user", first[0][1])
+        self.assertIn("first-user", first[-1][1])
+        self.assertIn("first-rag", first[-1][1])
+        self.assertNotEqual(first[-1], second[-1])
+
+    def test_changing_tool_context_only_appends_after_frozen_prefix(self):
+        responses = [
+            AIMessage(content="", tool_calls=[call(identifier="a")]),
+            AIMessage(content="", tool_calls=[call("search_evidence", {"query": "遗漏"}, "b")]),
+            AIMessage(content="完成"),
+        ]
+        def execute(state, name, args):
+            if name == "load_user_context":
+                return {"user_context": {"marker": "CONTEXT_A"}}
+            return {"rag_context": {"marker": "CONTEXT_B"}}
+
+        _, client, _, _ = test_agent_react.ReactGraphTests().run_graph(responses, execute=execute)
+        requests = [item.args[0] for item in client.invoke.call_args_list]
+        self.assertEqual(requests[0], requests[1][:len(requests[0])])
+        self.assertEqual(requests[1], requests[2][:len(requests[1])])
+        self.assertTrue(all("CONTEXT_A" not in request[0].content for request in requests))
+        self.assertEqual(sum(m.content.count("CONTEXT_B") for m in requests[2]), 1)
+        schemas = [item.args[0] for item in client.bind_tools.call_args_list]
+        self.assertTrue(all(schema == schemas[0] for schema in schemas))

@@ -1064,7 +1064,7 @@ class AgentSystemTest(unittest.TestCase):
             {},
             {"rag_route": "writing_guidance", "evidence_cards": [{"evidence_id": "knowledge:writing_guidance"}]},
         )
-        prompt = messages[-1][1]
+        prompt = messages[0][1]
         self.assertIn("写法讲解", prompt)
         self.assertIn("不要套训练诊断报告结构", prompt)
         self.assertIn("不得给题目编号编造网址", build_agent_messages("diagnosis", "推荐一道题", {}, [], {}, {})[0][1])

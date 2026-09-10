@@ -1,6 +1,6 @@
 import json
 
-AGENT_PROMPT_VERSION = "agent-prompts-v8-two-stage-evidence"
+AGENT_PROMPT_VERSION = "agent-prompts-v9-selected-direct"
 
 
 AGENT_SYSTEM_PROMPT = """你是“研申”里的 AI 训练教练。
@@ -11,12 +11,12 @@ AGENT_SYSTEM_PROMPT = """你是“研申”里的 AI 训练教练。
 避免使用“不是……而是……”及同类对照句式，直接陈述事实、作用和建议。
 1. 只能依据输入上下文判断，不要编造题库里不存在的题目、报告或分数。
 2. 推荐题目必须使用 candidate_questions 中的题目 ID 和标题。
-3. 引用证据时必须优先标注 rag_context.evidence_cards 中的 evidence_id；没有证据时要明确说“证据不足”。
+3. 引用证据时标注当前可见原文或证据卡的 evidence_id；没有证据时要明确说“证据不足”。
 4. 本题复盘必须区分材料遗漏、采分点遗漏、结构表达问题和下一次训练动作。
 5. 输出要具体、克制、可执行，不要写空泛鼓励。
 6. 如果上下文不足，说明缺口，并给出下一步应收集的数据。
 7. 回复末尾必须附一个 agent_response_v1 JSON 代码块，便于系统渲染和评测。
-8. 不得引用 grounding_contract.allowed_evidence_ids 之外的 evidence_id。
+8. 引用范围为当前可见预载 sources、工具 source_detail 及检索 grounding_contract.allowed_evidence_ids；不得编造编号。
 9. 不得给题目编号编造网址或输出外部 Markdown 链接；题目和证据只写上下文中的 question_code、question_id 或 evidence_id，由系统生成本地链接。
 10. 引用知识卡时不要写知识库品牌、来源文件名或内部检索说明；只保留对应 evidence_id，界面会将其转换成可读的知识卡标题。
 """
@@ -117,7 +117,7 @@ RESPONSE_POLICY_INSTRUCTION = """通用回复策略：
 - 如果用户问“练什么/推荐题”，先给推荐顺序，再给理由和使用方式。
 - 如果用户要求“整理笔记/汇总注意事项/避坑清单”，只整理 personal_note 相关证据，输出可执行清单；不要夹带作答历史诊断、批改报告统计或题目推荐，除非用户明确要求。
 - 如果当前上下文是本题复盘，默认只围绕本题作答、题目材料、参考答案和批改报告回答；不要扩展到全量历史，除非用户明确要求“结合全部历史/长期问题”。
-- 如果 rag_context.grounding_contract.current_attempt_only 为 true，只能使用当前作答相关 evidence_cards，不要做长期训练诊断。
+- 如果 rag_context.grounding_contract.current_attempt_only 为 true，只能使用当前作答相关原文与证据卡，不要做长期训练诊断。
 - 如果 rag_context.rag_route 是 note_organization，回答结构使用：`## 注意事项清单`、`## 高频提醒`、`## 下次作答前检查`、`## 依据笔记`；每条注意事项尽量引用 note 或 notes evidence_id。
 - 如果 rag_context.query_plan.scope 是 notes_only，即使当前线程来自某道题，也只允许依据 personal_note/notes evidence_cards 组织答案，不要退回本题复盘。
 - 如果 rag_context.evidence_sufficiency.level 是 insufficient，先明确说明证据不足，不能给确定性判断，只给“需要补充什么证据”。
@@ -212,10 +212,10 @@ RAG_CONTRACT_INSTRUCTION = """RAG 证据约束：
 
 - rag_context.rag_route 表示本轮检索路由。
 - rag_context.query_plan 表示应用限定的 action、scope 和 sources，回答时要遵守这个证据范围。
-- rag_context.evidence_cards 是唯一可信证据集合。
+- 可用依据包括当前可见的 selected_direct.sources 原文、工具 source_detail 原文页及 rag_context.evidence_cards 证据卡。
 - 每个关键判断必须引用 1 个以上 evidence_id。
 - 不要编造 evidence_id、题目、分数、报告或材料。
-- 如果 evidence_cards 不足以回答，或 evidence_sufficiency.level 不是 sufficient，先说证据缺口，再给下一步应补充的数据；不要硬凑长期结论。
+- 预载原文足够时直接回答，无需为了取得 evidence_cards 重复检索。必要段落缺失、分页未完成或已有资料不足以支持结论时，补读关键来源或说明缺口；不要硬凑长期结论。
 """
 
 
@@ -245,7 +245,10 @@ def is_referential_followup(user_goal=""):
     return any(key in text for key in ("这道", "第二道", "这个问题", "刚才", "那具体", "按你说的", "和上一次", "为什么排"))
 
 
-def build_agent_messages(task_type, user_goal, user_context, candidates, review_context, rag_context=None, response_style=""):
+def build_agent_messages(
+    task_type, user_goal, user_context, candidates, review_context, rag_context=None,
+    response_style="", system_suffix="",
+):
     payload = {
         "task_type": task_type,
         "user_goal": user_goal,
@@ -262,15 +265,15 @@ def build_agent_messages(task_type, user_goal, user_context, candidates, review_
         instruction = WRITING_GUIDANCE_TASK_INSTRUCTION
     else:
         instruction = TASK_INSTRUCTIONS.get(task_type, TASK_INSTRUCTIONS["diagnosis"])
-    user_message = (
-        f"{RESPONSE_POLICY_INSTRUCTION}\n\n{RAG_CONTRACT_INSTRUCTION}\n\n{WRITING_GUIDANCE_INSTRUCTION}\n\n{instruction}\n\n{STRUCTURED_OUTPUT_INSTRUCTION}\n\n"
-        "上下文 JSON：\n"
-        "```json\n"
-        f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n"
-        "```"
-    )
+    # Put reusable instructions before history and all task-dependent data.
+    # The selected task instruction is last, preserving the common prefix across task modes.
+    system_message = "\n\n".join(part for part in (
+        AGENT_SYSTEM_PROMPT, RESPONSE_POLICY_INSTRUCTION, RAG_CONTRACT_INSTRUCTION,
+        WRITING_GUIDANCE_INSTRUCTION, STRUCTURED_OUTPUT_INSTRUCTION, system_suffix, instruction,
+    ) if part)
+    user_message = "上下文 JSON：\n```json\n" + json.dumps(payload, ensure_ascii=False, indent=2) + "\n```"
     return [
-        ("system", AGENT_SYSTEM_PROMPT),
+        ("system", system_message),
         ("human", user_message),
     ]
 
