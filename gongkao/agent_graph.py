@@ -14,7 +14,7 @@ from .agent_prompts import (
     with_conversation_history,
     with_long_term_memories,
 )
-from .agent_rag import normalize_query_plan
+from .agent_rag import normalize_query_plan, route_from_plan
 from .agent_react import (
     MAX_MODEL_CALLS,
     MAX_RUN_SECONDS,
@@ -70,6 +70,9 @@ class AgentState(TypedDict, total=False):
     deadline: float
     pending_calls: list[Dict[str, Any]]
     tool_cache: Dict[str, Any]
+    evidence_catalog: Dict[str, Any]
+    search_observation: Dict[str, Any]
+    source_detail: Dict[str, Any]
     base_messages: list[Any]
     result_store: Dict[str, str]
     message_fingerprints: list[str]
@@ -339,7 +342,13 @@ def _graph_for(settings, db_path, stack=None):
             None, state.get("user_goal", ""), state["task_type"], state.get("subject_ids") or [], module
         )
         messages = build_agent_messages(
-            state["task_type"], state.get("user_goal", ""), {}, [], {}, {}, _response_style(state)
+            state["task_type"],
+            state.get("user_goal", ""),
+            {},
+            [],
+            {},
+            {"rag_route": route_from_plan(plan)},
+            _response_style(state),
         )
         messages[0] = ("system", messages[0][1] + "\n" + REACT_INSTRUCTION)
         messages[-1] = ("human", messages[-1][1] + "\n本轮范围：" + json.dumps(plan, ensure_ascii=False))
@@ -354,6 +363,7 @@ def _graph_for(settings, db_path, stack=None):
         return {
             "module": module,
             "context_plan": {"module": module, "rag_query_plan": plan},
+            "evidence_catalog": {},
             "base_messages": prefix,
             "prefix_history_removed": removed,
             "result_store": {},
@@ -469,7 +479,7 @@ def _graph_for(settings, db_path, stack=None):
                     ).hexdigest()
                 try:
                     # Cache updates as well as observations so revisiting a query restores its evidence contract.
-                    if key in cache:
+                    if key in cache and name != "read_source":
                         change, identifier = cache[key]
                         result = store[identifier]
                         status = "cached"
@@ -479,6 +489,11 @@ def _graph_for(settings, db_path, stack=None):
                         identifier = result_id(result)
                         store[identifier] = result
                         cache[key] = (change, identifier)
+                    if "evidence_catalog" in change:
+                        change = {
+                            **change,
+                            "evidence_catalog": {**working.get("evidence_catalog", {}), **change["evidence_catalog"]},
+                        }
                     working.update(change)
                     updates.update(change)
                 except ValueError as exc:

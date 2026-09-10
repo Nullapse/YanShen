@@ -154,6 +154,10 @@ def normalize_query_plan(plan=None, user_goal="", task_type="diagnosis", subject
     if referential_followup and module in {"summary", "analysis", "countermeasure", "document", "essay", "top_loss", "improvement"} and not explicit_module_change:
         normalized["module"] = module
     writing_guidance_requested = _wants_guidance(user_goal)
+    if task_type == "review" and subject_ids and any(
+        marker in (user_goal or "") for marker in ("本题", "这题", "这道", "这份", "我的答案", "复盘", "改写", "润色")
+    ) and not any(marker in (user_goal or "") for marker in ("只讲方法", "不看作答", "通用方法")):
+        writing_guidance_requested = False
     explicit_note_organization = _wants_note_organization(user_goal)
     history_expansion_requested = any(
         key in (user_goal or "")
@@ -408,13 +412,13 @@ def cards_from_review_context(review_context, rag_route):
                     attempt_id=attempt_id,
                     supports=supports + ["structure_judgement", "rewrite_attempt"],
                     confidence=0.82,
-                    metadata={"material_number": number},
+                    metadata={"material_number": number, "source_id": material.get("id")},
                 )
             )
         for index, report in enumerate(item.get("reports") or [], start=1):
             cards.append(
                 make_card(
-                    f"report:{attempt_id}:{index}",
+                    f"grading_report:{report['id']}" if report.get("id") else f"report:{attempt_id}:{index}",
                     "grading_report",
                     f"批改报告 {index}",
                     report.get("report_text", ""),
@@ -423,13 +427,13 @@ def cards_from_review_context(review_context, rag_route):
                     attempt_id=attempt_id,
                     supports=supports + ["loss_analysis", "rewrite_attempt"],
                     confidence=0.88,
-                    metadata={"provider": report.get("provider"), "model": report.get("model")},
+                    metadata={"provider": report.get("provider"), "model": report.get("model"), "source_id": report.get("id")},
                 )
             )
         for index, reference in enumerate(item.get("references") or [], start=1):
             cards.append(
                 make_card(
-                    f"reference:{question_id}:{index}",
+                    f"reference_answer:{reference['id']}" if reference.get("id") else f"reference:{question_id}:{index}",
                     "reference_answer",
                     f"参考答案 {reference.get('organization', index)}",
                     "\n".join([reference.get("answer_text", ""), reference.get("scoring_points", "")]),
@@ -438,6 +442,7 @@ def cards_from_review_context(review_context, rag_route):
                     attempt_id=attempt_id,
                     supports=supports + ["rewrite_attempt"],
                     confidence=0.78,
+                    metadata={"source_id": reference.get("id")},
                 )
             )
     return cards
@@ -503,7 +508,7 @@ def cards_from_module_context(module_context):
             )
         )
     for chunk in module_context.get("evidence_chunks") or []:
-        evidence_id = _normalize_evidence_id(chunk.get("evidence_ref"), chunk.get("source_type"), chunk.get("source_id"))
+        evidence_id = f"{chunk['source_type']}:{chunk['source_id']}" if chunk.get("source_id") is not None else _normalize_evidence_id(chunk.get("evidence_ref"), chunk.get("source_type"), chunk.get("source_id"))
         cards.append(
             make_card(
                 evidence_id,
@@ -515,7 +520,7 @@ def cards_from_module_context(module_context):
                 attempt_id=chunk.get("attempt_id"),
                 supports=supports,
                 confidence=(chunk.get("retrieval") or {}).get("rerank_score") or 0.76,
-                metadata={"score": chunk.get("score"), "retrieval": chunk.get("retrieval") or {}},
+                metadata={"source_id": chunk.get("source_id"), "score": chunk.get("score"), "retrieval": chunk.get("retrieval") or {}},
             )
         )
     return cards

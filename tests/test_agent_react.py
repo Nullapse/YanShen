@@ -145,7 +145,7 @@ class ToolContractTests(unittest.TestCase):
     def test_current_attempt_scope_does_not_offer_global_queries(self):
         state = {"subject_ids": [7], "context_plan": {"rag_query_plan": {"scope": "current_attempt"}}}
         names = {t["function"]["name"] for t in tool_specs(state)}
-        self.assertEqual(names, {"review_current_attempts", "search_evidence"})
+        self.assertEqual(names, {"review_current_attempts", "search_evidence", "read_source"})
         with self.assertRaises(ValueError):
             validate_call(state, "load_user_context", {})
         with self.assertRaises(ValueError):
@@ -153,7 +153,7 @@ class ToolContractTests(unittest.TestCase):
 
     def test_notes_only_scope(self):
         state = {"subject_ids": [7], "context_plan": {"rag_query_plan": {"scope": "notes_only"}}}
-        self.assertEqual([t["function"]["name"] for t in tool_specs(state)], ["search_evidence"])
+        self.assertEqual([t["function"]["name"] for t in tool_specs(state)], ["search_evidence", "read_source"])
 
     def test_limits_and_unknown_fields_validated_before_database(self):
         for args in ({"limit": True}, {"limit": 9}, {"limit": 0}, {"limit": 2, "db_path": "other"}, {}):
@@ -179,6 +179,7 @@ class ToolContractTests(unittest.TestCase):
         with (
             patch("gongkao.agent_react.connect", return_value=nullcontext(Mock())),
             patch("gongkao.agent_react.build_rag_context", return_value={}) as build,
+            patch("gongkao.agent_react.get_attempts_review_context", return_value={}),
         ):
             execute_tool(state, "search_evidence", {"query": "分析全部历史"})
         self.assertEqual(build.call_args.args[2], "复盘这道题")

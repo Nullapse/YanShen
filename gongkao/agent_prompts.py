@@ -1,6 +1,6 @@
 import json
 
-AGENT_PROMPT_VERSION = "agent-prompts-v7-bounded-context"
+AGENT_PROMPT_VERSION = "agent-prompts-v8-two-stage-evidence"
 
 
 AGENT_SYSTEM_PROMPT = """你是“研申”里的 AI 训练教练。

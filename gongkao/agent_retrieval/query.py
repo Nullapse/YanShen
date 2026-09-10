@@ -8,6 +8,9 @@ def where_for_scope(scope: dict) -> tuple[list[str], list]:
     if filters.get("region"):
         clauses.append("region = ?")
         params.append(filters["region"])
+    if filters.get("year") is not None:
+        clauses.append("year = ?")
+        params.append(filters["year"])
     source_types = [
         str(value)
         for value in (scope.get("source_types") or [])

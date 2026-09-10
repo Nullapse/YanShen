@@ -133,6 +133,9 @@ def retrieve_candidates(conn, filters=None, limit=8):
     if exclude_question_type:
         clauses.append("q.question_type <> ?")
         params.append(exclude_question_type)
+    if filters.get("year") is not None:
+        clauses.append("q.year = ?")
+        params.append(filters["year"])
     if region:
         clauses.append("q.region = ?")
         params.append(region)
@@ -189,7 +192,7 @@ def get_attempt_review_context(conn, attempt_id):
         (attempt["question_id"],),
     ).fetchone()
     references = conn.execute(
-        "SELECT organization, answer_text, scoring_points FROM reference_answers WHERE question_id = ? ORDER BY organization LIMIT 6",
+        "SELECT id, organization, answer_text, scoring_points FROM reference_answers WHERE question_id = ? ORDER BY organization LIMIT 6",
         (question["id"],),
     ).fetchall()
     materials = conn.execute(
@@ -231,6 +234,7 @@ def get_attempt_review_context(conn, attempt_id):
         },
         "materials": [
             {
+                "id": row["id"],
                 "material_number": row["material_number"],
                 "title": row["title"],
                 "content": _clip(row["content"], 900),
@@ -239,6 +243,7 @@ def get_attempt_review_context(conn, attempt_id):
         ],
         "references": [
             {
+                "id": row["id"],
                 "organization": row["organization"],
                 "answer_text": _clip(row["answer_text"], 700),
                 "scoring_points": _clip(row["scoring_points"], 500),
@@ -247,6 +252,7 @@ def get_attempt_review_context(conn, attempt_id):
         ],
         "reports": [
             {
+                "id": row["id"],
                 "provider": row["provider"],
                 "model": row["model"],
                 "created_at": format_beijing_time(row["created_at"]),

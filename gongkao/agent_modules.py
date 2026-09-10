@@ -95,6 +95,7 @@ def build_analysis_scope(user_goal="", module_id="overview", filters=None):
         "filters": filters,
         "scope": "recent" if recent_limit else "all",
         "recent_limit": recent_limit,
+        "source_types": filters.get("source_types") or [],
         "required_sources": ["stats", "attempts", "reports", "notes", "questions", "references", "materials"],
     }
 
