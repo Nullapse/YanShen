@@ -214,12 +214,14 @@ def build_rubric_prompt(question, materials, references, consensus):
     {{
       "label": "简短采分点名",
       "canonical_expression": "规范表达",
+      "core_mechanism": "该小点的核心动作机制与动宾要义（考生表述机制一致即可得分，不拘泥于特定字面）",
       "aliases": ["同义表达"],
       "tier": "core|material_core|supporting|disputed",
       "importance": "critical|major|supporting",
       "suggested_weight": 0.0,
       "weight_reason": "该点相对权重的材料与任务依据",
       "coverage_role": "required|alternative|bonus",
+      "is_structural": false,
       "alternative_group": "同组替代论据标识；无则为空",
       "required_for_full_score": true,
       "required_elements": ["该点不可缺少的语义成分"],
@@ -240,9 +242,9 @@ def build_rubric_prompt(question, materials, references, consensus):
 4. 只有一份参考答案或参考答案存在遗漏/偏差时，坚决以材料原文为准，把材料直接确认的点标为 material_core。评分基准以 AI 自主推导的材料原词为准，不得盲从有缺陷的参考答案。
 5. 评分基准必须能在题目字数预算内完成。先提炼“为完成题目任务不可缺少的语义”，再把例子、修饰、展开说明和非任务要求的泛化成效放入 optional_details；不得要求考生机械写全所有机构答案细节。
 6. required_for_full_score 只用于在建议字数内仍应覆盖的 core/material_core。supporting、disputed 以及仅属补充说明的内容必须为 false，遗漏时不扣主要分。
-7. 合并同一措施或同一机制下的相近细节。所有 required 点的 minimum_expression 加上必要序号和标点，按上述占格规则估算后必须能放入 suggested_max，并保留至少8格安全余量。
-8. 题干未明确要求“意义、作用、成效、影响”时，不得把泛化的“整体成效/示范意义”单列为必答扣分点；它只能是可选补充。
-9. disputed 不计分。控制在4—12个有效采分点，避免把一条答案拆成大量细碎扣分项。
+7. 评分基准遵循【微语义小点（Micro-Rubric）原则】：非综合写作的小题，必须按真实考场阅卷标准拆解为 8—18 个微语义小点，每个小点代表一个独立的动作机制、核心举措、主体归属或关键成效；严禁把一个包含多个举措的大案例粗放打包成单个宏观点。
+8. 结构体例刚性约束：若题目任务或材料包含明确的组织结构（如按地区/案例/主体分设：J县、K县、M县；或总分结构），各主体归属与分类小标题必须设为具有扣分权重的独立采分点（并标记 is_structural: true），严禁设为不扣分的 bonus，确保考生若抹去主体时得到刚性结构扣分。
+9. disputed 不计分。小题有效采分点保持在 8—18 个微小点；综合写作控制在 4—10 个立意与论据组。所有 required 点的 minimum_expression 加上必要序号和标点，按占格规则估算后必须能放入 suggested_max，并保留安全余量。
 10. 只要上面机构参考答案数量大于 0，就不得声称“无参考答案”或“未提供参考答案”；本地候选聚类只是辅助信息，不得替代对答案全文的核对。
 11. 综合写作不得把每一则具体材料案例都设为必答点。中心立意可以是 required；不同材料案例应作为同一 alternative_group 下的可替代论据；一般升华、科技手段等只能是 bonus。
 12. 每个计分点必须填写 suggested_weight 和 weight_reason；不要机械等权。若三个以上计分点确实等权，必须在顶层 equal_weight_reason 说明它们为何对完成题目任务同等重要。

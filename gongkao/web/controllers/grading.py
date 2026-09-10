@@ -1,6 +1,7 @@
 """Grading workflow and report controllers."""
 
 from ...answer_formatting import normalize_answer_format_json
+from ...grading_pipeline.report import build_user_mirrored_answer
 from ..runtime import (
     ACTIVE_JOB_STATUSES,
     AiConfigError,
@@ -24,6 +25,7 @@ from ..runtime import (
     grading_references_from_form,
     grading_report_return_path,
     hide_internal_score_calibration,
+    inline_markdown,
     invalidate_question_rubrics,
     json,
     layout,
@@ -456,6 +458,39 @@ class GradingController:
           <a href="/attempts/{attempt_id}/package.md">下载批改包</a>
           <form method="post" action="/attempts/{attempt_id}/delete" data-confirm="确认删除这次作答和对应批改报告吗？"><button class="menu-danger" type="submit">删除本次作答</button></form>
         """
+        user_mirrored_html = ""
+        if reports:
+            latest_report = reports[-1]
+            latest_ctx = report_contexts.get(latest_report["id"])
+            latest_res = {}
+            latest_rubric = {}
+            if latest_ctx:
+                try:
+                    latest_res = json.loads(latest_ctx["result_json"] or "{}")
+                    latest_rubric = json.loads(latest_ctx["rubric_snapshot_json"] or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    latest_res, latest_rubric = {}, {}
+            u_ans = (
+                latest_res.get("answer_snapshot")
+                or latest_rubric.get("answer_snapshot")
+                or attempt["answer_text"]
+                or ""
+            ).strip()
+            if u_ans:
+                scale = float(latest_res.get("display_max_score") or latest_rubric.get("display_max_score") or 100) / 100
+                mirrored_text = build_user_mirrored_answer(u_ans, latest_res, latest_rubric, scale)
+                paras = [p.strip() for p in mirrored_text.split("\n") if p.strip()]
+                body_content = "".join(f"<p>{inline_markdown(p)}</p>" for p in paras)
+                char_count = count_cjk_chars(u_ans)
+                user_mirrored_html = f"""
+            <section class="tool-panel user-original-answer-dock">
+              <div class="user-dock-header">
+                <span class="user-dock-title">📝 我的作答原文</span>
+                <span class="user-dock-count">{char_count} 字</span>
+              </div>
+              <div class="user-dock-body">{body_content}</div>
+              <div class="user-dock-tip">💡 绿色为完全得分点，黄色为部分得分点；未标记文字为未得分表述</div>
+            </section>"""
         body = f"""
         {workflow_header("grading", question, question=question, attempt=attempt, more_html=more_html, context_return=context_return)}
         <section class="grading-layout grading-result-first" data-resizable-attempt-pane data-resize-storage-key="gongkao.gradingPaneWidth.v2" data-default-side-width="480" data-default-side-ratio="0.42" data-min-main-width="440" data-min-side-width="360">
@@ -472,7 +507,7 @@ class GradingController:
           </article>
           <button class="pane-resizer" type="button" aria-label="调整批改侧栏宽度" data-pane-resizer></button>
           <aside class="grading-tools" data-session-scroll="grading-tools">
-            <details class="grading-context-disclosure grading-compare-panel"{' open data-default-open="1"' if reports else ""}>
+            <details class="grading-context-disclosure grading-compare-panel"{' data-default-open="1"' if not reports else ""}>
               <summary>查看题目、材料与参考答案</summary>
               <div class="grading-context-body">
                 <section><h2>题目</h2><p class="paper-line">第{question["question_number"] or "?"}题 · {esc(question["question_type"])}</p><div class="preline prompt-strong">{pre(question["prompt"])}</div><div class="preline">{pre(question["requirements"])}</div></section>
@@ -480,6 +515,7 @@ class GradingController:
                 <section><h2>参考答案</h2>{refs_html}</section>
               </div>
             </details>
+            {user_mirrored_html}
             <section class="tool-panel api-grade-panel grading-primary-action">
               <p class="eyebrow">Grading</p><h2>{"重新批改" if reports else "开始批改"}</h2>
               <p class="muted">模型：{esc(settings["provider_name"])} / {esc(settings["model"])}</p>

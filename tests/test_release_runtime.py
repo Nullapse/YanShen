@@ -1473,6 +1473,37 @@ class ReleaseRuntimeTest(unittest.TestCase):
         self.assertNotIn("<th>维度</th>", html)
         self.assertIn("踩点对比", html)
 
+    def test_report_markdown_hides_material_reading_and_optimization_suggestions(self):
+        html = markdownish(
+            "## 总体评分\n- 总分：15/20\n\n"
+            "## 材料领读\n材料信息 -> 转化要点 -> 答案\n\n"
+            "## 优化建议\n1. 表达规范\n\n"
+            "## 名师标杆答案与采分对照\n1. 标答要点"
+        )
+        self.assertIn("总体评分", html)
+        self.assertNotIn("材料领读", html)
+        self.assertNotIn("优化建议", html)
+        self.assertIn("名师标杆答案与采分对照", html)
+
+    def test_report_markdown_renders_master_benchmark_points_and_legend(self):
+        report = (
+            "## 名师标杆答案与采分对照\n"
+            "1. [标答点|hit|+2分 / 满分2分|准确命中原词|材料2第3段|深化数字转型]\n"
+            "2. [标答点|miss|+0分 / 满分2分|未命中要点|材料4第1段|优化审批流程]"
+        )
+        html = markdownish(report)
+        self.assertIn("master-benchmark-legend", html)
+        self.assertIn("完全得分", html)
+        self.assertIn("未得分", html)
+        self.assertIn('class="master-point-span status-hit"', html)
+        self.assertIn('data-point-status="hit"', html)
+        self.assertIn('data-point-score="+2分 / 满分2分"', html)
+        self.assertIn('data-point-eval="准确命中原词"', html)
+        self.assertIn('data-point-source="材料2第3段"', html)
+        self.assertIn("深化数字转型", html)
+        self.assertIn('class="master-point-span status-miss"', html)
+        self.assertIn("优化审批流程", html)
+
     def test_regular_report_table_does_not_get_score_table_layout(self):
         html = markdownish("| 项目 | 说明 |\n| --- | --- |\n| 总分 | 20分 |\n")
         self.assertIn("report-table", html)

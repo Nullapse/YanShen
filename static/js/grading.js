@@ -99,8 +99,223 @@ export function initializeDeepThinkingPreference(form, signal) {
   }
 }
 
+export function initializeMasterAnswerPopovers(signal) {
+  let activePopover = null;
+  let activeSpan = null;
+
+  const closePopover = () => {
+    if (activePopover) {
+      activePopover.remove();
+      activePopover = null;
+    }
+    if (activeSpan) {
+      activeSpan.classList.remove("active-popover-target");
+      activeSpan = null;
+    }
+  };
+
+  const openPopover = (span) => {
+    if (activeSpan === span) {
+      closePopover();
+      return;
+    }
+    closePopover();
+
+    let status = "hit";
+    let statusName = "完全得分";
+    let score = "";
+    let evalText = "";
+    let sourceText = "";
+    let section1Title = "作答诊断与得分分析";
+    let section2Title = "材料出处依据";
+
+    if (span.classList.contains("user-point-span")) {
+      status = span.dataset.userStatus || "hit";
+      statusName = span.dataset.userStatusName || (status === "hit" ? "完全命中" : "部分命中");
+      score = span.dataset.userScore || "";
+      const label = span.dataset.userLabel || "采分点";
+      const pkey = span.dataset.pointKey;
+      const peer = pkey ? document.querySelector(`.master-point-span[data-point-key="${pkey}"]`) : null;
+      section1Title = "对应采分要点诊断";
+      evalText = peer?.dataset.pointEval || `【${label}】作答表述准确契合采分点核心要义。`;
+      section2Title = "对应标答与材料依据";
+      if (peer) {
+        sourceText = `【标答对应】${peer.textContent.trim()}\n【材料出处】${peer.dataset.pointSource || "材料核心要义"}`;
+      } else {
+        sourceText = "考生作答表述的动作机制、手段或成效与材料采分点核心要义一致（近义概括、动宾结构吻合），准确命中得分！";
+      }
+    } else if (span.classList.contains("user-redundant-span")) {
+      status = "miss";
+      statusName = "🗑️ 考场冗余废话诊断";
+      score = span.dataset.redundantWasted || "无效填充";
+      section1Title = "未采分原因说明";
+      evalText = span.dataset.redundantReason || "该部分内容脱离采分要义，属于无效修饰或自创套话。";
+      section2Title = "考场失分警示与建议";
+      sourceText = "💡 此处在真实阅卷中不计分，且白白消耗字数格子。正是因为冗余套话占用篇幅，往往导致篇首总述或核心要点无空间书写而丢分！考场中应坚决精简或删除。";
+    } else if (span.classList.contains("user-typo-span")) {
+      status = "miss";
+      statusName = "🔴 错词/病句诊断";
+      score = "表达扣分";
+      section1Title = "问题定位";
+      evalText = span.dataset.typoReason || "表达不当或错别字。";
+      section2Title = "考场建议";
+      sourceText = "💡 避免输入法选错同音字，保持卷面表达严谨准确，避免给阅卷老师留下不良印象。";
+    } else {
+      status = span.dataset.pointStatus || "hit";
+      statusName = span.dataset.pointStatusName || (status === "hit" ? "完全得分" : (status === "partial" ? "部分得分" : "未得分"));
+      score = span.dataset.pointScore || "";
+      evalText = span.dataset.pointEval || "暂无作答诊断";
+      sourceText = span.dataset.pointSource || "暂无材料出处";
+    }
+
+    activeSpan = span;
+    activeSpan.classList.add("active-popover-target");
+
+    const popover = document.createElement("div");
+    popover.className = `point-popover-card status-${status}`;
+    popover.setAttribute("role", "dialog");
+    popover.setAttribute("aria-modal", "false");
+
+    const header = document.createElement("div");
+    header.className = "point-popover-header";
+
+    const badge = document.createElement("div");
+    badge.className = "point-popover-badge";
+    badge.innerHTML = `
+      <span class="status-indicator ${status}"></span>
+      <strong class="status-title">${statusName}</strong>
+      ${score ? `<span class="point-score-tag">${score}</span>` : ""}
+    `;
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "point-popover-close";
+    closeBtn.setAttribute("aria-label", "关闭");
+    closeBtn.innerHTML = "&times;";
+    closeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      closePopover();
+    });
+
+    header.appendChild(badge);
+    header.appendChild(closeBtn);
+
+    const body = document.createElement("div");
+    body.className = "point-popover-body";
+
+    const evalSection = document.createElement("div");
+    evalSection.className = "point-popover-section";
+    evalSection.innerHTML = `
+      <div class="section-title"><span class="icon">📝</span> <strong>${section1Title}</strong></div>
+      <p class="section-content eval-content">${evalText}</p>
+    `;
+
+    const sourceSection = document.createElement("div");
+    sourceSection.className = "point-popover-section material-section";
+    sourceSection.innerHTML = `
+      <div class="section-title"><span class="icon">📖</span> <strong>${section2Title}</strong></div>
+      <p class="section-content source-content">${sourceText}</p>
+    `;
+
+    body.appendChild(evalSection);
+    body.appendChild(sourceSection);
+
+    popover.appendChild(header);
+    popover.appendChild(body);
+
+    document.body.appendChild(popover);
+    activePopover = popover;
+
+    // Position calculation
+    const rect = span.getBoundingClientRect ? span.getBoundingClientRect() : { left: 50, top: 50, bottom: 70 };
+    const winWidth = typeof window !== "undefined" && window.innerWidth ? window.innerWidth : 1024;
+    const winHeight = typeof window !== "undefined" && window.innerHeight ? window.innerHeight : 768;
+    const popoverWidth = Math.min(420, winWidth - 24);
+    popover.style.width = `${popoverWidth}px`;
+
+    let left = rect.left;
+    if (left + popoverWidth > winWidth - 12) {
+      left = winWidth - popoverWidth - 12;
+    }
+    if (left < 12) left = 12;
+
+    const popoverHeight = popover.offsetHeight || 160;
+    let top = rect.bottom + 8;
+    if (top + popoverHeight > winHeight - 12 && rect.top - popoverHeight - 8 > 12) {
+      top = rect.top - popoverHeight - 8;
+    }
+
+    popover.style.left = `${Math.round(left)}px`;
+    popover.style.top = `${Math.round(top)}px`;
+  };
+
+  document.querySelectorAll(".master-point-span, .user-point-span, .user-redundant-span, .user-typo-span").forEach((span) => {
+    span.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (activeSpan === span) {
+        closePopover();
+      } else {
+        openPopover(span);
+      }
+    }, { signal });
+
+    span.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        e.stopPropagation();
+        if (activeSpan === span) {
+          closePopover();
+        } else {
+          openPopover(span);
+        }
+      }
+    }, { signal });
+  });
+
+  const clearPeerHovers = () => {
+    document.querySelectorAll(".is-peer-hovered").forEach((el) => el.classList.remove("is-peer-hovered"));
+  };
+
+  document.querySelectorAll("[data-point-key]").forEach((span) => {
+    const pkey = span.dataset.pointKey;
+    if (!pkey) return;
+    span.addEventListener("mouseenter", () => {
+      document.querySelectorAll(`[data-point-key="${pkey}"]`).forEach((peer) => {
+        peer.classList.add("is-peer-hovered");
+      });
+    }, { signal });
+    span.addEventListener("mouseleave", () => {
+      clearPeerHovers();
+    }, { signal });
+  });
+
+  document.addEventListener("click", (e) => {
+    if (activePopover && !activePopover.contains(e.target) && (!activeSpan || !activeSpan.contains(e.target))) {
+      closePopover();
+    }
+  }, { signal });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      closePopover();
+    }
+  }, { signal });
+
+  window.addEventListener("resize", () => {
+    closePopover();
+  }, { signal, passive: true });
+
+  if (signal) {
+    signal.addEventListener("abort", () => {
+      closePopover();
+    });
+  }
+}
+
 export function initializeGrading(signal, navigatePartial) {
   initializeGradingReviews(signal);
+  initializeMasterAnswerPopovers(signal);
   document.querySelectorAll("[data-grading-references]").forEach((form) => {
     initializeDeepThinkingPreference(form, signal);
     const checkboxes = Array.from(form.querySelectorAll("input[name='reference_id']"));

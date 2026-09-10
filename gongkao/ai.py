@@ -81,11 +81,16 @@ def chat_completion(settings, prompt, request_options=None):
     thinking_type = request_options.get("thinking")
     api_host = (urlparse(base_url).hostname or "").lower()
     if (
-        thinking_type in {"enabled", "disabled"}
+        thinking_type in {"enabled", "disabled", "medium"}
         and api_host == "api.deepseek.com"
         and model.startswith("deepseek-v4")
     ):
-        payload["thinking"] = {"type": thinking_type}
+        payload["thinking"] = {"type": "disabled" if thinking_type == "disabled" else "enabled"}
+    reasoning_effort = request_options.get("reasoning_effort")
+    if reasoning_effort:
+        payload["reasoning_effort"] = reasoning_effort
+    elif thinking_type in {"enabled", "medium"}:
+        payload["reasoning_effort"] = "medium"
     response_format = request_options.get("response_format")
     if isinstance(response_format, dict) and response_format.get("type") == "json_object":
         payload["response_format"] = {"type": "json_object"}

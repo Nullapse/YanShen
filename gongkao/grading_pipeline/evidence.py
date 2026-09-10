@@ -356,6 +356,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
     "dimension_scores": {json.dumps(dimension_score_template, ensure_ascii=False)},
     "holistic_adjustment_reason": "",
     "annotations": [{{"kind": "good|polish|change|delete|add|critical", "severity": "positive|low|medium|high|critical", "quote": "非补充类必须为用户答案连续原文", "anchor": "补充类必须为用户答案连续原文，表示插入在此句之后", "replacement": "", "reason": "", "point_key": ""}}],
+    "redundancies": [{{"quote": "用户答案中完全未采分的自创套话、超纲展开或多余修饰", "wasted_chars": 20, "reason": "为何未采分且冗余", "suggestion": "建议精简或删除"}}],
     "reference_fusion": "共性核心点和差异补充点",
     "material_reading": ["材料信息 -> 可转化要点 -> 答案表达"],
     "optimization_suggestions": ["具体建议"],
@@ -368,13 +369,15 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
 
 规则：
 1. rubric 的采分点权重总和必须等于 content 维度满分。明确评分标准中的数值优先；否则依据任务必要性、材料层级和机构共识动态分配，禁止无理由平均分配。
-2. rubric.point_key 只使用 point-1、point-2 这类 ASCII 标识；evaluation.point_matches 必须逐字复制对应的 rubric.point_key，不得翻译、改写或另起编号。先逐点分析，再给 dimension_scores。内容分是结合重点覆盖、准确性、完整性和材料转化质量的综合判断，不得机械等于逐点覆盖加总。
-3. dimension_scores 必须逐项覆盖固定维度；JSON 中 max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。各维度问题只扣一次，不再输出整体质量乘数。
-4. hit/partial 应提供用户答案中的短连续原文；若同一要点散落在多处，可用“……”连接多个按原文顺序出现的短片段，不得因此改判 miss。annotations 中除 add 外 quote 必须是连续原文；add 必须填写可在原文精确定位的 anchor，并把拟补文字写入 replacement。
-5. coaching context（跨题、知识、历史证据）只用于建议和 personalized_findings，绝不能影响 point_matches 或 dimension_scores。
-6. personalized_findings 的 finding 必须指出跨题共性（至少 2 条证据支撑才算 recurring）；root_cause 分析具体环节而不是复述症状；next_step 给出可执行的下一道题训练动作。宁可少写一条，也不要写空话。
-7. 修改版答案以 suggested_min—suggested_max 为目标，低于硬上限并预留至少8格。
-8. 只输出上述单个 JSON 块，不输出 Markdown 或额外解释。
+2. rubric.point_key 只使用 point-1、point-2 这类 ASCII 标识；evaluation.point_matches 必须逐字复制对应的 rubric.point_key，不得翻译、改写或另起编号。先逐点分析，再给 dimension_scores。
+3. dimension_scores 必须逐项覆盖固定维度；JSON 中 max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。
+4. 【核心要义对齐原则】：申论参考答案不唯一。只要用户答案表达的动作机制、工作手段、目标成效与采分小点的核心要义一致（近义概括、同义替换），必须判定为 hit 命中，绝不因未出现参考答案字面原词而误判！
+5. 【结构体例刚性扣分】：若题目材料按地区、主体或案例分设（如J县、K县、M县；或总分结构），用户答案若抹去主体、案例归属不清或缺失总述，必须在 structure/结构维度及主体采分点上进行硬扣分（扣1~2分），并在点评中严厉指出，绝不可放水！
+6. 【冗余废话深度排查】：在 redundancies 列表中，列出用户答案中与所有采分要义均无关联的文字（无信息增量套话、超纲细微展开、主观脑补），指出具体占用字数与删减理由。
+7. hit/partial 应提供用户答案中的短连续原文；若同一要点散落在多处，可用“……”连接多个按原文顺序出现的短片段，不得因此改判 miss。annotations 中除 add 外 quote 必须是连续原文。
+8. coaching context（跨题、知识、历史证据）只用于建议和 personalized_findings，绝不能影响 point_matches 或 dimension_scores。
+9. 修改版答案以 suggested_min—suggested_max 为目标，低于硬上限并预留至少8格。
+10. 只输出上述单个 JSON 块，不输出 Markdown 或额外解释。
 """
 
 
@@ -535,6 +538,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
     "dimension_scores": {json.dumps(dimension_score_template, ensure_ascii=False)},
     "holistic_adjustment_reason": "",
     "annotations": [{{"kind": "good|polish|change|delete|add|critical", "severity": "positive|low|medium|high|critical", "quote": "非补充类必须为用户答案连续原文", "anchor": "补充类必须为用户答案连续原文，表示插入在此句之后", "replacement": "", "reason": "", "point_key": ""}}],
+    "redundancies": [{{"quote": "用户答案中完全未采分的自创套话、超纲展开或多余修饰", "wasted_chars": 20, "reason": "为何未采分且冗余", "suggestion": "建议精简或删除"}}],
     "reference_fusion": "共性核心点和差异补充点",
     "material_reading": ["材料信息 -> 可转化要点 -> 答案表达"],
     "optimization_suggestions": ["具体建议"],
@@ -546,17 +550,14 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
 </smart_grading_json>
 
 规则：
-1. 每个可计分 point_key 必须且只能出现一次，并逐字复制评分基准中的 point_key，不得翻译、改写或另起编号；先在原答案中查找同义表达，避免误判漏点。
-2. point_matches 的每项还必须输出 coverage_ratio（0—1）。hit 固定为1，miss固定为0；partial 根据 required_elements 中实际覆盖的核心语义给出0.1—0.9，不得把所有 partial 机械写成0.5。简洁同义表达完整覆盖核心语义时应判 hit，不能因没写 optional_details 而降分。
-3. hit/partial 应提供用户答案中的短连续原文；若语义散落在多处，可用“……”连接按顺序出现的多个短片段。找不到一个完整长句不等于未命中。annotations 的定位规则保持严格。
-4. dimension_scores 必须逐项覆盖评分基准 dimensions；max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。point_based 模式的内容分最终由系统按必答点计算；holistic_essay 模式必须整体评价立意、材料转化和论证质量，具体材料案例只是可替代论据，不得因未使用某一则材料直接判核心任务失败。
-5. 同一个问题只能在最相关维度扣一次，不得再使用 overall_quality_ratio、总分系数或统一封顶。
-6. recurring 只在 history_stable=true 时使用，否则写 stage。
-7. personalized_findings 只能引用上面存在且 role=personalization 的 evidence_id。
-8. personalized_findings 的 finding 必须指出跨题共性（至少 2 条证据支撑才算 recurring）；root_cause 分析具体环节而不是复述症状；next_step 给出可执行的下一道题训练动作。宁可少写一条，也不要写空话。
-9. 修改版答案必须按结构化 word_budget 生成，以 suggested_min—suggested_max 为目标，并至少预留8格安全余量。{ANSWER_GRID_RULES}
-10. 输出修改版答案前先在内部按上述规则估算占格；除文种或结构确有需要外避免手动换行，因为换行会结算当前行剩余格。不得用空话凑字数，也不得为了写全 optional_details 挤占 required 点。
-11. 不直接输出总分、分数算式、折算分或等级；系统将各维度 score 相加、校准并缩放到原题满分。
-12. 同题人工纠错优先用于识别同义表达，但本次 hit/partial 仍必须给出当前用户答案中的连续原句。
-13. 上面的机构参考答案数量大于 0 时，reference_fusion 必须说明实际纳入的机构答案及其共性/差异，严禁写“无参考答案”“无额外参考答案”或“未提供参考答案”。
+1. 每个可计分 point_key 必须且只能出现一次，并逐字复制评分基准中的 point_key，不得翻译、改写或另起编号。
+2. 【核心要义对齐原则】：申论参考答案不唯一。只要用户答案所表达的动作机制、工作手段、目标成效与采分小点的核心要义一致（哪怕词句存在近义概括、同义替换），必须判定为 hit 命中，绝不因未出现参考答案字面原词而误判！
+3. 【结构体例刚性扣分】：若题目材料按地区、主体或案例分设（如J县、K县、M县；或总分结构），用户答案若抹去主体、案例归属不清或缺失总述，必须在 structure/结构维度及主体采分点上进行硬扣分（扣1~2分），并在点评中严厉指出，绝不可放水！
+4. 【冗余废话深度排查】：在 redundancies 列表中，列出用户答案中与所有采分要义均无关联的文字（无信息增量套话、超纲细微展开、主观脑补），指出具体占用字数与删减理由。
+5. point_matches 的每项还必须输出 coverage_ratio（0—1）。hit 固定为1，miss固定为0；partial 根据实际覆盖的核心语义给出0.1—0.9，不得把所有 partial 机械写成0.5。
+6. hit/partial 应提供用户答案中的短连续原文；若语义散落在多处，可用“……”连接按顺序出现的多个短片段。
+7. dimension_scores 必须逐项覆盖评分基准 dimensions；max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。
+8. 修改版答案必须按结构化 word_budget 生成，以 suggested_min—suggested_max 为目标，并至少预留8格安全余量。{ANSWER_GRID_RULES}
+9. 不直接输出总分、分数算式、折算分或等级；系统将各维度 score 相加、校准并缩放到原题满分。
+10. 上面的机构参考答案数量大于 0 时，reference_fusion 必须说明实际纳入的机构答案及其共性/差异，严禁写“无参考答案”“无额外参考答案”或“未提供参考答案”。
 """

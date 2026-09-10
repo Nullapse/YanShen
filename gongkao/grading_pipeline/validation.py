@@ -291,6 +291,26 @@ def validate_grading_result(
             }
         )
 
+    redundancies = []
+    for item in raw.get("redundancies") or []:
+        if not isinstance(item, dict):
+            continue
+        quote = _clean(item.get("quote"), 200)
+        if not quote:
+            continue
+        quote_clean = re.sub(r"\s+", "", quote)
+        answer_clean = re.sub(r"\s+", "", str(answer_text or ""))
+        if quote_clean and quote_clean in answer_clean:
+            wasted = int(item.get("wasted_chars") or len(quote))
+            redundancies.append(
+                {
+                    "quote": quote,
+                    "wasted_chars": wasted,
+                    "reason": _clean(item.get("reason"), 240) or "脱离采分要义的冗余修饰",
+                    "suggestion": _clean(item.get("suggestion"), 200) or "建议精简或删除",
+                }
+            )
+
     raw_score = round(sum(item["score"] for item in normalized_dimensions), 1)
     score, score_calibration = apply_score_calibration(raw_score, calibration_policy)
     if blank_answer:
@@ -372,6 +392,7 @@ def validate_grading_result(
         "weighted_coverage_score": weighted_coverage,
         "holistic_adjustment_reason": adjustment_reason,
         "annotations": annotations[:12],
+        "redundancies": redundancies[:10],
         "reference_fusion": _validated_reference_fusion(raw.get("reference_fusion"), rubric),
         "material_reading": [_clean(value, 360) for value in (raw.get("material_reading") or []) if _clean(value)][:12],
         "optimization_suggestions": [
