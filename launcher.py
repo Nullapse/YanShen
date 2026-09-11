@@ -1,4 +1,9 @@
+import codecs
 import ctypes
+import encodings
+import encodings.idna
+import encodings.utf_8
+import encodings.utf_8_sig
 import logging
 import os
 import subprocess

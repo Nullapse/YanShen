@@ -187,6 +187,18 @@ class UrlImporterTest(unittest.TestCase):
         self.assertIn("routecs=shenlun&type=1", read_url.call_args_list[1].args[0])
         self.assertEqual(len(read_url.call_args_list), 2)
 
+    def test_direct_fetch_handles_utf8_with_bom(self):
+        payload = _real_shape_payload()
+        bom = b"\xef\xbb\xbf"
+        responses = [
+            (bom + json.dumps(payload["meta"]).encode("utf-8"), "application/json"),
+            (bom + json.dumps(payload["static_payloads"][0]).encode("utf-8"), "application/json"),
+        ]
+        with patch("gongkao.services.url_importer._read_url", side_effect=responses):
+            result = fetch_source_draft(SOURCE_URL)
+        self.assertTrue(result["ok"])
+        self.assertEqual(len(result["draft"]["questions"]), 1)
+
     def test_api_url_can_include_device_id(self):
         info = parse_source_url(SOURCE_URL)
         url = build_fenbi_solution_api_url(info, "device-value")

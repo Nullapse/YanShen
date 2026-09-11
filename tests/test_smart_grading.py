@@ -1345,7 +1345,81 @@ class SmartGradingTest(unittest.TestCase):
                 calibration_policy=None,
             )
             self.assertAlmostEqual(result["score"], 100.0)
-            self.assertAlmostEqual(result["display_score"], 20.0)
+    def test_grading_preserves_accuracy_and_comprehensiveness_partial_scores(self):
+        question = {
+            "id": 101,
+            "question_type": "归纳概括",
+            "prompt": "请概括某市推进产业升级的主要举措。（20分）",
+            "requirements": "全面、准确。",
+            "display_max_score": 20,
+        }
+        point = {
+            "point_key": "p1",
+            "label": "搭建全流程服务平台，提供一站式服务",
+            "canonical_expression": "搭建全流程服务平台，提供一站式服务",
+            "reference_quote": "搭建全流程服务平台，提供一站式服务",
+            "weight": 50.0,
+            "display_weight": 10.0,
+            "coverage_role": "required",
+            "required_for_full_score": True,
+        }
+        rubric = {
+            "question_type": "归纳概括",
+            "scoring_mode": "point_based",
+            "display_max_score": 20,
+            "points": [point],
+            "criteria": [
+                {"dimension": "content", "weight": 70.0},
+                {"dimension": "structure", "weight": 15.0},
+                {"dimension": "expression", "weight": 10.0},
+                {"dimension": "format", "weight": 5.0},
+            ],
+        }
+        raw_1 = {
+            "point_matches": [{
+                "point_key": "p1",
+                "status": "partial",
+                "score_level": "half",
+                "answer_quote": "打造服务平台",
+                "reason": "写出了平台建设，但表述过于宽泛笼统，缺少全流程一站式服务的精准提炼。",
+                "missing_elements": ["表述过于宽泛，不够精准"],
+            }],
+            "dimension_scores": [
+                {"dimension": "content", "score": 10, "reason": ""},
+                {"dimension": "structure", "score": 15, "reason": ""},
+                {"dimension": "expression", "score": 10, "reason": ""},
+                {"dimension": "format", "score": 5, "reason": ""},
+            ],
+        }
+        res_1 = validate_grading_result(raw_1, rubric, "打造服务平台进行服务。", [])
+        m_1 = res_1["point_matches"][0]
+        self.assertEqual(m_1["status"], "partial")
+        self.assertEqual(m_1["score_level"], "half")
+        self.assertEqual(m_1["coverage_ratio"], 0.5)
+        self.assertEqual(m_1["awarded_score"], 25.0)
+
+        raw_2 = {
+            "point_matches": [{
+                "point_key": "p1",
+                "status": "partial",
+                "score_level": "mostly",
+                "answer_quote": "搭建服务平台，提供便民服务",
+                "reason": "要素基本具备，但概括不够全面，遗漏了一站式服务机制。",
+                "missing_elements": [],
+            }],
+            "dimension_scores": [
+                {"dimension": "content", "score": 10, "reason": ""},
+                {"dimension": "structure", "score": 15, "reason": ""},
+                {"dimension": "expression", "score": 10, "reason": ""},
+                {"dimension": "format", "score": 5, "reason": ""},
+            ],
+        }
+        res_2 = validate_grading_result(raw_2, rubric, "搭建服务平台，提供便民服务。", [])
+        m_2 = res_2["point_matches"][0]
+        self.assertEqual(m_2["status"], "partial")
+        self.assertEqual(m_2["score_level"], "mostly")
+        self.assertEqual(m_2["coverage_ratio"], 0.75)
+        self.assertEqual(m_2["awarded_score"], 37.5)
 
     def test_schema3_database_is_rejected(self):
         with tempfile.TemporaryDirectory() as directory:

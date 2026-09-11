@@ -1119,6 +1119,7 @@ def link_agent_evidence_refs(html_text, return_to=""):
 
 def inline_markdown(value, return_to=""):
     text = esc(value)
+    text = text.replace("&amp;emsp;", "&emsp;")
     text = re.sub(
         r"\[(GKS-\d+-Q\d+)\]\([^)]+\)",
         lambda match: (

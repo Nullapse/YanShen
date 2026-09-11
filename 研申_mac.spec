@@ -50,6 +50,18 @@ MACOS_HIDDENIMPORTS = (
     + collect_submodules("Foundation")
 )
 
+ENCODING_HIDDENIMPORTS = [
+    "encodings",
+    "encodings.utf_8",
+    "encodings.utf_8_sig",
+    "encodings.idna",
+    "encodings.gbk",
+    "encodings.gb2312",
+    "encodings.gb18030",
+    "encodings.ascii",
+    "encodings.latin_1",
+]
+
 datas = [
     ("static", "static"),
     ("gongkao/web/templates", "gongkao/web/templates"),
@@ -71,7 +83,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=datas,
-    hiddenimports=MACOS_HIDDENIMPORTS + AGENT_HIDDENIMPORTS,
+    hiddenimports=MACOS_HIDDENIMPORTS + AGENT_HIDDENIMPORTS + ENCODING_HIDDENIMPORTS,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

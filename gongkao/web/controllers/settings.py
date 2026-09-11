@@ -729,7 +729,9 @@ class SettingsController:
             return
         try:
             raw = backup.file.read()
-            payload = json.loads(raw.decode("utf-8-sig"))
+            if isinstance(raw, (bytes, bytearray)) and raw.startswith(b"\xef\xbb\xbf"):
+                raw = raw[3:]
+            payload = json.loads(raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else raw)
             with connect(self.db_path) as conn:
                 counts = import_personal_data(conn, payload)
         except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:

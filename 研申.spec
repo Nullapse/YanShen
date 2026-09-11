@@ -63,12 +63,24 @@ datas = [
 if os.path.exists("evals"):
     datas.append(("evals", "evals"))
 
+ENCODING_HIDDENIMPORTS = [
+    "encodings",
+    "encodings.utf_8",
+    "encodings.utf_8_sig",
+    "encodings.idna",
+    "encodings.gbk",
+    "encodings.gb2312",
+    "encodings.gb18030",
+    "encodings.ascii",
+    "encodings.latin_1",
+]
+
 a = Analysis(
     ["launcher.py"],
     pathex=[],
     binaries=[],
     datas=datas,
-    hiddenimports=collect_submodules("tkinter") + collect_submodules("webview") + AGENT_HIDDENIMPORTS,
+    hiddenimports=collect_submodules("tkinter") + collect_submodules("webview") + AGENT_HIDDENIMPORTS + ENCODING_HIDDENIMPORTS,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

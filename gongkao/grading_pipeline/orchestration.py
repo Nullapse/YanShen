@@ -132,7 +132,7 @@ def _build_review_prompt(question, rubric, answer_text, result):
 }}}}
 </smart_grading_json>
 
-规则：每个评分基准 point_key 和每个维度必须且只能出现一次；不得输出总分；不得因空格、标点、引号或省略号形式差异把已有语义改判为未命中；综合写作不要求机械覆盖每一则材料案例。非作文题按真实阅卷分档：hit/full=1；partial 只能为 mostly=0.75、half=0.5、slight=0.25；miss/none=0。同义核心完整必须hit，不得用粉笔答案没写的材料细节扣分。
+规则：每个评分基准 point_key 和每个维度必须且只能出现一次；不得输出总分；不得因空格、标点、引号或省略号形式差异把已有语义改判为未命中；综合写作不要求机械覆盖每一则材料案例。非作文题按真实阅卷全面性与准确性阶梯分档：全面且准确判 hit/full=1；概括不全面或不够准确必须判 partial（mostly=0.75、half=0.5、slight=0.25），并在 missing_elements 中说明缺失要素或不准确原因；完全未答或答错判 miss/none=0。不得把粗糙沾边无原则给满分，亦不得用粉笔答案没写的材料细节扣分。
 """
 
 

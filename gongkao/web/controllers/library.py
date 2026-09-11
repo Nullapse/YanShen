@@ -1,6 +1,7 @@
 """Question and paper library controllers."""
 
 import json
+import logging
 from urllib.parse import parse_qs, urlparse
 
 from ...ai import chat_completion
@@ -1543,6 +1544,7 @@ class LibraryController:
             self.send_json({"ok": False, "error": str(exc)}, status=400)
             return
         except Exception as exc:
+            logging.exception("URL 导入处理异常: %s", source_url)
             self.send_json({"ok": False, "error": f"URL 导入失败：{exc}"}, status=502)
             return
 

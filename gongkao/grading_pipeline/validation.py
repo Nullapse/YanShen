@@ -14,6 +14,14 @@ from .evidence_resolution import resolve_answer_evidence
 from .rubric import _default_criteria
 
 
+_DIAGNOSTIC_KEYWORDS = (
+    "准确", "全面", "精准", "规范", "概括", "提炼", "表述", "宽泛", "笼统",
+    "大而化之", "口语", "口语化", "偏弱", "欠缺", "缺失", "遗漏", "未体现", "未提及",
+    "缺少", "未写出", "未包含", "成效", "机制", "对象", "举措", "措施",
+    "并列", "要素", "不够", "略欠", "不完整", "较弱", "偏离", "差异", "深度",
+)
+
+
 def _coverage_factor(candidate, status):
     """Map a teacher-style completion band to an auditable score fraction."""
     if status == "hit":
@@ -167,12 +175,19 @@ def validate_grading_result(
             missing_elements = []
         elif status == "partial" and reference_boundary:
             if not missing_elements:
-                raise ValueError(f"给分点 {point['point_key']} 判为部分得分，但未指出粉笔原文中缺失的核心语义")
+                if candidate.get("reason"):
+                    missing_elements = [_clean(candidate.get("reason"), 100)]
+                else:
+                    missing_elements = ["作答概括不够全面或不够准确"]
             supported_missing = [
                 value for value in missing_elements
-                if _semantic_overlap(value, reference_boundary) >= 0.3
+                if _semantic_overlap(value, reference_boundary) >= 0.2
+                or any(keyword in value for keyword in _DIAGNOSTIC_KEYWORDS)
             ]
-            if not supported_missing:
+            has_diagnostic_reason = any(
+                keyword in str(candidate.get("reason") or "") for keyword in _DIAGNOSTIC_KEYWORDS
+            )
+            if not supported_missing and not has_diagnostic_reason:
                 status = "hit"
                 missing_elements = []
                 candidate = {
@@ -181,9 +196,7 @@ def validate_grading_result(
                     "score_level": "full",
                 }
             else:
-                # Only omissions supported by the exact Fenbi clause may appear
-                # in the report; material-only additions are silently discarded.
-                missing_elements = supported_missing
+                missing_elements = supported_missing or missing_elements
         quote = _clean(candidate.get("answer_quote"), 240)
         resolution = (
             resolve_answer_evidence(quote, answer_text)

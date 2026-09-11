@@ -959,6 +959,27 @@ def _read_url(url: str, *, timeout=20, max_bytes=MAX_FETCH_BYTES, credentials=No
         return data, response.headers.get_content_type() if response.headers else ""
 
 
+def _decode_response_text(data, errors: str = "replace") -> str:
+    """Decode response bytes, stripping UTF-8 BOM if present without requiring the utf-8-sig codec."""
+    if not isinstance(data, (bytes, bytearray)):
+        return str(data or "")
+    if data.startswith(b"\xef\xbb\xbf"):
+        data = data[3:]
+    return data.decode("utf-8", errors)
+
+
+def _decode_response_json(data):
+    """Safely parse JSON from bytes or str, handling UTF-8 BOM cleanly."""
+    if isinstance(data, (bytes, bytearray)):
+        if data.startswith(b"\xef\xbb\xbf"):
+            data = data[3:]
+        try:
+            return json.loads(data)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return json.loads(data.decode("utf-8", "replace"))
+    return json.loads(data)
+
+
 def _post_fenbi_json(url: str, payload, credentials=None, referer="", timeout=30) -> dict:
     """Post a JSON payload to a Fenbi host using only filtered local cookies."""
 
@@ -989,18 +1010,16 @@ def _post_fenbi_json(url: str, payload, credentials=None, referer="", timeout=30
             raw = response.read(MAX_FETCH_BYTES + 1)
             if len(raw) > MAX_FETCH_BYTES:
                 raise UrlImportError("粉笔提交响应过大，已停止读取")
-            text = raw.decode("utf-8-sig", "replace")
             try:
-                return json.loads(text)
-            except json.JSONDecodeError:
-                return {"_raw": text}
+                return _decode_response_json(raw)
+            except (json.JSONDecodeError, ValueError):
+                return {"_raw": _decode_response_text(raw, "replace")}
     except HTTPError as exc:
         raw = exc.read(MAX_FETCH_BYTES + 1)
-        text = raw.decode("utf-8-sig", "replace")
         try:
-            body = json.loads(text)
-        except json.JSONDecodeError:
-            body = {"_raw": text}
+            body = _decode_response_json(raw)
+        except (json.JSONDecodeError, ValueError):
+            body = {"_raw": _decode_response_text(raw, "replace")}
         body["_http_status"] = exc.code
         return body
 
@@ -1052,7 +1071,7 @@ def _fenbi_static_payloads(meta, base_url: str, routecs: str, credentials=None) 
     payloads = []
     for static_url in _extract_static_urls(meta, base_url, routecs):
         static_data, _ = _read_url(static_url, credentials=credentials, referer=base_url)
-        payloads.append(json.loads(static_data.decode("utf-8-sig")))
+        payloads.append(_decode_response_json(static_data))
     return payloads
 
 
@@ -1132,7 +1151,7 @@ def _auto_submit_fenbi_exercise(
     if not static_urls:
         return False
     static_data, _ = _read_url(static_urls[0], credentials=credentials, referer=info.source_url)
-    static_payload = json.loads(static_data.decode("utf-8-sig"))
+    static_payload = _decode_response_json(static_data)
     questions = static_payload.get("questions") or []
     updates = []
     for index, question in enumerate(questions, start=1):
@@ -1201,7 +1220,7 @@ def fetch_source_draft(source_url: str, credentials: dict | None = None, auto_su
         if info.source_kind == "fenbi_exercise":
             exercise_api = build_fenbi_solution_api_url(info, device_id)
             exercise_data, _ = _read_url(exercise_api, credentials=credentials, referer=info.source_url)
-            exercise_payload = json.loads(exercise_data.decode("utf-8-sig"))
+            exercise_payload = _decode_response_json(exercise_data)
             exercise = _unwrap(exercise_payload)
             exercise_static_payloads = _fenbi_static_payloads(
                 exercise,
@@ -1232,7 +1251,7 @@ def fetch_source_draft(source_url: str, credentials: dict | None = None, auto_su
 
         api_url = build_fenbi_solution_api_url(solution_info, device_id)
         data, _ = _read_url(api_url, credentials=credentials, referer=info.source_url)
-        payload = json.loads(data.decode("utf-8-sig"))
+        payload = _decode_response_json(data)
         if isinstance(payload, dict):
             api_message = _first_text(payload, ("message", "msg", "error"))
             api_has_content = any(key in payload for key in ("data", "staticUrl", "static_url", "materials", "solutions", "questions"))

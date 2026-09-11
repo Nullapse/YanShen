@@ -13,7 +13,7 @@ def limited_reference_guidance(reference_count):
         return (
             "唯一参考答案规则：本题只有 1 份粉笔标准答案。非作文题的内容采分点只能从这份答案逐句切分，"
             "不得从材料新增采分点，不得把材料中的地点、案例、政策名或技术名追加为必需条件。"
-            "用户表述不要求逐字一致，核心动作、对象或效果同义即应命中全分。"
+            "用户表述不要求逐字一致，核心动作、对象或效果同义即应命中全分；概括不全面或不够准确必须按阶梯判定部分得分。"
         )
     if count == 0:
         return "本题未提供参考答案，只能依据题干和材料建立评分基准。"
@@ -97,11 +97,19 @@ def normalize_reference_answer_text(text):
 
 def strip_master_point_tags(text):
     """Remove report-only scoring metadata while preserving the visible answer clause."""
+    if not text:
+        return ""
+    s = str(text)
+
     def visible_clause(match):
         payload = match.group(1)
         return payload.rsplit("|", 1)[-1]
 
-    return re.sub(r"\[(?:标答点|标答标题)\|([^\]]+)\]", visible_clause, str(text or ""))
+    s = re.sub(r"\[(?:标答点|标答标题|作答点)\|([^\]]+)\]", visible_clause, s)
+    s = re.sub(r"<[^>]+>", "", s)
+    s = html_lib.unescape(s)
+    s = s.replace("\u2003", " ").replace("\u2002", " ").replace("\xa0", " ")
+    return s
 
 
 def count_cjk_chars(text):
@@ -261,7 +269,7 @@ def extract_revised_answer_streams(answer_body):
     return streams
 
 
-def revised_answer_word_count_line(actual_chars, word_limit="", streams=None):
+def revised_answer_word_count_line(actual_chars, word_limit="", streams=None, is_reference=False):
     budget = word_limit_budget(word_limit)
     if streams and len(streams) >= 2:
         stream_parts = []
@@ -271,6 +279,8 @@ def revised_answer_word_count_line(actual_chars, word_limit="", streams=None):
         parts = [f"实际字数：{' · '.join(stream_parts)}"]
     else:
         parts = [f"实际字数：{actual_chars}字"]
+    if is_reference:
+        return "；".join(parts)
     if budget["suggested_min"]:
         parts.append(f"建议区间：{budget['suggested_min']}—{budget['suggested_max']}字")
     if budget["hard_max_exclusive"]:
@@ -284,7 +294,10 @@ def revised_answer_word_count_line(actual_chars, word_limit="", streams=None):
 
 
 def split_revised_answer_section(report_text):
-    match = re.search(r"(?m)^##\s*(?:修改版答案|名师修改版范文|名师标杆答案与采分对照)\s*$", report_text or "")
+    match = re.search(
+        r"(?m)^##\s*(?:修改版答案|名师修改版范文|名师标杆答案与采分对照|粉笔参考答案与采分对照|.+?参考答案与采分对照)\s*$",
+        report_text or "",
+    )
     if not match:
         return None
     body_start = match.end()
@@ -321,16 +334,18 @@ def normalize_revised_answer_word_count(report_text, word_limit=""):
     streams = extract_revised_answer_streams(answer_body)
     budget = word_limit_budget(word_limit)
     hard_max = budget["hard_max_exclusive"]
+    is_reference = "参考答案" in heading
     if len(streams) >= 2:
         actual_chars = max(s["chars"] for s in streams)
-        over_limit = bool(hard_max and any(s["chars"] >= hard_max for s in streams))
+        over_limit = bool(hard_max and any(s["chars"] >= hard_max for s in streams) and not is_reference)
     else:
-        actual_chars = count_cjk_chars(answer_body)
-        over_limit = bool(hard_max and actual_chars >= hard_max)
+        clean_body = strip_master_point_tags(answer_body)
+        actual_chars = count_cjk_chars(clean_body)
+        over_limit = bool(hard_max and actual_chars >= hard_max and not is_reference)
     normalized_section = (
         heading
         + "\n"
-        + revised_answer_word_count_line(actual_chars, word_limit, streams=streams)
+        + revised_answer_word_count_line(actual_chars, word_limit, streams=streams, is_reference=is_reference)
         + "\n\n"
         + ("> 系统提示：修改版答案未满足严格硬限制，不能直接作为最终答案使用；请继续压缩。\n\n" if over_limit else "")
         + answer_body
@@ -356,25 +371,29 @@ def revised_answer_word_count_status(report_text, word_limit=""):
             "over_by": 0,
             "streams": [],
         }
-    _, body_start, body_end = section
+    section_start, body_start, body_end = section
+    heading = report_text[section_start:body_start]
     answer_body = revised_answer_body(report_text[body_start:body_end])
     streams = extract_revised_answer_streams(answer_body)
+    is_reference = "参考答案" in heading
     if len(streams) >= 2:
         actual_chars = max(s["chars"] for s in streams)
         over_by = max(
             (s["chars"] - hard_max + 1 for s in streams if hard_max and s["chars"] >= hard_max),
             default=0,
-        )
+        ) if not is_reference else 0
     else:
-        actual_chars = count_cjk_chars(answer_body)
-        over_by = actual_chars - hard_max + 1 if hard_max and actual_chars >= hard_max else 0
+        clean_body = strip_master_point_tags(answer_body)
+        actual_chars = count_cjk_chars(clean_body)
+        over_by = actual_chars - hard_max + 1 if hard_max and actual_chars >= hard_max and not is_reference else 0
+    budget_status = "参考答案" if is_reference else budget_status_label(actual_chars, budget)
     return {
         "has_revised_answer": bool(answer_body),
         "actual_chars": actual_chars,
         "max_chars": hard_max,
         "budget": budget,
-        "budget_status": budget_status_label(actual_chars, budget),
-        "over_limit": over_by > 0,
+        "budget_status": budget_status,
+        "over_limit": bool(hard_max and actual_chars >= hard_max and not is_reference),
         "over_by": over_by,
         "streams": streams,
     }
@@ -574,16 +593,14 @@ def select_relevant_materials(question, materials):
 REPORT_INSTRUCTIONS = """你是一名严谨的申论阅卷与诊断老师，不是参考答案作者。请基于题目、作答要求、整卷材料、用户答案和本批改包实际提供的参考答案完成评分与诊断。
 
 批改原则：
-1. 对只有一份粉笔答案的非作文题，粉笔答案是内容给分点的唯一来源；题干用于限定任务，材料只用于核验明显事实错误，绝不能新增、扩写或替换粉笔答案中的扣分条件。
-2. 白鹭和小马哥的方法只用于拆分采分点、归并同类信息、识别材料原词、动宾要义、主体对象及同义表达，严禁据此生成任何完整答案。
-3. 禁止生成、改写、压缩、润色或替换参考答案；禁止输出“修改版答案”“名师答案”“小马哥版”“白鹭版”或任何可直接替换的完整范文。
-4. 非作文题采用真实阅卷式划点：以唯一粉笔答案为来源，先识别一级要点组，再合理归并为少量完整给分点；20分题通常5—10点，每点一般1—3分。不得把每个词、地点、案例拆成0.5分碎片，也不得把整组措施捆成一个笼统大点。
-5. 判定漏点前必须在用户原答案中寻找同义、近义和句式不同但机制一致的表达。核心动作、对象、方式或效果一致时，应判为命中或部分命中，不能要求与粉笔答案逐字相同。
-6. 【错别字免扣分铁律】：同音错别字、输入法联想失误和非原则性打字错误不作为扣分依据；语义可识别时正常判分。
-7. 粉笔答案可能存在局限，可在“参考答案可靠性说明”中提示争议，但不得把粉笔未写的材料内容计分或扣分；若发现粉笔与材料存在明显事实冲突，应拒绝给出数值分并说明原因。
-8. 修改建议必须说明用户答案应补、应删、应合并或应规范的位置，只给局部动作，不输出重写后的完整答案。
-9. 综合分析题按题型逻辑判断；大作文按立意、结构、论证、素材和语言综合评分。
-10. 字数只统计用户作答纯正文。参考答案、批改标签、得分说明、材料出处和诊断文字均不计入用户答案字数。
+1. 对只有一份粉笔答案的非作文题，粉笔答案是内容给分点的唯一来源；题干用于限定任务，材料只用于核验明显事实错误，绝不能新增、扩写或替换粉笔答案中的扣分条件。系统已提供采分点，AI 绝不生成任何答案，只逐点判断用户在这些得分点的得分情况。
+2. 禁止生成、改写、压缩、润色或替换参考答案；禁止输出“修改版答案”“名师答案”或任何可直接替换的完整范文。
+3. 非作文题采用真实阅卷式划点：以唯一粉笔答案为来源，先识别一级要点组，再合理归并为少量完整给分点；20分题通常5—10点，每点一般1—3分。不得把每个词、地点、案例拆成0.5分碎片，也不得把整组措施捆成一个笼统大点。
+4. 判定漏点与得分档位时，严格审查考生作答的“全面性”与“准确性”。不能要求与粉笔答案逐字相同，但必须既全面又准确才判命中满分；若核心意思虽有涉及但概括不全面（遗漏重要要素或成效）或不够准确（表述宽泛、笼统、口语化、提炼偏弱），必须判为部分得分并阶梯赋分，不得直接给满分；完全未提及或答错才判为未命中。
+5. 【错别字免扣分铁律】：同音错别字、输入法联想失误和非原则性打字错误不作为扣分依据；语义可识别时正常判分。
+6. 【大作文袁东方法论】：大作文（综合写作）严格依据袁东方法论进行审题判断与定级赋分，严禁脱离材料空发议论，审查立意、五段三分结构、材料关键词转化及语言表达。
+7. 修改建议必须说明用户答案应补、应删、应合并或应规范的位置，只给局部动作，不输出重写后的完整答案。
+8. 字数只统计用户作答纯正文。参考答案、批改标签、得分说明、材料出处和诊断文字均不计入用户答案字数。
 
 请输出 Markdown：
 ## 总体评分
@@ -595,7 +612,7 @@ REPORT_INSTRUCTIONS = """你是一名严谨的申论阅卷与诊断老师，不�
 按粉笔答案顺序分组列出：要点组、完整给分点、满分、粉笔依据、用户对应原句、完成档位、实得分和理由。给分点应便于真实阅卷老师快速识别，不机械碎分。
 
 ## 用户作答诊断
-指出结构、逻辑、表达、冗余和字数问题，并引用用户原句。
+指出结构、逻辑、表达和字数问题，并引用用户原句。
 
 ## 局部修改建议
 只列具体修改动作，不提供完整改写答案。
@@ -670,10 +687,10 @@ def build_grading_package(
         [
             "",
             "## Shenlun.skill 名师做题法与批改铁律",
-            "- 【小马哥极简原词直抄流】：材料有什么抄什么，不自创高级概括词。利用8类信号词锁定材料要点，提取动宾短语+具体对象+成效，单条要点≤40字，严格去水，字数预算85%—95%，高密度踩点。",
-            "- 【白鹭规范提炼流】：从材料已有规范词中提炼4/6/8字前置概括小标题，逻辑归并3—5条，结构为“小标题 + 举措展开 -> 成效”，轻串联流畅表达。",
+            "- 【AI 仅评分诊断】：系统或参考答案已提供采分点及分值，AI 绝不生成任何完整答案，只逐点判断用户在各采分点的得分情况。",
+            "- 【全面准确阶梯给分】：既全面又准确才判命中满分。若概括不全面或用词不够准确规范，必须判为部分得分并梯度赋分，绝不机械苛求字面原词一致，但也绝不把粗糙沾边放水为满分。",
+            "- 【大作文袁东方法论】：综合写作严格依据袁东方法论，审查立意深度、五段三分论点结构、材料关键词转化与四维度定级赋分，严禁脱离材料空发议论。",
             "- 【错别字免扣分铁律】：考生使用电脑键盘输入法作答，同音错别字、联想误差属正常输入偏差，一律不予扣分，只要语义表达指向采分点即判定命中给分！",
-            "- 【AI 仅评分诊断】：唯一粉笔答案是内容给分点来源；题干限定任务，材料只核验明显事实错误。白鹭和小马哥只用于拆点、归并和同义识别，AI 禁止生成、改写或压缩完整答案。",
             "",
             "## 题目",
             question["prompt"],
@@ -685,7 +702,7 @@ def build_grading_package(
             "",
             "## 本次批改参考答案",
             "",
-            "参考答案使用规则：只有一份粉笔答案时，内容给分点只能从该答案合理划分；题干限定任务，材料仅核验明显事实错误，不新增扣分条件。AI 只做采分点判断和局部诊断，不得生成或改写完整答案。",
+            "参考答案使用规则：系统已提供明确的采分点和分值，AI 只逐点判断用户在这些得分点的得分情况。AI 绝不生成任何答案或改写完整答案。",
         ]
     )
     sample_guidance = limited_reference_guidance(len(references))
