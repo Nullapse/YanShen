@@ -390,11 +390,17 @@ def render_grading_report(
 
     point_matches = result.get("point_matches") or []
     if point_matches:
+        table_title = "## 袁东方法论核心论点与论据判定" if is_essay else "## 采分点判断"
+        table_header = (
+            "| 考查维度 | 核心要义/分论点 | 满分 | 判断 | 实得分 | 用户答案对应内容 | 诊断原因 |"
+            if is_essay
+            else "| 要点组 | 给分点 | 满分 | 判断 | 实得分 | 用户答案对应内容 | 得分原因 |"
+        )
         lines.extend(
             [
                 "",
-                "## 采分点判断",
-                "| 要点组 | 给分点 | 满分 | 判断 | 实得分 | 用户答案对应内容 | 得分原因 |",
+                table_title,
+                table_header,
                 "| --- | --- | ---: | --- | ---: | --- | --- |",
             ]
         )
@@ -409,13 +415,13 @@ def render_grading_report(
             earned_points = float(match.get("awarded_score") or 0) * display_scale
             lines.append(
                 "| {group} | {label} | {maximum} | {status} | {earned} | {quote} | {reason} |".format(
-                    group=str(point.get("group_label") or "其他").replace("|", "／"),
+                    group=str(point.get("group_label") or ("立意与论证" if is_essay else "其他")).replace("|", "／"),
                     label=str(point.get("label") or match.get("point_key") or "采分点").replace("|", "／"),
                     maximum=_format_score(max_points),
                     status=status_text,
                     earned=_format_score(earned_points),
                     quote=str(match.get("answer_quote") or "未体现").replace("|", "／"),
-                    reason=str(match.get("reason") or "按粉笔参考答案的核心语义判断。").replace("|", "／"),
+                    reason=str(match.get("reason") or ("按袁东方法论核心立意与材料依据研判。" if is_essay else "按粉笔参考答案的核心语义判断。")).replace("|", "／"),
                 )
             )
 
@@ -462,7 +468,8 @@ def render_grading_report(
         lines.extend(
             [
                 "",
-                f"## {primary_org}参考答案",
+                f"## {primary_org}参考答案与立意校核（仅作论点切题参考）",
+                "> 【立意校核说明】：粉笔大作文参考答案仅用于核验考生的中心立意与分论点是否切题、正确，绝不作为客观细分采分点逐句对齐扣分。具体给分严格依据袁东大作文两轮阅卷定级赋分标准执行。",
                 "",
                 primary_text,
             ]

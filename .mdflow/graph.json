@@ -1,20 +1,20 @@
 {
   "version": 1,
   "projectId": "yanshen",
-  "graphRevision": 72,
-  "exportedAt": "2026-09-11T05:50:14.433Z",
+  "graphRevision": 73,
+  "exportedAt": "2026-09-11T09:46:02.711Z",
   "data": {
     "projects": [
       {
         "created_at": "2026-09-09T09:39:30.644Z",
-        "graph_revision": 72,
-        "handoff_json": "{\"activePlanId\":\"plan-teacher-style-fenbi-scoring\",\"activeStepId\":\"rebuild-relaunch\",\"nowDoing\":\"排查并修复URL导入试卷时出现的 unknown encoding: utf-8-sig 报错\",\"nextUp\":\"根据用户后续真实作答批改体验，持续调优微采分点匹配精度与袁东大作文诊断细化度\",\"lastFinished\":\"完成mdflow架构全面同步：归档旧双流派生成器，新增粉笔固定采分树引擎与袁东大作文模型；更新双栏镜像对照UI；清除硬编码扣分规则；通过全部253项后端及28项前端测试并重新打包原生macOS应用\",\"touchedFiles\":[\"gongkao/grading.py\",\"gongkao/grading_pipeline/evidence.py\",\"gongkao/web/runtime.py\",\".mdflow/graph.json\",\".mdflow/mdflow.sqlite\"],\"cursorUpdatedAt\":\"2026-09-11T05:42:49.493Z\"}",
+        "graph_revision": 73,
+        "handoff_json": "{\"activePlanId\":\"plan-teacher-style-fenbi-scoring\",\"activeStepId\":\"rebuild-relaunch\",\"nowDoing\":\"研读Shenlun.skill中袁东大作文方法论，排查并重构当前大作文评分模型与提示词体系\",\"nextUp\":\"根据用户使用反馈，持续优化复杂套卷URL自动解析与划点批改体验\",\"lastFinished\":\"完成mdflow架构全面同步：归档旧双流派生成器，新增粉笔固定采分树引擎与袁东大作文模型；更新双栏镜像对照UI；清除硬编码扣分规则；通过全部253项后端及28项前端测试并重新打包原生macOS应用\",\"touchedFiles\":[\"gongkao/grading.py\",\"gongkao/grading_pipeline/evidence.py\",\"gongkao/web/runtime.py\",\".mdflow/graph.json\",\".mdflow/mdflow.sqlite\"],\"cursorUpdatedAt\":\"2026-09-11T09:32:28.940Z\"}",
         "id": "yanshen",
         "name": "YanShen - 申论智能备考系统 (macOS & 权威名师融合版)",
         "repo_root": ".",
         "schema_version": 1,
-        "timeline_json": "{\"activePlanId\":\"plan-teacher-style-fenbi-scoring\",\"activeStepId\":\"rebuild-relaunch\",\"nowDoing\":\"排查并修复URL导入试卷时出现的 unknown encoding: utf-8-sig 报错\",\"nextUp\":\"根据用户后续真实作答批改体验，持续调优微采分点匹配精度与袁东大作文诊断细化度\",\"lastFinished\":\"完成mdflow架构全面同步：归档旧双流派生成器，新增粉笔固定采分树引擎与袁东大作文模型；更新双栏镜像对照UI；清除硬编码扣分规则；通过全部253项后端及28项前端测试并重新打包原生macOS应用\",\"touchedFiles\":[\"gongkao/grading.py\",\"gongkao/grading_pipeline/evidence.py\",\"gongkao/web/runtime.py\",\".mdflow/graph.json\",\".mdflow/mdflow.sqlite\"],\"cursorUpdatedAt\":\"2026-09-11T05:42:49.493Z\"}",
-        "updated_at": "2026-09-11T05:50:14.433Z"
+        "timeline_json": "{\"activePlanId\":\"plan-teacher-style-fenbi-scoring\",\"activeStepId\":\"rebuild-relaunch\",\"nowDoing\":\"研读Shenlun.skill中袁东大作文方法论，排查并重构当前大作文评分模型与提示词体系\",\"nextUp\":\"根据用户使用反馈，持续优化复杂套卷URL自动解析与划点批改体验\",\"lastFinished\":\"完成mdflow架构全面同步：归档旧双流派生成器，新增粉笔固定采分树引擎与袁东大作文模型；更新双栏镜像对照UI；清除硬编码扣分规则；通过全部253项后端及28项前端测试并重新打包原生macOS应用\",\"touchedFiles\":[\"gongkao/grading.py\",\"gongkao/grading_pipeline/evidence.py\",\"gongkao/web/runtime.py\",\".mdflow/graph.json\",\".mdflow/mdflow.sqlite\"],\"cursorUpdatedAt\":\"2026-09-11T09:32:28.940Z\"}",
+        "updated_at": "2026-09-11T09:46:02.711Z"
       }
     ],
     "blocks": [
@@ -121,7 +121,7 @@
         "summary": "袁东大作文方法论：单/双/多主题类型、五段三分结构、材料关键词三步提炼、四维定级赋分",
         "tags_json": "[]",
         "title": "袁东大作文两轮五维评分模型",
-        "updated_at": "2026-09-11T05:26:33.633Z"
+        "updated_at": "2026-09-11T09:46:02.711Z"
       },
       {
         "architecture_layer": "unspecified",
@@ -1107,6 +1107,26 @@
         "aggregation_policy_json": "{}",
         "checkpoint_kind": "atomic",
         "coverage": "complete",
+        "created_at": "2026-09-11T09:46:02.711Z",
+        "criteria": "大作文全面落地袁东方法论（审题三类型、五段三分四层链条、双线融合、创新加分机制），明确粉笔大作文参考答案仅作立意校核参考，257项全套单元测试通过，macOS应用打包成功并启动。",
+        "current_revision": 1,
+        "eligible_after_children": 0,
+        "evidence_json": "[{\"command\":\"pytest tests/\",\"output\":\"257 passed, 1 warning in 30.74s\"},{\"command\":\"python scripts/audit_release.py\",\"output\":\"Release database audit passed.\"},{\"kind\":\"mdflow-identity\",\"version\":2,\"gitHead\":\"c2f9d193eb6ced236ed6e14482743f7cc7a7411b\",\"files\":[{\"path\":\"gongkao/taxonomy.py\",\"hash\":\"7a935b1361e37cfdfd7e08d1e9243e6f13975b0bcec2cf7df342b904741c279b\"}],\"bindings\":[{\"id\":\"source_96a3edd3-5e9c-42fd-8397-9fe3c515da69\",\"blockId\":\"essay-yuandong-evaluator\",\"path\":\"gongkao/taxonomy.py\",\"symbol\":\"classify_essay_theme_type\",\"language\":\"python\",\"signature\":\"def classify_essay_theme_type(prompt, requirements=\\\"\\\"):\",\"fileHash\":\"7a935b1361e37cfdfd7e08d1e9243e6f13975b0bcec2cf7df342b904741c279b\",\"nodeHash\":\"19c784410117e882929c643b1094568f3a009369888d1165a89ab34859bc59f3\",\"signatureHash\":\"d157c23a34b3de06501d3a9daf7455634d79afcc67d8b513702f9ae6e0576853\",\"startLine\":364,\"endLine\":380,\"bindingStatus\":\"fresh\"}]}]",
+        "evidence_level": "integration",
+        "id": "checkpoint_3316e73e-39e4-4e71-ba11-78678ed8baa3",
+        "invalidated_at": null,
+        "project_id": "yanshen",
+        "required_evidence_level": "static",
+        "status": "passed",
+        "target_id": "essay-yuandong-evaluator",
+        "target_type": "block",
+        "title": "袁东大作文方法论全面注入与立意校核定级重构完成",
+        "updated_at": "2026-09-11T09:46:02.711Z"
+      },
+      {
+        "aggregation_policy_json": "{}",
+        "checkpoint_kind": "atomic",
+        "coverage": "complete",
         "created_at": "2026-09-11T05:26:52.071Z",
         "criteria": "浏览器端导入书签与单次无状态导入会话桥接验证通过",
         "current_revision": 1,
@@ -1328,15 +1348,6 @@
     "checkpoint_dependencies": [],
     "localized_text": [],
     "change_sets": [
-      {
-        "actor": "agent",
-        "created_at": "2026-09-10T09:35:55.233Z",
-        "git_head": null,
-        "id": "change_47e7aef4-9f65-47f0-a31e-6921a2e0f468",
-        "project_id": "yanshen",
-        "reason": "Checkpoint: 粉笔参考答案采分对照与正文计数",
-        "task": "粉笔参考答案采分对照与正文计数"
-      },
       {
         "actor": "agent",
         "created_at": "2026-09-10T10:37:37.721Z",
@@ -1777,26 +1788,18 @@
         "project_id": "yanshen",
         "reason": "Checkpoint: 浏览器已登录来源页桥接验证",
         "task": "浏览器已登录来源页桥接验证"
+      },
+      {
+        "actor": "agent",
+        "created_at": "2026-09-11T09:46:02.711Z",
+        "git_head": null,
+        "id": "change_d4fb6f30-c78e-4242-adcd-fbd09de46a1a",
+        "project_id": "yanshen",
+        "reason": "Checkpoint: 袁东大作文方法论全面注入与立意校核定级重构完成",
+        "task": "袁东大作文方法论全面注入与立意校核定级重构完成"
       }
     ],
     "history": [
-      {
-        "action": "created",
-        "affected_refs_json": "[\"checkpoint:checkpoint_fe7b1131-4d93-4b06-9237-609997b177b1\",\"block:web-grading-ui\"]",
-        "after_json": "{\"id\":\"checkpoint_fe7b1131-4d93-4b06-9237-609997b177b1\",\"targetType\":\"block\",\"targetId\":\"web-grading-ui\",\"title\":\"粉笔参考答案采分对照与正文计数\",\"criteria\":\"报告以粉笔参考答案原文作为标杆，HTML 实体不再显示为乱码；批改标签、得分说明和材料出处不计入答案正文占格。\",\"status\":\"passed\",\"checkpointKind\":\"atomic\",\"aggregationPolicy\":{},\"eligibleAfterChildren\":false,\"evidenceLevel\":\"integration\",\"requiredEvidenceLevel\":\"integration\",\"coverage\":\"complete\",\"evidence\":[{\"kind\":\"test\",\"command\":\"node --test tests/frontend/*.test.mjs\",\"result\":\"Frontend interaction tests passed\"},{\"kind\":\"lint\",\"command\":\"npm run lint:js\",\"result\":\"JavaScript lint passed\"},{\"kind\":\"regression\",\"result\":\"Added regression coverage proving annotated text counts exactly as visible answer text and &emsp; is not rendered literally\"},{\"kind\":\"mdflow-identity\",\"version\":2,\"gitHead\":\"07cd58bdc640c7982117a678b0fe0d3cf771d90b\",\"files\":[],\"bindings\":[]}],\"invalidatedAt\":null,\"bindings\":[],\"children\":[],\"currentRevision\":1}",
-        "before_json": "{}",
-        "chain_scope_id": null,
-        "change_set_id": "change_47e7aef4-9f65-47f0-a31e-6921a2e0f468",
-        "changed_fields_json": "[\"title\",\"criteria\",\"status\",\"checkpointKind\",\"aggregationPolicy\",\"eligibleAfterChildren\",\"evidenceLevel\",\"requiredEvidenceLevel\",\"coverage\",\"evidence\"]",
-        "created_at": "2026-09-10T09:35:55.233Z",
-        "entity_id": "checkpoint_fe7b1131-4d93-4b06-9237-609997b177b1",
-        "entity_type": "checkpoint",
-        "evidence_refs_json": "[\"node --test tests/frontend/*.test.mjs\",\"npm run lint:js\"]",
-        "id": 50,
-        "plan_id": null,
-        "revision": 1,
-        "summary": "passed: 粉笔参考答案采分对照与正文计数"
-      },
       {
         "action": "updated",
         "affected_refs_json": "[\"block:paper-url-importer\"]",
@@ -2986,18 +2989,26 @@
         "plan_id": null,
         "revision": 1,
         "summary": "passed: 浏览器已登录来源页桥接验证"
+      },
+      {
+        "action": "created",
+        "affected_refs_json": "[\"checkpoint:checkpoint_3316e73e-39e4-4e71-ba11-78678ed8baa3\",\"block:essay-yuandong-evaluator\"]",
+        "after_json": "{\"id\":\"checkpoint_3316e73e-39e4-4e71-ba11-78678ed8baa3\",\"targetType\":\"block\",\"targetId\":\"essay-yuandong-evaluator\",\"title\":\"袁东大作文方法论全面注入与立意校核定级重构完成\",\"criteria\":\"大作文全面落地袁东方法论（审题三类型、五段三分四层链条、双线融合、创新加分机制），明确粉笔大作文参考答案仅作立意校核参考，257项全套单元测试通过，macOS应用打包成功并启动。\",\"status\":\"passed\",\"checkpointKind\":\"atomic\",\"aggregationPolicy\":{},\"eligibleAfterChildren\":false,\"evidenceLevel\":\"integration\",\"requiredEvidenceLevel\":\"static\",\"coverage\":\"complete\",\"evidence\":[{\"command\":\"pytest tests/\",\"output\":\"257 passed, 1 warning in 30.74s\"},{\"command\":\"python scripts/audit_release.py\",\"output\":\"Release database audit passed.\"},{\"kind\":\"mdflow-identity\",\"version\":2,\"gitHead\":\"c2f9d193eb6ced236ed6e14482743f7cc7a7411b\",\"files\":[{\"path\":\"gongkao/taxonomy.py\",\"hash\":\"7a935b1361e37cfdfd7e08d1e9243e6f13975b0bcec2cf7df342b904741c279b\"}],\"bindings\":[{\"id\":\"source_96a3edd3-5e9c-42fd-8397-9fe3c515da69\",\"blockId\":\"essay-yuandong-evaluator\",\"path\":\"gongkao/taxonomy.py\",\"symbol\":\"classify_essay_theme_type\",\"language\":\"python\",\"signature\":\"def classify_essay_theme_type(prompt, requirements=\\\"\\\"):\",\"fileHash\":\"7a935b1361e37cfdfd7e08d1e9243e6f13975b0bcec2cf7df342b904741c279b\",\"nodeHash\":\"19c784410117e882929c643b1094568f3a009369888d1165a89ab34859bc59f3\",\"signatureHash\":\"d157c23a34b3de06501d3a9daf7455634d79afcc67d8b513702f9ae6e0576853\",\"startLine\":364,\"endLine\":380,\"bindingStatus\":\"fresh\"}]}],\"invalidatedAt\":null,\"bindings\":[],\"children\":[],\"currentRevision\":1}",
+        "before_json": "{}",
+        "chain_scope_id": null,
+        "change_set_id": "change_d4fb6f30-c78e-4242-adcd-fbd09de46a1a",
+        "changed_fields_json": "[\"title\",\"criteria\",\"status\",\"checkpointKind\",\"aggregationPolicy\",\"eligibleAfterChildren\",\"evidenceLevel\",\"requiredEvidenceLevel\",\"coverage\",\"evidence\"]",
+        "created_at": "2026-09-11T09:46:02.711Z",
+        "entity_id": "checkpoint_3316e73e-39e4-4e71-ba11-78678ed8baa3",
+        "entity_type": "checkpoint",
+        "evidence_refs_json": "[\"pytest tests/\",\"python scripts/audit_release.py\"]",
+        "id": 121,
+        "plan_id": null,
+        "revision": 1,
+        "summary": "passed: 袁东大作文方法论全面注入与立意校核定级重构完成"
       }
     ],
     "change_feed": [
-      {
-        "action": "created",
-        "change_set_id": "change_47e7aef4-9f65-47f0-a31e-6921a2e0f468",
-        "created_at": "2026-09-10T09:35:55.233Z",
-        "entity_id": "checkpoint_fe7b1131-4d93-4b06-9237-609997b177b1",
-        "entity_type": "checkpoint",
-        "project_id": "yanshen",
-        "sequence": 50
-      },
       {
         "action": "updated",
         "change_set_id": "change_8ef09a60-4d75-428b-a207-4eab3fe5a69a",
@@ -3627,6 +3638,15 @@
         "entity_type": "checkpoint",
         "project_id": "yanshen",
         "sequence": 120
+      },
+      {
+        "action": "created",
+        "change_set_id": "change_d4fb6f30-c78e-4242-adcd-fbd09de46a1a",
+        "created_at": "2026-09-11T09:46:02.711Z",
+        "entity_id": "checkpoint_3316e73e-39e4-4e71-ba11-78678ed8baa3",
+        "entity_type": "checkpoint",
+        "project_id": "yanshen",
+        "sequence": 121
       }
     ]
   }

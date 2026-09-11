@@ -163,6 +163,74 @@ class ShenlunIntegrationTest(unittest.TestCase):
         self.assertIn("名师解题逻辑 vs 机构参考答案对照审计", report)
         self.assertIn("机构答案自创成语过多", report)
 
+    def test_yuandong_essay_grading_package(self):
+        from gongkao.grading import build_grading_package, REPORT_INSTRUCTIONS_ESSAY
+        question = {
+            "id": 100,
+            "question_code": "2026-GK-05",
+            "year": 2026,
+            "region": "国考",
+            "exam_type": "行政执法",
+            "paper_name": "行政执法卷",
+            "question_type": "综合写作",
+            "title": "大作文",
+            "word_limit": "1000-1200字",
+            "zhejiang_relevance": 5,
+            "is_full_original": 1,
+            "prompt": "请以“守正与创新”为主题写一篇文章。",
+            "requirements": "自选角度，立意明确，结构完整，字数1000-1200字。",
+            "materials": "材料内容：守正为根基，创新为动力。",
+        }
+        references = [
+            {"organization": "粉笔", "answer_text": "粉笔大作文范文参考", "scoring_points": "立意：守正创新相辅相成"}
+        ]
+        package = build_grading_package(question, references)
+        self.assertIn("Shenlun.skill 袁东大作文方法论与评审铁律", package)
+        self.assertIn("【粉笔大作文参考答案仅作立意校核依据】", package)
+        self.assertIn("双主题AB型", package)
+        self.assertIn("五段三分规范结构与段内四层链条", package)
+        self.assertIn("政策理论线", package)
+        self.assertIn("案例分析线", package)
+        self.assertIn("模板与创新规则（模板是底线，不是天花板）", package)
+        self.assertIn("## 袁东审题与立意诊断", package)
+        self.assertIn("## 五段三分与双线论证分析", package)
+        self.assertIn("正文字数规则：仅统计用户作答纯正文字数", package)
+        self.assertIn("错别字免扣分铁律", package)
+        self.assertIn(REPORT_INSTRUCTIONS_ESSAY, package)
+
+    def test_render_grading_report_essay_reference_audit(self):
+        from gongkao.grading_pipeline.report import render_grading_report
+        result = {
+            "score": 82,
+            "display_score": 82,
+            "display_max_score": 100,
+            "overall_summary": "立意高远，论据扎实",
+            "point_matches": [
+                {
+                    "point_key": "p1",
+                    "status": "hit",
+                    "coverage_ratio": 1.0,
+                    "awarded_score": 20,
+                    "answer_quote": "守正为基，创新为翼",
+                    "reason": "中心论点明确切题",
+                }
+            ],
+            "annotations": [],
+        }
+        rubric = {
+            "question_type": "综合写作",
+            "selected_references": [
+                {"organization": "粉笔", "answer_text": "粉笔大作文参考答案"},
+            ],
+            "points": [
+                {"point_key": "p1", "label": "中心论点：守正创新", "weight": 20, "group_label": "立意"}
+            ],
+        }
+        report = render_grading_report(result, rubric, [])
+        self.assertIn("## 袁东方法论核心论点与论据判定", report)
+        self.assertIn("## 粉笔参考答案与立意校核（仅作论点切题参考）", report)
+        self.assertIn("【立意校核说明】：粉笔大作文参考答案仅用于核验考生的中心立意与分论点是否切题", report)
+
 
     def test_benchmark_count_excludes_diagnostics_and_decodes_entities(self):
         from gongkao.grading import count_cjk_chars, normalize_revised_answer_word_count
