@@ -619,6 +619,34 @@ class SmartGradingTest(unittest.TestCase):
         self.assertIn("普通“写到了”不能进入此档", grading_prompt)
         self.assertIn('"max_score": 70.0', grading_prompt)
 
+    def test_essay_prompt_requires_band_first_scoring_contract(self):
+        prompt = build_grading_prompt(
+            {
+                "id": 2,
+                "question_type": "综合写作",
+                "prompt": "请围绕材料主题写一篇文章。",
+                "requirements": "观点明确，论证充分。",
+                "word_limit": "1000字左右",
+            },
+            [{"material_number": 1, "content": "材料主题与案例。"}],
+            {"id": 2, "answer_text": "一篇待评作文。"},
+            {
+                "points": [],
+                "dimensions": [
+                    {"dimension": "content", "weight": 40},
+                    {"dimension": "reasoning", "weight": 25},
+                    {"dimension": "structure", "weight": 20},
+                    {"dimension": "expression", "weight": 10},
+                    {"dimension": "format", "weight": 5},
+                ],
+            },
+            [],
+        )
+        self.assertIn('"overall_band": "A|B|C|D|E"', prompt)
+        self.assertIn('"high_band_evidence"', prompt)
+        self.assertIn("先定档，后分维度", prompt)
+        self.assertIn("普通模板化、仅语句流畅", prompt)
+
     def test_selected_reference_full_content_is_kept_in_both_prompts(self):
         question = {
             "id": 7,

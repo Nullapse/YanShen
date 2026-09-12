@@ -16,6 +16,17 @@ def _format_score(value) -> str:
     return f"{round(float(value or 0), 1):g}"
 
 
+def _essay_grade_label(score, result):
+    """Use Yuan Dong's five essay classes instead of the generic score labels."""
+    return result.get("essay_band_label") or (
+        "一类文（优秀）" if score >= 80 else
+        "二类文（良好）" if score >= 70 else
+        "三类文（中上）" if score >= 60 else
+        "四类文（一般）" if score >= 50 else
+        "五类文（较弱）"
+    )
+
+
 def _format_point_data(point_def, match, display_scale):
     status = str(match.get("status") or "miss").lower()
     if status in ("hit", "full", "完全得分", "完全命中", "满分"):
@@ -319,7 +330,10 @@ def render_grading_report(
     provisional = result.get("score_status") == "provisional"
     score_label = "原评分（已过期）" if stale else "总分"
     estimated = " · 百分制估分" if result.get("score_is_estimated") else ""
-    if score >= 80:
+    is_essay = rubric.get("question_type") == "综合写作"
+    if is_essay:
+        grade = _essay_grade_label(score, result)
+    elif score >= 80:
         grade = "优秀"
     elif score >= 65:
         grade = "良好"
@@ -336,6 +350,8 @@ def render_grading_report(
     word_limit = str(result.get("word_limit") or rubric.get("word_limit") or "").strip()
     if word_limit:
         lines.append(f"- 字数要求：{word_limit}")
+    if is_essay and result.get("essay_band_reason"):
+        lines.append(f"- 袁东定档依据：{result['essay_band_reason']}")
     if stale:
         lines.append("- 状态：采分点已人工纠正，总分待重新批改；该分数不计入统计。")
     elif provisional:
@@ -386,8 +402,6 @@ def render_grading_report(
         "major": "重要",
         "supporting": "补充",
     }
-    is_essay = rubric.get("question_type") == "综合写作"
-
     point_matches = result.get("point_matches") or []
     if point_matches:
         table_title = "## 袁东方法论核心论点与论据判定" if is_essay else "## 采分点判断"

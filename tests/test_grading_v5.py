@@ -184,9 +184,141 @@ class GradingV5Test(unittest.TestCase):
             "测试作文",
             [],
         )
-        self.assertEqual(result["score"], 73)
+        self.assertEqual(result["score"], 69.0)
+        self.assertEqual(result["essay_band"], "C")
         self.assertEqual(result["score_status"], "provisional")
         self.assertIn("essay_high_band_diagnostic_conflict", result["review"]["reasons"])
+
+    def test_essay_unjustified_first_class_score_is_capped_at_third_band(self):
+        rubric = {
+            "question_type": "综合写作",
+            "scoring_mode": "holistic_essay",
+            "dimensions": [
+                {"dimension": "content", "weight": 40},
+                {"dimension": "reasoning", "weight": 25},
+                {"dimension": "structure", "weight": 20},
+                {"dimension": "expression", "weight": 10},
+                {"dimension": "format", "weight": 5},
+            ],
+            "points": [],
+        }
+        result = validate_grading_result(
+            {
+                "overall_band": "A",
+                "band_reason": "结构完整、语言流畅",
+                "point_matches": [],
+                "dimension_scores": [
+                    {"dimension": "content", "score": 40, "reason": "内容完整"},
+                    {"dimension": "reasoning", "score": 25, "reason": "论证完整"},
+                    {"dimension": "structure", "score": 20, "reason": "结构完整"},
+                    {"dimension": "expression", "score": 10, "reason": "表达流畅"},
+                    {"dimension": "format", "score": 5, "reason": "格式正确"},
+                ],
+            },
+            rubric,
+            "一篇只有模板和套话的作文。",
+            [],
+        )
+        self.assertEqual(result["score"], 69.0)
+        self.assertEqual(result["essay_band"], "C")
+        self.assertFalse(result["essay_high_band_eligible"])
+        self.assertIn("缺少一类文", result["essay_band_reason"])
+        self.assertAlmostEqual(sum(item["score"] for item in result["dimension_scores"]), 69.0)
+
+    def test_essay_first_class_score_requires_all_high_band_evidence(self):
+        rubric = {
+            "question_type": "综合写作",
+            "scoring_mode": "holistic_essay",
+            "dimensions": [
+                {"dimension": "content", "weight": 40},
+                {"dimension": "reasoning", "weight": 25},
+                {"dimension": "structure", "weight": 20},
+                {"dimension": "expression", "weight": 10},
+                {"dimension": "format", "weight": 5},
+            ],
+            "points": [],
+        }
+        result = validate_grading_result(
+            {
+                "overall_band": "A",
+                "high_band_evidence": {
+                    "precise_task_and_theme": True,
+                    "clear_thesis": True,
+                    "coherent_argument_structure": True,
+                    "material_accurate_and_specific": True,
+                    "major_arguments_fully_developed": True,
+                    "depth_or_innovation": True,
+                    "no_fact_or_logic_hard_error": True,
+                },
+                "point_matches": [],
+                "dimension_scores": [
+                    {"dimension": "content", "score": 34, "reason": "材料转化准确且具体"},
+                    {"dimension": "reasoning", "score": 22, "reason": "论证充分深入"},
+                    {"dimension": "structure", "score": 18, "reason": "结构严密"},
+                    {"dimension": "expression", "score": 9, "reason": "表达准确"},
+                    {"dimension": "format", "score": 4, "reason": "格式规范"},
+                ],
+            },
+            rubric,
+            "审题精准、论证充分、材料使用具体的完整作文。",
+            [],
+        )
+        self.assertEqual(result["score"], 87.0)
+        self.assertEqual(result["essay_band"], "A")
+        self.assertTrue(result["essay_high_band_eligible"])
+
+    def test_essay_missing_first_round_band_does_not_preserve_a_high_total(self):
+        rubric = {
+            "question_type": "综合写作",
+            "scoring_mode": "holistic_essay",
+            "dimensions": [
+                {"dimension": "content", "weight": 40},
+                {"dimension": "reasoning", "weight": 25},
+                {"dimension": "structure", "weight": 20},
+                {"dimension": "expression", "weight": 10},
+                {"dimension": "format", "weight": 5},
+            ],
+            "points": [],
+        }
+        result = validate_grading_result(
+            {
+                "point_matches": [],
+                "dimension_scores": [
+                    {"dimension": "content", "score": 32, "reason": "内容尚可"},
+                    {"dimension": "reasoning", "score": 20, "reason": "论证尚可"},
+                    {"dimension": "structure", "score": 16, "reason": "结构尚可"},
+                    {"dimension": "expression", "score": 8, "reason": "表达尚可"},
+                    {"dimension": "format", "score": 4, "reason": "格式尚可"},
+                ],
+            },
+            rubric,
+            "缺少第一轮档位字段的作文。",
+            [],
+        )
+        self.assertEqual(result["score"], 69.0)
+        self.assertEqual(result["essay_band"], "C")
+        self.assertEqual(result["essay_band_declared"], "")
+
+    def test_essay_report_uses_yuandong_five_class_labels(self):
+        report = render_grading_report(
+            {
+                "score": 65,
+                "display_score": 65,
+                "display_max_score": 100,
+                "essay_band": "C",
+                "essay_band_label": "三类文（中上）",
+                "essay_band_reason": "按实际完成质量定档。",
+                "overall_summary": "立意基本切题，但论证仍显空泛。",
+                "weighted_coverage_score": 0,
+                "content_score": 26,
+                "dimension_scores": [],
+                "point_matches": [],
+            },
+            {"question_type": "综合写作", "points": [], "selected_references": []},
+            [],
+        )
+        self.assertIn("等级：三类文（中上）", report)
+        self.assertNotIn("等级：良好", report)
 
     def test_rubric_prompt_exposes_weight_contract(self):
         prompt = build_rubric_prompt(

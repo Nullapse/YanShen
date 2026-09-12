@@ -107,8 +107,16 @@ def _smart_response_parts(response, expects_rubric):
 
 
 def _build_review_prompt(question, rubric, answer_text, result):
-    essay_guidance = ESSAY_SCORING_GUIDANCE if question.get("question_type") == "综合写作" else ""
-    return f"""你正在复核一份申论智能评分中的结构化冲突。只纠正采分点状态、证据短引文和维度分，不生成或改写任何完整答案。
+    is_essay = question.get("question_type") == "综合写作"
+    essay_guidance = ESSAY_SCORING_GUIDANCE if is_essay else ""
+    essay_review_fields = (
+        '  "overall_band": "A|B|C|D|E",\n'
+        '  "band_reason": "复核后的整篇档位依据",\n'
+        '  "high_band_evidence": {"precise_task_and_theme": false, "clear_thesis": false, "coherent_argument_structure": false, "material_accurate_and_specific": false, "major_arguments_fully_developed": false, "depth_or_innovation": false, "no_fact_or_logic_hard_error": false},\n'
+        if is_essay
+        else ""
+    )
+    return f"""你正在复核一份申论智能评分中的结构化冲突。只纠正采分点状态、证据短引文、整篇档位和维度分，不生成或改写任何完整答案。
 
 题目信息：
 {json.dumps({key: question.get(key) for key in ('question_type', 'prompt', 'requirements', 'word_limit')}, ensure_ascii=False)}
@@ -127,18 +135,27 @@ def _build_review_prompt(question, rubric, answer_text, result):
 只输出 <smart_grading_json> 包裹的合法 JSON：
 <smart_grading_json>
 {{"evaluation": {{
+{essay_review_fields}
   "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "score_level": "full|mostly|half|slight|none", "coverage_ratio": 0.0, "answer_quote": "一段短连续原文，或用……连接按顺序出现的短片段", "reason": "复核依据", "confidence": 0.0, "missing_elements": []}}],
   "dimension_scores": [{{"dimension": "", "score": 0.0, "reason": "复核后的维度依据"}}]
 }}}}
 </smart_grading_json>
 
-规则：每个评分基准 point_key 和每个维度必须且只能出现一次；不得输出总分；不得因空格、标点、引号或省略号形式差异把已有语义改判为未命中；综合写作大作文严格依据袁东方法论两轮阅卷定档赋分，粉笔答案仅用于校核考生的中心立意与论点切题度，绝不是客观给分点，严禁逐句对齐扣分，亦不要求机械覆盖每一则材料案例。非作文题按真实阅卷全面性与准确性阶梯分档：全面且准确判 hit/full=1；概括不全面或不够准确必须判 partial（mostly=0.75、half=0.5、slight=0.25），并在 missing_elements 中说明缺失要素或不准确原因；完全未答或答错判 miss/none=0。不得把粗糙沾边无原则给满分，亦不得用粉笔答案没写的材料细节扣分。
+规则：每个评分基准 point_key 和每个维度必须且只能出现一次；不得输出数值总分；不得因空格、标点、引号或省略号形式差异把已有语义改判为未命中；综合写作必须先复核 overall_band，再在该档区间内分配维度分；B档至少要求除 depth_or_innovation 外其余六项证据为 true 且无事实/逻辑硬伤，A档还要求 depth_or_innovation 为 true，普通模板化或仅语言流畅最多按C档。综合写作粉笔答案仅用于校核中心立意与论点切题度，绝不是客观给分点，严禁逐句对齐扣分，亦不要求机械覆盖每一则材料案例。非作文题按真实阅卷全面性与准确性阶梯分档：全面且准确判 hit/full=1；概括不全面或不够准确必须判 partial（mostly=0.75、half=0.5、slight=0.25），并在 missing_elements 中说明缺失要素或不准确原因；完全未答或答错判 miss/none=0。不得把粗糙沾边无原则给满分，亦不得用粉笔答案没写的材料细节扣分。
 """
 
 
 def _merge_review_evaluation(original, reviewed):
     merged = dict(original or {})
-    for key in ("point_matches", "dimension_scores", "holistic_adjustment_reason"):
+    for key in (
+        "point_matches",
+        "dimension_scores",
+        "holistic_adjustment_reason",
+        "overall_band",
+        "band_reason",
+        "high_band_evidence",
+        "band_evidence",
+    ):
         if reviewed.get(key) is not None:
             merged[key] = reviewed[key]
     return merged

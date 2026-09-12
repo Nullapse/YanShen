@@ -40,9 +40,9 @@ def _extract_matching_quote(quote, reason, answer_text):
 
 RUBRIC_VERSION = "rubric-v8-fenbi-score-tree"
 
-RESULT_VERSION = "grading-result-v9-fenbi-score-tree"
+RESULT_VERSION = "grading-result-v10-fenbi-score-tree-yuandong-band-first"
 
-PIPELINE_VERSION = "smart-grading-v8-fenbi-score-tree"
+PIPELINE_VERSION = "smart-grading-v9-fenbi-score-tree-yuandong-band-first"
 
 CONSENSUS_MAX_MATERIAL_CLAUSES = 240
 

@@ -77,3 +77,8 @@ class GradingResult(TypedDict, total=False):
     review: dict
     summary: dict
     word_limit: str
+    essay_band: str
+    essay_band_label: str
+    essay_band_reason: str
+    essay_band_declared: str
+    essay_high_band_eligible: bool

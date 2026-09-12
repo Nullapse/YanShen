@@ -32,6 +32,21 @@ def _dimension_score_template(dimensions):
     ]
 
 
+def _essay_band_prompt_contract(is_essay):
+    """Return the explicit first-round band contract for essay grading."""
+    if not is_essay:
+        return "", ""
+    fields = (
+        '  "overall_band": "A|B|C|D|E",\n'
+        '  "band_reason": "先定整篇档位的具体依据；不能只写语句流畅或结构完整",\n'
+        '  "high_band_evidence": {"precise_task_and_theme": false, "clear_thesis": false, "coherent_argument_structure": false, "material_accurate_and_specific": false, "major_arguments_fully_developed": false, "depth_or_innovation": false, "no_fact_or_logic_hard_error": false},\n'
+    )
+    rules = (
+        "大作文必须填写 overall_band、band_reason 和 high_band_evidence。B（二类文，70—79）至少要求除 depth_or_innovation 外其余六项证据为 true，且无事实/逻辑硬伤；A（一类文，80—100）还要求 depth_or_innovation 也为 true。普通模板化、仅语句流畅、仅标题完整或仅分段清楚，最多进入C（三类文，60—69）。如果任一证据不确定就填 false，并按C/D/E档给分。overall_band 是整篇分数上限约束，不是可忽略的标签。\n"
+    )
+    return fields, rules
+
+
 DIMENSION_SCORING_GUIDANCE = """维度分采用符合真实考场阅卷强度的“得分制”，不是从满分起步的扣分制，也不是概率或0—1置信度。必须先看实际完成质量，再从0分向上给分。
 - 90%—100%仅用于几乎可直接作为考场高分范文的表现：任务完整、材料转化准确、重点突出且基本没有可见缺陷；普通“写到了”不能进入此档。
 - 75%—89%用于完成度较高但仍有明确提升空间的表现。
@@ -81,7 +96,7 @@ ESSAY_SCORING_GUIDANCE = """【袁东大作文（综合写作）专业评审方�
 每个分论点段内部坚持政策理论线（政策精神转述）与案例分析线（有名有姓有细节、提炼启示）双线融合，严禁通篇纯理论空谈或纯讲故事。
 
 五、模板与创新加分规则（模板是底线，不是天花板）：
-1. 模板是保底工具（保二类文70分以上）。
+1. 模板是保底工具，只能说明结构方向基本可用，不代表自动达到70分；模板化但论证空洞、材料转化薄弱的文章仍按实际完成质量定为三类或四类。
 2. 超越模板的创新加分情形：
    - 独到的切入角度（如从哲学高度切入，格局更高，予以加分）；
    - 新颖的论证结构（以核心故事贯穿全文层层剥开，只要自洽深刻，不扣结构分，反而加分）；
@@ -342,6 +357,7 @@ def build_combined_grading_prompt(
         role_instruction = (
             "你正在评审申论大作文（综合写作）。请严格依据【袁东大作文方法论】进行专业审题判断与定级赋分。\n"
             "你是阅卷与诊断老师，不是参考答案作者；只分析立意、五段三分框架、材料论据转化与固定维度得分。\n"
+            "【先定档，后分维度】：先对整篇文章做第一轮五档定级，再在该档允许的分数区间内分配各维度；不得先把内容、论证、结构、表达、格式分别打高分后再相加。\n"
             "【粉笔答案仅作立意校核】：大作文不是客观小题！粉笔参考答案仅用于判断考生的中心立意与分论点是否切题、正确，绝不是客观给分点，严禁把粉笔答案逐句对齐扣分！\n"
             "【修改建议与字数】：修改建议必须说明用户答案应补、应删、应合并或应规范的具体位置与局部动作，只给局部动作，严禁输出重写后的完整文章。字数只统计用户作答纯正文。\n"
             "禁止生成、改写、压缩或润色任何完整答案。coaching_context 只用于点评建议，不得影响任何得分。"
@@ -602,6 +618,7 @@ def build_grading_prompt(
         role_instruction = (
             "你正在评审申论大作文（综合写作）。请严格依据【袁东大作文方法论】进行专业审题判断与定级赋分。\n"
             "你是阅卷与诊断老师，不是参考答案作者；只分析立意、五段三分框架、材料论据转化与固定维度得分。\n"
+            "【先定档，后分维度】：先对整篇文章做第一轮五档定级，再在该档允许的分数区间内分配各维度；不得先把内容、论证、结构、表达、格式分别打高分后再相加。\n"
             "【粉笔答案仅作立意校核】：大作文不是客观小题！粉笔参考答案仅用于判断考生的中心立意与分论点是否切题、正确，绝不是客观给分点，严禁把粉笔答案逐句对齐扣分！\n"
             "【修改建议与字数】：修改建议必须说明用户答案应补、应删、应合并或应规范的具体位置与局部动作，只给局部动作，严禁输出重写后的完整文章。字数只统计用户作答纯正文。\n"
             "禁止生成、改写、压缩或润色任何完整答案。coaching_context 只用于点评建议，不得影响任何得分。"
@@ -618,6 +635,8 @@ def build_grading_prompt(
             "4. 完全未答或理解错误判 miss/none=0。\n"
             "禁止生成、改写、压缩或润色任何完整答案。coaching_context 只用于点评建议，不得影响任何得分。"
         )
+
+    essay_output_fields, essay_band_rules = _essay_band_prompt_contract(is_essay)
 
     return f"""{role_instruction}
 
@@ -658,13 +677,15 @@ coaching_context（跨题、知识和历史最小证据）：
 
 {essay_guidance}
 
+{essay_band_rules}
+
 输出保持干练：每个 reason 最多 60 字；annotations 最多 6 条。不要重复题干、材料或参考答案全文。
 
 只输出一个由 <smart_grading_json> 与 </smart_grading_json> 包裹的合法 JSON：
 <smart_grading_json>
 {{
   "evaluation": {{
-    "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "score_level": "full|mostly|half|slight|none", "coverage_ratio": 0.0, "answer_quote": "尽量使用用户答案短且连续的原文", "reason": "覆盖或缺失说明", "confidence": 0.0, "missing_elements": []}}],
+{essay_output_fields}  "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "score_level": "full|mostly|half|slight|none", "coverage_ratio": 0.0, "answer_quote": "尽量使用用户答案短且连续的原文", "reason": "覆盖或缺失说明", "confidence": 0.0, "missing_elements": []}}],
     "dimension_scores": {json.dumps(dimension_score_template, ensure_ascii=False)},
     "holistic_adjustment_reason": "",
     "annotations": [{{"kind": "good|polish|change|delete|add|critical", "severity": "positive|low|medium|high|critical", "quote": "非补充类必须为用户答案连续原文", "anchor": "补充类必须为用户答案连续原文，表示插入在此句之后", "replacement": "", "reason": "", "point_key": ""}}],
@@ -686,5 +707,5 @@ coaching_context（跨题、知识和历史最小证据）：
 4. hit/partial 应提供用户答案中的短连续原文；若语义散落在多处，可用“……”连接按顺序出现的多个短片段。
 5. dimension_scores 必须逐项覆盖评分基准 dimensions；max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。
 6. 你是阅卷与诊断老师，不是答案作者。禁止输出、改写、压缩或润色任何完整答案；禁止自创任何替代答案。
-7. 不直接输出总分、分数算式、折算分或等级；系统将各维度 score 相加、校准并缩放到原题满分。
+7. 非作文题不直接输出总分、分数算式、折算分或等级；综合写作必须输出 overall_band 作为第一轮整篇定档，但仍不得输出数值总分或算式，系统负责校验档位上限并缩放到原题满分。
 """

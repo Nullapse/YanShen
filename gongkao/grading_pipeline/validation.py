@@ -22,6 +22,189 @@ _DIAGNOSTIC_KEYWORDS = (
 )
 
 
+_ESSAY_BAND_RANGES = {
+    "A": (80.0, 100.0, "一类文（优秀）"),
+    "B": (70.0, 79.0, "二类文（良好）"),
+    "C": (60.0, 69.0, "三类文（中上）"),
+    "D": (50.0, 59.0, "四类文（一般）"),
+    "E": (0.0, 49.0, "五类文（较弱）"),
+}
+
+_ESSAY_BAND_ALIASES = {
+    "a": "A",
+    "一类": "A",
+    "一类文": "A",
+    "优秀": "A",
+    "excellent": "A",
+    "b": "B",
+    "二类": "B",
+    "二类文": "B",
+    "良好": "B",
+    "good": "B",
+    "c": "C",
+    "三类": "C",
+    "三类文": "C",
+    "中上": "C",
+    "d": "D",
+    "四类": "D",
+    "四类文": "D",
+    "一般": "D",
+    "e": "E",
+    "五类": "E",
+    "五类文": "E",
+    "较弱": "E",
+}
+
+_ESSAY_HIGH_BAND_EVIDENCE_KEYS = (
+    "precise_task_and_theme",
+    "clear_thesis",
+    "coherent_argument_structure",
+    "material_accurate_and_specific",
+    "major_arguments_fully_developed",
+    "depth_or_innovation",
+    "no_fact_or_logic_hard_error",
+)
+
+_ESSAY_SECOND_BAND_EVIDENCE_KEYS = tuple(
+    key for key in _ESSAY_HIGH_BAND_EVIDENCE_KEYS if key != "depth_or_innovation"
+)
+
+_ESSAY_HIGH_BAND_DIAGNOSTIC_RE = re.compile(
+    r"(?:关键)?事实(?:偏差|错误)|材料误读|论证(?:空泛|薄弱|不足)|未能结合.{0,12}(?:材料|案例)"
+    r"|主要(?:部分|段落).{0,8}(?:缺少|不足)"
+)
+
+
+def _normalize_essay_band(value):
+    """Normalize the model's whole-essay band without treating it as proof."""
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    if text in _ESSAY_BAND_ALIASES:
+        return _ESSAY_BAND_ALIASES[text]
+    compact = re.sub(r"\s+", "", text)
+    if compact in _ESSAY_BAND_ALIASES:
+        return _ESSAY_BAND_ALIASES[compact]
+    range_match = re.search(r"(\d{2})\s*[—\-~至到]\s*(\d{2,3})", compact)
+    if range_match:
+        lower = float(range_match.group(1))
+        if lower >= 80:
+            return "A"
+        if lower >= 70:
+            return "B"
+        if lower >= 60:
+            return "C"
+        if lower >= 50:
+            return "D"
+        return "E"
+    return ""
+
+
+def _essay_band_for_score(score):
+    value = float(score or 0)
+    if value >= 80:
+        return "A"
+    if value >= 70:
+        return "B"
+    if value >= 60:
+        return "C"
+    if value >= 50:
+        return "D"
+    return "E"
+
+
+def _essay_evidence_is_true(value):
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "0", "false", "no", "否", "不"}
+    return bool(value)
+
+
+def _essay_high_band_is_eligible(raw, diagnostic):
+    evidence = raw.get("high_band_evidence")
+    if not isinstance(evidence, dict):
+        evidence = raw.get("band_evidence")
+    if not isinstance(evidence, dict):
+        return False
+    if not all(_essay_evidence_is_true(evidence.get(key)) for key in _ESSAY_HIGH_BAND_EVIDENCE_KEYS):
+        return False
+    return not _ESSAY_HIGH_BAND_DIAGNOSTIC_RE.search(str(diagnostic or ""))
+
+
+def _essay_second_band_is_eligible(raw, diagnostic):
+    evidence = raw.get("high_band_evidence")
+    if not isinstance(evidence, dict):
+        evidence = raw.get("band_evidence")
+    if not isinstance(evidence, dict):
+        return False
+    if not all(_essay_evidence_is_true(evidence.get(key)) for key in _ESSAY_SECOND_BAND_EVIDENCE_KEYS):
+        return False
+    return not _ESSAY_HIGH_BAND_DIAGNOSTIC_RE.search(str(diagnostic or ""))
+
+
+def _resolve_essay_band(raw, raw_score, diagnostic):
+    """Apply the conservative Yuan Dong five-band ceiling to an essay score."""
+    declared = _normalize_essay_band(raw.get("overall_band"))
+    inferred = _essay_band_for_score(raw_score)
+    reasons = []
+    if declared:
+        band = declared
+    else:
+        # A missing first-round band cannot justify either a first- or
+        # second-class score. The model is explicitly asked to provide it;
+        # omission therefore falls back to the top of the third band.
+        band = "C" if raw_score >= 70 else inferred
+        reasons.append("未提供整篇五档定级，按保守规则不直接进入一、二类文")
+
+    if band == "A" and not _essay_high_band_is_eligible(raw, diagnostic):
+        band = "B" if raw_score >= 70 else inferred
+        reasons.append("缺少一类文所需的完整高分证据，或诊断存在硬伤")
+    if band == "B" and not _essay_second_band_is_eligible(raw, diagnostic):
+        band = "C" if raw_score >= 60 else inferred
+        reasons.append("缺少二类文要求的切题、论证、材料和展开证据，或诊断存在硬伤")
+
+    lower, upper, label = _ESSAY_BAND_RANGES[band]
+    if raw_score < lower:
+        band = inferred
+        lower, upper, label = _ESSAY_BAND_RANGES[band]
+        reasons.append("整篇档位与维度合计不一致，采用实际合计所在档位")
+    if raw_score > upper:
+        reasons.append(f"按{label}上限约束维度合计")
+    return {
+        "band": band,
+        "label": label,
+        "lower": lower,
+        "upper": upper,
+        "reason": "；".join(reasons) or f"按{label}完成先定档，再分配各维度分。",
+        "declared": declared,
+        "high_band_eligible": _essay_high_band_is_eligible(raw, diagnostic),
+        "second_band_eligible": _essay_second_band_is_eligible(raw, diagnostic),
+    }
+
+
+def _rescale_dimension_scores(dimensions, target):
+    """Lower dimension scores proportionally when the essay band sets a ceiling."""
+    current = sum(float(item.get("score") or 0) for item in dimensions)
+    target = max(0.0, float(target or 0))
+    if current <= target + 0.001:
+        return False
+    if target <= 0:
+        for item in dimensions:
+            item["score"] = 0.0
+        return True
+    factor = target / current
+    for item in dimensions:
+        item["score"] = round(float(item.get("score") or 0) * factor, 1)
+    difference = round(target - sum(float(item.get("score") or 0) for item in dimensions), 1)
+    if difference:
+        for item in reversed(dimensions):
+            candidate = round(float(item.get("score") or 0) + difference, 1)
+            maximum = float(item.get("max_score") or 0)
+            if 0 <= candidate <= maximum:
+                item["score"] = candidate
+                break
+    return True
+
+
 def _coverage_factor(candidate, status):
     """Map a teacher-style completion band to an auditable score fraction."""
     if status == "hit":
@@ -404,6 +587,12 @@ def validate_grading_result(
             )
 
     raw_score = round(sum(item["score"] for item in normalized_dimensions), 1)
+    essay_diagnostic = " ".join(item.get("reason") or "" for item in normalized_dimensions)
+    essay_band_info = (
+        _resolve_essay_band(raw, raw_score, essay_diagnostic)
+        if scoring_mode == "holistic_essay"
+        else None
+    )
     if scoring_mode == "fenbi_tree":
         score = 0.0 if blank_answer else round(weighted_coverage, 1)
         score_calibration = {
@@ -442,6 +631,27 @@ def validate_grading_result(
                 (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
                 0.0,
             )
+        if scoring_mode == "holistic_essay" and essay_band_info:
+            score_calibration.update(
+                {
+                    "essay_band": essay_band_info["band"],
+                    "essay_band_label": essay_band_info["label"],
+                    "essay_band_cap": essay_band_info["upper"],
+                    "essay_band_reason": essay_band_info["reason"],
+                    "essay_band_high_evidence": essay_band_info["high_band_eligible"],
+                }
+            )
+            if score > essay_band_info["upper"]:
+                uncapped_score = score
+                _rescale_dimension_scores(normalized_dimensions, essay_band_info["upper"])
+                score = round(essay_band_info["upper"], 1)
+                score_calibration["essay_band_adjustment"] = round(score - uncapped_score, 1)
+                score_calibration["adjustment"] = round(score - raw_score, 1)
+                score_calibration["score"] = score
+                content_score = next(
+                    (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
+                    0.0,
+                )
 
     review_reasons = []
     for match in matches:
@@ -453,7 +663,6 @@ def validate_grading_result(
             review_reasons.append(f"unresolved_required_evidence:{match['point_key']}")
     if scoring_mode == "holistic_essay" and abs(content_score - weighted_coverage) > content_weight * 0.35:
         review_reasons.append("essay_content_diagnostic_divergence")
-    essay_diagnostic = " ".join(item.get("reason") or "" for item in normalized_dimensions)
     if (
         scoring_mode == "holistic_essay"
         and raw_score >= 70
@@ -476,7 +685,7 @@ def validate_grading_result(
         dimension["display_max_score"] = round(dimension["max_score"] * display_scale, 2)
         dimension["display_score"] = round(dimension["score"] * display_scale, 2)
 
-    return {
+    result = {
         "schema_version": RESULT_VERSION,
         "score_status": score_status,
         "point_matches": matches,
@@ -514,3 +723,14 @@ def validate_grading_result(
         "review": review,
         "validation_errors": review_reasons,
     }
+    if essay_band_info:
+        result.update(
+            {
+                "essay_band": essay_band_info["band"],
+                "essay_band_label": essay_band_info["label"],
+                "essay_band_reason": essay_band_info["reason"],
+                "essay_band_declared": essay_band_info["declared"],
+                "essay_high_band_eligible": essay_band_info["high_band_eligible"],
+            }
+        )
+    return result
