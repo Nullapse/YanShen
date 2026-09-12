@@ -164,7 +164,7 @@ class ShenlunIntegrationTest(unittest.TestCase):
         self.assertIn("机构答案自创成语过多", report)
 
     def test_yuandong_essay_grading_package(self):
-        from gongkao.grading import build_grading_package, REPORT_INSTRUCTIONS_ESSAY
+        from gongkao.grading import REPORT_INSTRUCTIONS_ESSAY, build_grading_package
         question = {
             "id": 100,
             "question_code": "2026-GK-05",
@@ -267,9 +267,9 @@ class ShenlunIntegrationTest(unittest.TestCase):
         self.assertNotIn('"revised_answer"', prompt)
 
     def test_relay_base_url_normalization_and_headers(self):
-        from gongkao.ai import build_chat_url, DEFAULT_USER_AGENT
-        from gongkao.web.controllers.settings import _clean_base_url
         from gongkao.agent_graph import _normalize_base_url
+        from gongkao.ai import DEFAULT_USER_AGENT, build_chat_url
+        from gongkao.web.controllers.settings import _clean_base_url
 
         # Test URL normalization for OpenCode Go
         self.assertEqual(build_chat_url("https://opencode.ai/go"), "https://opencode.ai/zen/go/v1/chat/completions")
@@ -299,6 +299,7 @@ class ShenlunIntegrationTest(unittest.TestCase):
         import tempfile
         from pathlib import Path
         from urllib.parse import urlencode
+
         from gongkao.db import connect, prepare_user_database
         from gongkao.web.controllers.settings import SettingsController
 

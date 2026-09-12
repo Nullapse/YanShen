@@ -128,7 +128,7 @@ def chat_completion(settings, prompt, request_options=None):
         if "1010" in detail or exc.code == 403:
             raise AiRequestError(f"API 请求失败：HTTP {exc.code}。服务商或中转站拦截了请求（如 Cloudflare WAF）。详细：{detail[:300]}") from exc
         raise AiRequestError(f"API 请求失败：HTTP {exc.code}。{detail[:500]}") from exc
-    except (TimeoutError, TimeoutAsyncError if 'TimeoutAsyncError' in globals() else TimeoutError) as exc:
+    except TimeoutError as exc:
         raise AiRequestError("API 请求超时（超过 300 秒），请检查网络或换用响应更快的模型。") from exc
     except URLError as exc:
         if "timed out" in str(exc.reason).lower():

@@ -4,17 +4,13 @@ generating dual-stream master answers and scoring rubrics without being misled
 by inaccurate reference answers.
 """
 
-import json
 import re
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .ai import chat_completion
 from .db import connect
 from .grading import word_limit_budget
-from .grading_pipeline.evidence import _material_text
-
-
-from pathlib import Path
 
 
 def build_solver_prompt(

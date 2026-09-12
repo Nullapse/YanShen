@@ -397,11 +397,6 @@ def render_grading_report(
         point.get("point_key"): point for point in rubric.get("points", [])
     }
     status_labels = {"hit": "命中", "partial": "部分命中", "miss": "未命中"}
-    importance_labels = {
-        "critical": "核心",
-        "major": "重要",
-        "supporting": "补充",
-    }
     point_matches = result.get("point_matches") or []
     if point_matches:
         table_title = "## 袁东方法论核心论点与论据判定" if is_essay else "## 采分点判断"

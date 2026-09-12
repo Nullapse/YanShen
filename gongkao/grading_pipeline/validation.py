@@ -13,7 +13,6 @@ from .contracts import GradingResult
 from .evidence_resolution import resolve_answer_evidence
 from .rubric import _default_criteria
 
-
 _DIAGNOSTIC_KEYWORDS = (
     "准确", "全面", "精准", "规范", "概括", "提炼", "表述", "宽泛", "笼统",
     "大而化之", "口语", "口语化", "偏弱", "欠缺", "缺失", "遗漏", "未体现", "未提及",

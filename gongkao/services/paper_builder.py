@@ -5,7 +5,7 @@ and parsing raw exam paper text into structured objects.
 import hashlib
 import json
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List
 
 from ..organizations import canonicalize_organization
 from ..taxonomy import classify_question_type

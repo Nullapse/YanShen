@@ -4,8 +4,26 @@ import json
 import logging
 from urllib.parse import parse_qs, urlparse
 
-from ...ai import chat_completion
 from ...ai_solver import get_question_solution, solve_question_with_ai
+from ...services.paper_builder import (
+    add_paper_question,
+    add_question_reference_answer,
+    create_custom_paper,
+    parse_raw_paper_text,
+)
+from ...services.url_importer import (
+    FENBI_CREDENTIALS,
+    IMPORT_SESSIONS,
+    MAX_BRIDGE_BYTES,
+    UrlImportError,
+    build_fenbi_bookmarklet,
+    draft_from_bridge_payload,
+    fenbi_credentials_summary,
+    fetch_source_draft,
+    parse_fenbi_credentials,
+    parse_source_url,
+    public_import_summary,
+)
 from ..runtime import (
     PAPER_WORK_STATUS_OPTIONS,
     QUESTION_WORK_STATUS_OPTIONS,
@@ -41,25 +59,6 @@ from ..runtime import (
     tabbed_references,
     workflow_header,
     year_range_filter,
-)
-from ...services.paper_builder import (
-    add_paper_question,
-    add_question_reference_answer,
-    create_custom_paper,
-    parse_raw_paper_text,
-)
-from ...services.url_importer import (
-    FENBI_CREDENTIALS,
-    IMPORT_SESSIONS,
-    MAX_BRIDGE_BYTES,
-    UrlImportError,
-    build_fenbi_bookmarklet,
-    draft_from_bridge_payload,
-    fenbi_credentials_summary,
-    fetch_source_draft,
-    parse_fenbi_credentials,
-    parse_source_url,
-    public_import_summary,
 )
 
 

@@ -1,15 +1,10 @@
-import codecs
 import ctypes
-import encodings
-import encodings.idna
-import encodings.utf_8
-import encodings.utf_8_sig
 import logging
 import os
 import subprocess
+import sys
 import threading
 import time
-import sys
 import urllib.request
 
 try:
@@ -317,7 +312,7 @@ class Launcher:
             import webview
 
             logging.info("Opening native pywebview desktop window at %s", self.start_url)
-            window = webview.create_window(
+            webview.create_window(
                 APP_NAME,
                 self.start_url,
                 width=1320,

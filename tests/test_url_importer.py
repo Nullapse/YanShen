@@ -22,7 +22,6 @@ from gongkao.services.url_importer import (
 )
 from gongkao.web.application import create_server
 
-
 SOURCE_URL = "https://spa.fenbi.com/ti/exam/solution/1_2_3r9r4m3?routecs=shenlun"
 
 

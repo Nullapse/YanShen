@@ -1146,56 +1146,6 @@ export function initializeAnnotations(signal) {
       activeRangeFromHighlight = false;
       clearSelectedHighlight();
     };
-    const syncToolbarSelection = (mark = null) => {
-      const activeColor = mark?.dataset.highlightColor || "";
-      const activeStyle = mark?.dataset.annotationStyle || "";
-      toolbar.querySelectorAll("[data-highlight-color]").forEach((button) => {
-        const active = Boolean(activeColor) && button.dataset.highlightColor === activeColor;
-        button.classList.toggle("is-active", active);
-        button.setAttribute("aria-pressed", String(active));
-      });
-      toolbar.querySelectorAll("[data-highlight-style]").forEach((button) => {
-        const active = Boolean(activeStyle) && button.dataset.highlightStyle === activeStyle;
-        button.classList.toggle("is-active", active);
-        button.setAttribute("aria-pressed", String(active));
-      });
-    };
-    const showToolbar = (range, mark = null) => {
-      hidePopover();
-      activeRange = range;
-      syncToolbarSelection(mark);
-      toolbar.hidden = false;
-      const toolbarRect = toolbar.getBoundingClientRect();
-      const topCandidate = range.rect.top + window.scrollY - toolbarRect.height - 8;
-      const top = topCandidate > window.scrollY + 8
-        ? topCandidate
-        : range.rect.bottom + window.scrollY + 8;
-      const left = clampNumber(
-        range.rect.left + window.scrollX + (range.rect.width / 2) - (toolbarRect.width / 2),
-        window.scrollX + 8,
-        window.scrollX + document.documentElement.clientWidth - toolbarRect.width - 8,
-      );
-      toolbar.style.top = `${Math.round(top)}px`;
-      toolbar.style.left = `${Math.round(left)}px`;
-    };
-    const showToolbarForHighlight = (mark) => {
-      const container = mark.closest("[data-material-highlight], [data-text-annotation]");
-      if (!container) return;
-      const start = Number(mark.dataset.highlightStart);
-      const end = Number(mark.dataset.highlightEnd);
-      if (!Number.isInteger(start) || !Number.isInteger(end) || end <= start) return;
-      window.getSelection()?.removeAllRanges();
-      clearSelectedHighlight();
-      mark.classList.add("is-selected-highlight");
-      activeRangeFromHighlight = true;
-      showToolbar({
-        container,
-        start,
-        end,
-        rect: mark.getBoundingClientRect(),
-        note: mark.dataset.annotationNote || "",
-      }, mark);
-    };
     const updateToolbarFromSelection = () => {
       if (isModalActive()) return;
       if (activeRangeFromHighlight) return;

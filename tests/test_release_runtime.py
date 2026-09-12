@@ -1818,7 +1818,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
         self.assertIn('["yellow", "orange", "pink", "purple", "blue", "green"]', script)
         self.assertIn("removeHighlightOverlap", script)
         self.assertIn("normalizeMaterialHighlights", script)
-        self.assertIn("showToolbarForHighlight", script)
+        self.assertIn("showCancelConfirm", script)
         self.assertIn("!selection.isCollapsed", script)
         self.assertIn("if (!toolbar.hidden && !toolbar.contains(event.target))", script)
         self.assertIn("dataset.highlightStart", script)

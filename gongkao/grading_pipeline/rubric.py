@@ -70,7 +70,6 @@ def compact_reference_consensus(conn, references, materials, similarity_threshol
             clusters.append({"representative": clause["text"], "vector": vector, "items": [clause]})
 
     organization_count = len(references)
-    single_reference_scoring = organization_count == 1 and question.get("question_type") != "综合写作"
     core_threshold = max(2, (organization_count + 1) // 2)
     cluster_candidates = []
     for index, cluster in enumerate(clusters, start=1):

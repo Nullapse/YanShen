@@ -1578,7 +1578,7 @@ def markdownish(value, return_to="", source_text="", annotation_scope="grading-a
             while index < len(lines) and not lines[index].strip().startswith("## "):
                 revised_lines.append(lines[index])
                 index += 1
-            stream_indices = [i for i, l in enumerate(revised_lines) if l.strip().startswith("### ")]
+            stream_indices = [i for i, line in enumerate(revised_lines) if line.strip().startswith("### ")]
             if len(stream_indices) >= 2:
                 pre_stream_lines = revised_lines[:stream_indices[0]]
                 for p_line in pre_stream_lines:

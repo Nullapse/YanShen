@@ -1246,7 +1246,7 @@ class SmartGradingTest(unittest.TestCase):
         for index in range(1, 11):
             key = f"point-{index}"
             self.assertIn(f"|{key}|", report)
-            self.assertNotIn(f"[标答点|miss|", report)
+            self.assertNotIn("[标答点|miss|", report)
         self.assertNotIn("覆盖20%", report)
 
     def test_partial_master_point_and_user_redundancy_share_visible_annotations(self):

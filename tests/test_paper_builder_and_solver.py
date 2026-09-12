@@ -24,7 +24,6 @@ from gongkao.services.paper_builder import (
 )
 from gongkao.web.application import create_server
 
-
 SAMPLE_RAW_PAPER = """2024年某省公务员考试《申论》真题（A卷）
 
 【给定资料】

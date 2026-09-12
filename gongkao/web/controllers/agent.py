@@ -3,7 +3,6 @@
 import time
 
 from ...ai_config import load_effective_agent_settings
-from .settings import _clean_base_url
 from ..runtime import (
     MODULES,
     AgentRunError,
@@ -55,6 +54,7 @@ from ..runtime import (
     start_or_continue_chat_async,
     valid_module_id,
 )
+from .settings import _clean_base_url
 
 
 class AgentController:

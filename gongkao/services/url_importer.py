@@ -1274,7 +1274,7 @@ def fetch_source_draft(source_url: str, credentials: dict | None = None, auto_su
                 info.source_url,
                 score_trees=score_trees,
             )
-        except UrlImportError as exc:
+        except UrlImportError:
             if info.source_kind != "fenbi_exercise" or not exercise_payload or not exercise_static_payloads:
                 raise
             draft = normalize_fenbi_payload(
