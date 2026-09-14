@@ -279,6 +279,7 @@ class GradingController:
                         "content": "立意与素材" if is_essay else "内容要点",
                         "reasoning": "论证深度" if is_essay else "论点论证",
                         "structure": "框架结构",
+                        "material": "素材运用" if is_essay else "材料依据",
                         "expression": "申论语言" if is_essay else "语言表达",
                         "format": "卷面格式" if is_essay else "格式规范",
                         "feasibility": "对策可行性",
@@ -374,10 +375,18 @@ class GradingController:
                     ):
                         selected = " selected" if match.get("status") == value else ""
                         status_options.append(f'<option value="{value}"{selected}>{label}</option>')
+                    point_meta = (
+                        f"论点/论据校核 {coverage_percent}%"
+                        if is_essay
+                        else (
+                            f"AI 覆盖判断 {coverage_percent}% · "
+                            f"建议权重 {esc(point.get('weight', match.get('weight', 0)))}"
+                        )
+                    )
                     feedback_items.append(f"""
                     <form class="grading-point-feedback" method="post" action="/grading-reports/{report["id"]}/feedback">
                       <input type="hidden" name="point_key" value="{esc(match.get("point_key"))}">
-                      <div><strong>{esc(point.get("label") or match.get("point_key"))}</strong><small>AI 覆盖判断 {coverage_percent}% · 建议权重 {esc(point.get("weight", match.get("weight", 0)))}</small></div>
+                      <div><strong>{esc(point.get("label") or match.get("point_key"))}</strong><small>{point_meta}</small></div>
                       <select name="corrected_status">{"".join(status_options)}</select>
                       <input name="corrected_quote" value="{esc(match.get("answer_quote"))}" placeholder="用户答案中的连续原句">
                       <input name="note" value="" placeholder="纠正理由（可选）">

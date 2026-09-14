@@ -165,6 +165,28 @@ def fenbi_tree_available(references):
     return any(_score_tree_from_reference(reference) for reference in dedupe_references(references))
 
 
+def fenbi_tree_is_applicable(question, references):
+    """Fenbi's point tree is authoritative for small questions, never essays."""
+    question = _row_dict(question)
+    return question.get("question_type") != "综合写作" and fenbi_tree_available(references)
+
+
+def is_current_holistic_essay_rubric(rubric):
+    """Reject essay caches that predate Yuan Dong's fixed five-dimension model."""
+    if not isinstance(rubric, dict) or rubric.get("scoring_mode") != "holistic_essay":
+        return False
+    dimensions = {}
+    for item in rubric.get("dimensions") or rubric.get("criteria") or []:
+        if not isinstance(item, dict) or not item.get("dimension"):
+            continue
+        dimensions[str(item["dimension"])] = float(item.get("weight") or 0)
+    expected = {
+        dimension: float(weight)
+        for dimension, weight in QUESTION_TYPE_PROFILES["综合写作"].items()
+    }
+    return dimensions == expected
+
+
 def _tree_number(value):
     try:
         number = float(value)
@@ -318,6 +340,7 @@ def manual_grading_basis(conn, question, materials, references):
     question = _row_dict(question)
     materials = [_row_dict(row) for row in materials]
     references = [_row_dict(row) for row in references]
+    is_essay = question.get("question_type") == "综合写作"
     ref_hash = reference_set_hash(references)
     source_hash = rubric_source_hash(question, materials, references)
     row = conn.execute(
@@ -330,8 +353,10 @@ def manual_grading_basis(conn, question, materials, references):
         (question.get("id"), ref_hash, source_hash, RUBRIC_VERSION),
     ).fetchone()
     if row:
-        return {"kind": "cached_rubric", "rubric": json.loads(row["rubric_json"])}
-    if fenbi_tree_available(references):
+        cached_rubric = json.loads(row["rubric_json"])
+        if not is_essay or is_current_holistic_essay_rubric(cached_rubric):
+            return {"kind": "cached_rubric", "rubric": cached_rubric}
+    if fenbi_tree_is_applicable(question, references):
         return {
             "kind": "fenbi_tree",
             "rubric": build_fenbi_tree_rubric(question, references),
@@ -353,17 +378,32 @@ def build_rubric_prompt(question, materials, references, consensus):
     effective_word_limit = question_word_limit_text(question)
     word_budget = word_limit_budget(effective_word_limit)
     budget_guidance = _word_budget_guidance(word_budget)
+    is_essay = question.get("question_type") == "综合写作"
     profile = QUESTION_TYPE_PROFILES.get(question.get("question_type")) or QUESTION_TYPE_PROFILES["归纳概括"]
     content_display_max = round(profile["content"] * question_display_max_score(question) / 100, 1)
-    single_reference_policy = (
-        "本题只有一份粉笔参考答案。该答案是内容采分点的唯一边界：只能切分其中已经写出的语义，"
-        "材料只用于排除明显无依据内容，绝对不得从材料新增采分点，也不得给参考答案小点追加地点、案例、政策名称或技术名称。"
-        if len(reference_context) == 1 and question.get("question_type") != "综合写作"
-        else "多份参考答案仅作候选解释，题干与材料用于核验评分边界。"
+    if is_essay:
+        single_reference_policy = (
+            "综合写作参考答案仅用于校核中心立意与分论点是否切题，绝不作为逐点累加作文总分的计分表。"
+        )
+    elif len(reference_context) == 1:
+        single_reference_policy = (
+            "本题只有一份粉笔参考答案。该答案是内容采分点的唯一边界：只能切分其中已经写出的语义，"
+            "材料只用于排除明显无依据内容，绝对不得从材料新增采分点，也不得给参考答案小点追加地点、案例、政策名称或技术名称。"
+        )
+    else:
+        single_reference_policy = "多份参考答案仅作候选解释，题干与材料用于核验评分边界。"
+    essay_rubric_contract = (
+        """【综合写作基准边界】：
+1. 作文总分必须先按袁东两轮阅卷确定整篇档位（一类文80—100、二类文70—79、三类文60—69、四类文50—59、五类文50分以下），再在档位区间内按立意、结构、论证、素材、语言五维分配；禁止把下面 points 的权重逐点相加得到作文总分。
+2. points 只用于立意切题度、分论点方向和材料论据覆盖的校核与原文批注。中心立意可作为 required；不同材料案例是可替代论据，统一设为 alternative；不得机械要求覆盖每则材料。
+3. 模板正确但论证空洞、素材薄弱或语言一般，只能进入三类或四类，不能因结构模板完整而进入一类或二类。"""
+        if is_essay
+        else ""
     )
     return f"""你正在为一道申论题建立可缓存、可审计的评分基准。只建立本题评分基准，不批改用户答案。
 
 {single_reference_policy}
+{essay_rubric_contract}
 
 题目ID：{question.get("id")}
 题型：{question.get("question_type")}

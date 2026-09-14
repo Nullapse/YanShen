@@ -8,7 +8,7 @@ CONTENT_WEIGHTS = {
     "综合分析": 55,
     "提出对策": 60,
     "公文写作": 50,
-    "综合写作": 40,
+    "综合写作": 30,
 }
 
 
@@ -359,21 +359,32 @@ def render_grading_report(
 
     display_scale = display_max / 100
     content_weight = CONTENT_WEIGHTS.get(rubric.get("question_type"), 70)
-    lines.extend(
-        [
-            "",
-            "## 采分点证据与整体校准",
-            (
-                f"- 逐点累计内容分："
-                f"{_format_score(float(result.get('weighted_coverage_score') or 0) * display_scale)}"
-                f"/{_format_score(content_weight * display_scale)}"
-            ),
-            (
-                f"- 综合内容分："
-                f"{_format_score(float(result.get('content_score') or 0) * display_scale)}"
-            ),
-        ]
-    )
+    if is_essay:
+        lines.extend(["", "## 袁东定档与五维评分"])
+        for dimension in result.get("dimension_scores") or []:
+            dimension_label = dimension.get("label") or dimension.get("dimension") or "评分维度"
+            lines.append(
+                f"- {dimension_label}："
+                f"{_format_score(float(dimension.get('display_score') or 0))}"
+                f"/{_format_score(float(dimension.get('display_max_score') or 0))}。"
+                f"{dimension.get('reason') or ''}"
+            )
+    else:
+        lines.extend(
+            [
+                "",
+                "## 采分点证据与整体校准",
+                (
+                    f"- 逐点累计内容分："
+                    f"{_format_score(float(result.get('weighted_coverage_score') or 0) * display_scale)}"
+                    f"/{_format_score(content_weight * display_scale)}"
+                ),
+                (
+                    f"- 综合内容分："
+                    f"{_format_score(float(result.get('content_score') or 0) * display_scale)}"
+                ),
+            ]
+        )
     if result.get("holistic_adjustment_reason"):
         lines.append(f"- 整体调整理由：{result['holistic_adjustment_reason']}")
     calibration = result.get("score_calibration") or {}
@@ -401,7 +412,7 @@ def render_grading_report(
     if point_matches:
         table_title = "## 袁东方法论核心论点与论据判定" if is_essay else "## 采分点判断"
         table_header = (
-            "| 考查维度 | 核心要义/分论点 | 满分 | 判断 | 实得分 | 用户答案对应内容 | 诊断原因 |"
+            "| 考查维度 | 核心要义/分论点 | 判断 | 用户答案对应内容 | 诊断原因 |"
             if is_essay
             else "| 要点组 | 给分点 | 满分 | 判断 | 实得分 | 用户答案对应内容 | 得分原因 |"
         )
@@ -410,7 +421,9 @@ def render_grading_report(
                 "",
                 table_title,
                 table_header,
-                "| --- | --- | ---: | --- | ---: | --- | --- |",
+                "| --- | --- | --- | --- | --- |"
+                if is_essay
+                else "| --- | --- | ---: | --- | ---: | --- | --- |",
             ]
         )
         for match in point_matches:
@@ -422,17 +435,28 @@ def render_grading_report(
                 status_text = {0.75: "大部分得分", 0.5: "一半得分", 0.25: "少量得分"}.get(ratio, "部分得分")
             max_points = float(point.get("display_weight") or float(point.get("weight") or 0) * display_scale)
             earned_points = float(match.get("awarded_score") or 0) * display_scale
-            lines.append(
-                "| {group} | {label} | {maximum} | {status} | {earned} | {quote} | {reason} |".format(
-                    group=str(point.get("group_label") or ("立意与论证" if is_essay else "其他")).replace("|", "／"),
-                    label=str(point.get("label") or match.get("point_key") or "采分点").replace("|", "／"),
-                    maximum=_format_score(max_points),
-                    status=status_text,
-                    earned=_format_score(earned_points),
-                    quote=str(match.get("answer_quote") or "未体现").replace("|", "／"),
-                    reason=str(match.get("reason") or ("按袁东方法论核心立意与材料依据研判。" if is_essay else "按粉笔参考答案的核心语义判断。")).replace("|", "／"),
+            row_values = {
+                "group": str(point.get("group_label") or ("立意与论证" if is_essay else "其他")).replace("|", "／"),
+                "label": str(point.get("label") or match.get("point_key") or "采分点").replace("|", "／"),
+                "maximum": _format_score(max_points),
+                "status": status_text,
+                "earned": _format_score(earned_points),
+                "quote": str(match.get("answer_quote") or "未体现").replace("|", "／"),
+                "reason": str(
+                    match.get("reason")
+                    or ("按袁东方法论核心立意与材料依据研判。" if is_essay else "按粉笔参考答案的核心语义判断。")
+                ).replace("|", "／"),
+            }
+            if is_essay:
+                lines.append(
+                    "| {group} | {label} | {status} | {quote} | {reason} |".format(**row_values)
                 )
-            )
+            else:
+                lines.append(
+                    "| {group} | {label} | {maximum} | {status} | {earned} | {quote} | {reason} |".format(
+                        **row_values
+                    )
+                )
 
     if is_essay:
         # 大作文：保留并强化逐字逐句原文批注，以及修改版范文

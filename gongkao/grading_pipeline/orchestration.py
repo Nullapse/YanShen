@@ -33,7 +33,8 @@ from .rubric import (
     build_rubric_prompt,
     compact_reference_consensus,
     extract_tagged_json,
-    fenbi_tree_available,
+    fenbi_tree_is_applicable,
+    is_current_holistic_essay_rubric,
     manual_grading_basis,
     validate_rubric,
 )
@@ -228,8 +229,15 @@ def run_grading_job(db_path, job_id, chat_completion_func):
                 reused = True
 
         deep_thinking = bool(options.get("deep_thinking"))
+        is_essay = question.get("question_type") == "综合写作"
+        if is_essay and reused and not is_current_holistic_essay_rubric(rubric):
+            # Older caches could contain a Fenbi score tree for essays. Essay
+            # totals must come from Yuan Dong's fixed five-dimension banding.
+            cached_row = None
+            rubric = None
+            reused = False
 
-        if fenbi_tree_available(references):
+        if fenbi_tree_is_applicable(question, references):
             if reused and rubric and rubric.get("scoring_mode") == "fenbi_tree":
                 _update_job(db_path, job_id, "reusing_rubric", 42, "已复用粉笔踩分树，正在准备逐点批改…")
                 consensus = {}

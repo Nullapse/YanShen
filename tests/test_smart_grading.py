@@ -633,11 +633,11 @@ class SmartGradingTest(unittest.TestCase):
             {
                 "points": [],
                 "dimensions": [
-                    {"dimension": "content", "weight": 40},
-                    {"dimension": "reasoning", "weight": 25},
+                    {"dimension": "content", "weight": 30},
                     {"dimension": "structure", "weight": 20},
-                    {"dimension": "expression", "weight": 10},
-                    {"dimension": "format", "weight": 5},
+                    {"dimension": "reasoning", "weight": 20},
+                    {"dimension": "material", "weight": 15},
+                    {"dimension": "expression", "weight": 15},
                 ],
             },
             [],
@@ -646,6 +646,7 @@ class SmartGradingTest(unittest.TestCase):
         self.assertIn('"high_band_evidence"', prompt)
         self.assertIn("先定档，后分维度", prompt)
         self.assertIn("普通模板化、仅语句流畅", prompt)
+        self.assertIn('"dimension": "material", "max_score": 15.0', prompt)
 
     def test_selected_reference_full_content_is_kept_in_both_prompts(self):
         question = {
@@ -803,7 +804,10 @@ class SmartGradingTest(unittest.TestCase):
         self.assertEqual(QUESTION_TYPE_PROFILES["综合分析"], {"content": 55, "reasoning": 25, "structure": 10, "expression": 10})
         self.assertEqual(QUESTION_TYPE_PROFILES["提出对策"], {"content": 60, "feasibility": 20, "structure": 10, "expression": 10})
         self.assertEqual(QUESTION_TYPE_PROFILES["公文写作"], {"content": 50, "format": 20, "structure": 20, "expression": 10})
-        self.assertEqual(QUESTION_TYPE_PROFILES["综合写作"], {"content": 40, "reasoning": 25, "structure": 20, "expression": 10, "format": 5})
+        self.assertEqual(
+            QUESTION_TYPE_PROFILES["综合写作"],
+            {"content": 30, "structure": 20, "reasoning": 20, "material": 15, "expression": 15},
+        )
         self.assertTrue(all(sum(profile.values()) == 100 for profile in QUESTION_TYPE_PROFILES.values()))
 
     def test_dynamic_point_weights_are_preserved_and_normalized(self):
@@ -1373,6 +1377,132 @@ class SmartGradingTest(unittest.TestCase):
                 calibration_policy=None,
             )
             self.assertAlmostEqual(result["score"], 100.0)
+
+    def test_essay_with_fenbi_tree_builds_holistic_rubric_and_bands_total(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path, question_id, attempt_id, reference_ids = self.make_database(directory)
+            tree = {
+                "name": "得分分析",
+                "full_mark": 35,
+                "children": [{"id": 1, "name": "中心立意", "full_mark": 35, "children": []}],
+            }
+            with connect(path) as conn:
+                conn.execute(
+                    """
+                    UPDATE questions
+                       SET question_type = '综合写作',
+                           prompt = '请围绕数字治理写一篇文章。（35分）',
+                           requirements = '观点明确，论证充分。',
+                           word_limit = '1000字左右'
+                     WHERE id = ?
+                    """,
+                    (question_id,),
+                )
+                conn.execute(
+                    "UPDATE reference_answers SET score_tree_json = ? WHERE id = ?",
+                    (json.dumps(tree, ensure_ascii=False), reference_ids[0]),
+                )
+                attempt = conn.execute("SELECT * FROM attempts WHERE id = ?", (attempt_id,)).fetchone()
+                settings = conn.execute("SELECT * FROM ai_settings WHERE id = 1").fetchone()
+                job, _ = create_grading_job(conn, attempt, settings, reference_ids[:1], "", {})
+
+            calls = []
+
+            def essay_chat(settings, prompt, request_options=None):
+                calls.append(prompt)
+                if "<rubric_json>" in prompt:
+                    payload = {
+                        "question_id": question_id,
+                        "task_constraints": {
+                            "object": "数字治理",
+                            "required_structure": ["五段三分"],
+                            "format_rules": [],
+                        },
+                        "points": [
+                            {
+                                "point_key": "thesis",
+                                "group_key": "group-1",
+                                "group_label": "中心立意",
+                                "point_order": 1,
+                                "label": "数字治理提升服务效率",
+                                "canonical_expression": "数字平台提高办事便利度，政策信息获取更及时。",
+                                "aliases": ["数字服务便民"],
+                                "tier": "core",
+                                "importance": "critical",
+                                "suggested_weight": 30,
+                                "weight_reason": "中心立意是袁东定档的首要依据。",
+                                "required_for_full_score": True,
+                                "required_elements": ["数字化", "服务效率"],
+                                "optional_details": [],
+                                "minimum_expression": "数字治理提升服务效率",
+                                "reference_quote": "数字平台提高办事便利度，政策信息获取更及时。",
+                                "material_evidence": [{"material_number": 1, "quote": "村民办事更加方便"}],
+                                "reference_ids": [reference_ids[0]],
+                                "confidence": 0.95,
+                            }
+                        ],
+                        "equal_weight_reason": "",
+                        "conflicts": [],
+                    }
+                    text = f"<rubric_json>{json.dumps(payload, ensure_ascii=False)}</rubric_json>"
+                    return text, text
+
+                evaluation = {
+                    "overall_band": "B",
+                    "band_reason": "立意切题，结构完整，三个主要论证成立。",
+                    "high_band_evidence": {
+                        "precise_task_and_theme": True,
+                        "clear_thesis": True,
+                        "coherent_argument_structure": True,
+                        "material_accurate_and_specific": True,
+                        "major_arguments_fully_developed": True,
+                        "depth_or_innovation": False,
+                        "no_fact_or_logic_hard_error": True,
+                    },
+                    "point_matches": [
+                        {
+                            "point_key": "thesis",
+                            "status": "hit",
+                            "score_level": "full",
+                            "answer_quote": "数字平台让村民办事更加方便",
+                            "reason": "中心立意与材料方向一致。",
+                        }
+                    ],
+                    "dimension_scores": [
+                        {"dimension": "content", "score": 30, "reason": "立意准确切题。"},
+                        {"dimension": "structure", "score": 20, "reason": "结构完整。"},
+                        {"dimension": "reasoning", "score": 20, "reason": "主要论证成立。"},
+                        {"dimension": "material", "score": 15, "reason": "材料使用准确。"},
+                        {"dimension": "expression", "score": 15, "reason": "语言流畅。"},
+                    ],
+                    "holistic_adjustment_reason": "",
+                    "annotations": [],
+                    "summary": {},
+                }
+                text = f"<smart_grading_json>{json.dumps({'evaluation': evaluation}, ensure_ascii=False)}</smart_grading_json>"
+                return text, text
+
+            with patch(
+                "gongkao.grading_pipeline.orchestration.retrieve_grading_evidence",
+                return_value=([], {"history_attempt_count": 0, "history_stable": False}),
+            ):
+                report_id = run_grading_job(path, job["id"], essay_chat)
+
+            self.assertIsNotNone(report_id)
+            self.assertEqual(len(calls), 2)
+            self.assertIn("<rubric_json>", calls[0])
+            self.assertIn("禁止把下面 points 的权重逐点相加得到作文总分", calls[0])
+            with connect(path) as conn:
+                context = conn.execute(
+                    "SELECT * FROM grading_report_contexts WHERE report_id = ?",
+                    (report_id,),
+                ).fetchone()
+                rubric = json.loads(context["rubric_snapshot_json"])
+                result = json.loads(context["result_json"])
+            self.assertEqual(rubric["scoring_mode"], "holistic_essay")
+            self.assertNotEqual(rubric.get("source"), "fenbi_score_tree")
+            self.assertEqual(result["score"], 79.0)
+            self.assertEqual(result["essay_band"], "B")
     def test_grading_preserves_accuracy_and_comprehensiveness_partial_scores(self):
         question = {
             "id": 101,

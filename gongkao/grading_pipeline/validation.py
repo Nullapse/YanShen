@@ -84,6 +84,15 @@ def _normalize_essay_band(value):
     compact = re.sub(r"\s+", "", text)
     if compact in _ESSAY_BAND_ALIASES:
         return _ESSAY_BAND_ALIASES[compact]
+    class_match = re.search(r"(?:第)?([1-5一二三四五])\s*类(?:文|文章)?", compact)
+    if class_match:
+        return {
+            "1": "A", "一": "A",
+            "2": "B", "二": "B",
+            "3": "C", "三": "C",
+            "4": "D", "四": "D",
+            "5": "E", "五": "E",
+        }[class_match.group(1)]
     range_match = re.search(r"(\d{2})\s*[—\-~至到]\s*(\d{2,3})", compact)
     if range_match:
         lower = float(range_match.group(1))
@@ -321,8 +330,9 @@ def validate_grading_result(
     if len(candidate_keys) != len(set(candidate_keys)):
         raise ValueError("批改结果包含重复 point_key，无法保证逐点判定唯一")
     candidates = {str(item.get("point_key") or ""): item for item in raw_point_matches}
-    scoring_mode = rubric.get("scoring_mode") or (
-        "holistic_essay" if rubric.get("question_type") == "综合写作" else "point_based"
+    is_essay = rubric.get("question_type") == "综合写作"
+    scoring_mode = "holistic_essay" if is_essay else (
+        rubric.get("scoring_mode") or "point_based"
     )
     blank_answer = not str(answer_text or "").strip()
     if scoring_mode == "point_based" and not blank_answer:

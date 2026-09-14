@@ -40,9 +40,9 @@ def _extract_matching_quote(quote, reason, answer_text):
 
 RUBRIC_VERSION = "rubric-v8-fenbi-score-tree"
 
-RESULT_VERSION = "grading-result-v10-fenbi-score-tree-yuandong-band-first"
+RESULT_VERSION = "grading-result-v11-essay-holistic-only"
 
-PIPELINE_VERSION = "smart-grading-v9-fenbi-score-tree-yuandong-band-first"
+PIPELINE_VERSION = "smart-grading-v10-essay-holistic-only"
 
 CONSENSUS_MAX_MATERIAL_CLAUSES = 240
 
@@ -51,7 +51,7 @@ QUESTION_TYPE_PROFILES = {
     "综合分析": {"content": 55, "reasoning": 25, "structure": 10, "expression": 10},
     "提出对策": {"content": 60, "feasibility": 20, "structure": 10, "expression": 10},
     "公文写作": {"content": 50, "format": 20, "structure": 20, "expression": 10},
-    "综合写作": {"content": 40, "reasoning": 25, "structure": 20, "expression": 10, "format": 5},
+    "综合写作": {"content": 30, "structure": 20, "reasoning": 20, "material": 15, "expression": 15},
 }
 
 CRITERION_LABELS = {
@@ -60,6 +60,7 @@ CRITERION_LABELS = {
     "expression": "表达准确、规范、简洁，避免歧义和重复",
     "format": "文种、身份、称谓、落款和字数格式符合要求",
     "reasoning": "论点、论据与论证关系完整，材料转化合理",
+    "material": "立意与论证使用题目和材料信息，案例、政策及事实依据准确具体",
     "feasibility": "对策回应问题，主体、对象和措施明确，具有针对性与可执行性",
 }
 

@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import unittest
 
@@ -10,7 +11,13 @@ from gongkao.grading_pipeline.calibration import (
 from gongkao.grading_pipeline.common import question_word_limit_text
 from gongkao.grading_pipeline.evidence_resolution import resolve_answer_evidence
 from gongkao.grading_pipeline.report import render_grading_report
-from gongkao.grading_pipeline.rubric import build_rubric_prompt, normalize_essay_coverage_roles
+from gongkao.grading_pipeline.rubric import (
+    build_rubric_prompt,
+    fenbi_tree_is_applicable,
+    is_current_holistic_essay_rubric,
+    manual_grading_basis,
+    normalize_essay_coverage_roles,
+)
 from gongkao.grading_pipeline.validation import validate_grading_result
 
 
@@ -107,11 +114,11 @@ class GradingV5Test(unittest.TestCase):
             "scoring_mode": "holistic_essay",
             "display_max_score": 35,
             "dimensions": [
-                {"dimension": "content", "weight": 40},
-                {"dimension": "reasoning", "weight": 25},
+                {"dimension": "content", "weight": 30},
                 {"dimension": "structure", "weight": 20},
-                {"dimension": "expression", "weight": 10},
-                {"dimension": "format", "weight": 5},
+                {"dimension": "reasoning", "weight": 20},
+                {"dimension": "material", "weight": 15},
+                {"dimension": "expression", "weight": 15},
             ],
             "points": [
                 {"point_key": "ecology", "label": "生态", "weight": 7.5, "coverage_role": "alternative"},
@@ -130,23 +137,25 @@ class GradingV5Test(unittest.TestCase):
                 {"point_key": "material4", "status": "miss", "answer_quote": ""},
             ],
             "dimension_scores": [
-                {"dimension": "content", "score": 24, "reason": "立意准确，论据转化仍可深化。"},
-                {"dimension": "reasoning", "score": 14, "reason": "论证基本成立。"},
+                {"dimension": "content", "score": 20, "reason": "立意准确，论据转化仍可深化。"},
                 {"dimension": "structure", "score": 15, "reason": "结构完整。"},
+                {"dimension": "reasoning", "score": 14, "reason": "论证基本成立。"},
+                {"dimension": "material", "score": 9, "reason": "材料使用基本准确。"},
                 {"dimension": "expression", "score": 7, "reason": "表达顺畅。"},
-                {"dimension": "format", "score": 5, "reason": "格式正确。"},
             ],
-            "overall_summary": "总评：24+14+15+7+5=65分。立意准确。",
+            "overall_summary": "总评：20+15+14+9+7=65分。立意准确。",
             "summary": {"verdict": "立意准确", "strengths": ["结构完整"], "weaknesses": ["论证可深化"]},
         }
         result = validate_grading_result(raw, rubric, answer, [])
         report = render_grading_report(result, rubric, [])
         self.assertEqual(result["score"], 65)
         self.assertEqual(result["display_score"], 23)
-        self.assertEqual(result["content_score"], 24)
+        self.assertEqual(result["content_score"], 20)
         self.assertEqual(result["score_status"], "valid")
-        self.assertNotIn("24+14+15+7+5", report)
+        self.assertNotIn("20+15+14+9+7", report)
         self.assertEqual(report.count("- 总分：23/35"), 1)
+        self.assertIn("## 袁东定档与五维评分", report)
+        self.assertNotIn("逐点累计内容分", report)
 
     def test_word_limit_prefers_specific_range_across_source_fields(self):
         question = {
@@ -161,11 +170,11 @@ class GradingV5Test(unittest.TestCase):
             "question_type": "综合写作",
             "scoring_mode": "holistic_essay",
             "dimensions": [
-                {"dimension": "content", "weight": 40},
-                {"dimension": "reasoning", "weight": 25},
+                {"dimension": "content", "weight": 30},
                 {"dimension": "structure", "weight": 20},
-                {"dimension": "expression", "weight": 10},
-                {"dimension": "format", "weight": 5},
+                {"dimension": "reasoning", "weight": 20},
+                {"dimension": "material", "weight": 15},
+                {"dimension": "expression", "weight": 15},
             ],
             "points": [],
         }
@@ -174,10 +183,10 @@ class GradingV5Test(unittest.TestCase):
                 "point_matches": [],
                 "dimension_scores": [
                     {"dimension": "content", "score": 28, "reason": "存在材料事实偏差。"},
-                    {"dimension": "reasoning", "score": 18, "reason": "一个主要段落论证不足。"},
                     {"dimension": "structure", "score": 16, "reason": "结构完整。"},
-                    {"dimension": "expression", "score": 7, "reason": "表达流畅。"},
-                    {"dimension": "format", "score": 4, "reason": "格式正确。"},
+                    {"dimension": "reasoning", "score": 18, "reason": "一个主要段落论证不足。"},
+                    {"dimension": "material", "score": 10, "reason": "材料事实存在偏差。"},
+                    {"dimension": "expression", "score": 13, "reason": "表达流畅。"},
                 ],
             },
             rubric,
@@ -194,11 +203,11 @@ class GradingV5Test(unittest.TestCase):
             "question_type": "综合写作",
             "scoring_mode": "holistic_essay",
             "dimensions": [
-                {"dimension": "content", "weight": 40},
-                {"dimension": "reasoning", "weight": 25},
+                {"dimension": "content", "weight": 30},
                 {"dimension": "structure", "weight": 20},
-                {"dimension": "expression", "weight": 10},
-                {"dimension": "format", "weight": 5},
+                {"dimension": "reasoning", "weight": 20},
+                {"dimension": "material", "weight": 15},
+                {"dimension": "expression", "weight": 15},
             ],
             "points": [],
         }
@@ -208,11 +217,11 @@ class GradingV5Test(unittest.TestCase):
                 "band_reason": "结构完整、语言流畅",
                 "point_matches": [],
                 "dimension_scores": [
-                    {"dimension": "content", "score": 40, "reason": "内容完整"},
-                    {"dimension": "reasoning", "score": 25, "reason": "论证完整"},
+                    {"dimension": "content", "score": 30, "reason": "内容完整"},
                     {"dimension": "structure", "score": 20, "reason": "结构完整"},
-                    {"dimension": "expression", "score": 10, "reason": "表达流畅"},
-                    {"dimension": "format", "score": 5, "reason": "格式正确"},
+                    {"dimension": "reasoning", "score": 20, "reason": "论证完整"},
+                    {"dimension": "material", "score": 15, "reason": "素材运用充分"},
+                    {"dimension": "expression", "score": 15, "reason": "表达流畅"},
                 ],
             },
             rubric,
@@ -230,11 +239,11 @@ class GradingV5Test(unittest.TestCase):
             "question_type": "综合写作",
             "scoring_mode": "holistic_essay",
             "dimensions": [
-                {"dimension": "content", "weight": 40},
-                {"dimension": "reasoning", "weight": 25},
+                {"dimension": "content", "weight": 30},
                 {"dimension": "structure", "weight": 20},
-                {"dimension": "expression", "weight": 10},
-                {"dimension": "format", "weight": 5},
+                {"dimension": "reasoning", "weight": 20},
+                {"dimension": "material", "weight": 15},
+                {"dimension": "expression", "weight": 15},
             ],
             "points": [],
         }
@@ -252,31 +261,176 @@ class GradingV5Test(unittest.TestCase):
                 },
                 "point_matches": [],
                 "dimension_scores": [
-                    {"dimension": "content", "score": 34, "reason": "材料转化准确且具体"},
-                    {"dimension": "reasoning", "score": 22, "reason": "论证充分深入"},
-                    {"dimension": "structure", "score": 18, "reason": "结构严密"},
-                    {"dimension": "expression", "score": 9, "reason": "表达准确"},
-                    {"dimension": "format", "score": 4, "reason": "格式规范"},
+                    {"dimension": "content", "score": 26, "reason": "立意准确深刻"},
+                    {"dimension": "structure", "score": 17, "reason": "结构严密"},
+                    {"dimension": "reasoning", "score": 17, "reason": "论证充分深入"},
+                    {"dimension": "material", "score": 13, "reason": "材料转化准确且具体"},
+                    {"dimension": "expression", "score": 12, "reason": "表达准确流畅"},
                 ],
             },
             rubric,
             "审题精准、论证充分、材料使用具体的完整作文。",
             [],
         )
-        self.assertEqual(result["score"], 87.0)
+        self.assertEqual(result["score"], 85.0)
         self.assertEqual(result["essay_band"], "A")
         self.assertTrue(result["essay_high_band_eligible"])
+
+    def test_second_class_essay_cannot_keep_a_full_marks_total(self):
+        rubric = {
+            "question_type": "综合写作",
+            "scoring_mode": "holistic_essay",
+            "dimensions": [
+                {"dimension": "content", "weight": 30},
+                {"dimension": "structure", "weight": 20},
+                {"dimension": "reasoning", "weight": 20},
+                {"dimension": "material", "weight": 15},
+                {"dimension": "expression", "weight": 15},
+            ],
+            "points": [],
+        }
+        result = validate_grading_result(
+            {
+                "overall_band": "二类文",
+                "high_band_evidence": {
+                    "precise_task_and_theme": True,
+                    "clear_thesis": True,
+                    "coherent_argument_structure": True,
+                    "material_accurate_and_specific": True,
+                    "major_arguments_fully_developed": True,
+                    "depth_or_innovation": False,
+                    "no_fact_or_logic_hard_error": True,
+                },
+                "point_matches": [],
+                "dimension_scores": [
+                    {"dimension": "content", "score": 30, "reason": "立意准确"},
+                    {"dimension": "structure", "score": 20, "reason": "结构完整"},
+                    {"dimension": "reasoning", "score": 20, "reason": "论证较强"},
+                    {"dimension": "material", "score": 15, "reason": "素材运用准确"},
+                    {"dimension": "expression", "score": 15, "reason": "表达流畅"},
+                ],
+            },
+            rubric,
+            "一篇明确判定为二类文、但模型维度合计给到满分的作文。",
+            [],
+        )
+        self.assertEqual(result["score"], 79.0)
+        self.assertEqual(result["essay_band"], "B")
+        self.assertEqual(sum(item["score"] for item in result["dimension_scores"]), 79.0)
+
+    def test_legacy_fenbi_essay_rubric_is_scored_holistically(self):
+        rubric = {
+            "question_type": "综合写作",
+            "scoring_mode": "fenbi_tree",
+            "dimensions": [{"dimension": "content", "weight": 100}],
+            "points": [{"point_key": "fenbi-1", "weight": 100, "coverage_role": "required"}],
+        }
+        result = validate_grading_result(
+            {
+                "overall_band": "B",
+                "high_band_evidence": {
+                    "precise_task_and_theme": True,
+                    "clear_thesis": True,
+                    "coherent_argument_structure": True,
+                    "material_accurate_and_specific": True,
+                    "major_arguments_fully_developed": True,
+                    "depth_or_innovation": False,
+                    "no_fact_or_logic_hard_error": True,
+                },
+                "point_matches": [
+                    {"point_key": "fenbi-1", "status": "hit", "answer_quote": "原文"},
+                ],
+                "dimension_scores": [
+                    {"dimension": "content", "score": 100, "reason": "踩点均已命中"},
+                ],
+            },
+            rubric,
+            "原文",
+            [],
+        )
+        self.assertEqual(result["score"], 79.0)
+        self.assertEqual(result["essay_band"], "B")
+        self.assertEqual(result["score_calibration"].get("essay_band_cap"), 79.0)
+
+    def test_manual_essay_basis_never_uses_fenbi_score_tree(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        conn.execute(
+            """
+            CREATE TABLE grading_rubrics (
+                id INTEGER PRIMARY KEY,
+                question_id INTEGER,
+                reference_set_hash TEXT,
+                source_hash TEXT,
+                rubric_version TEXT,
+                rubric_json TEXT,
+                status TEXT,
+                updated_at TEXT
+            )
+            """
+        )
+        tree = {
+            "name": "得分分析",
+            "full_mark": 35,
+            "children": [{"id": 1, "name": "中心立意", "full_mark": 35, "children": []}],
+        }
+        question = {"id": 1, "question_type": "综合写作", "prompt": "写一篇文章。", "requirements": ""}
+        references = [
+            {
+                "id": 10,
+                "organization": "粉笔",
+                "answer_text": "参考范文",
+                "score_tree_json": json.dumps(tree, ensure_ascii=False),
+            }
+        ]
+        basis = manual_grading_basis(conn, question, [], references)
+        self.assertEqual(basis["kind"], "uncached")
+        self.assertFalse(fenbi_tree_is_applicable(question, references))
+        self.assertFalse(
+            is_current_holistic_essay_rubric(
+                {
+                    "scoring_mode": "holistic_essay",
+                    "dimensions": [
+                        {"dimension": "content", "weight": 40},
+                        {"dimension": "reasoning", "weight": 25},
+                        {"dimension": "structure", "weight": 20},
+                        {"dimension": "expression", "weight": 10},
+                        {"dimension": "format", "weight": 5},
+                    ],
+                }
+            )
+        )
+        self.assertTrue(
+            is_current_holistic_essay_rubric(
+                {
+                    "scoring_mode": "holistic_essay",
+                    "dimensions": [
+                        {"dimension": "content", "weight": 30},
+                        {"dimension": "structure", "weight": 20},
+                        {"dimension": "reasoning", "weight": 20},
+                        {"dimension": "material", "weight": 15},
+                        {"dimension": "expression", "weight": 15},
+                    ],
+                }
+            )
+        )
+        self.assertTrue(
+            fenbi_tree_is_applicable(
+                {**question, "question_type": "归纳概括"},
+                references,
+            )
+        )
 
     def test_essay_missing_first_round_band_does_not_preserve_a_high_total(self):
         rubric = {
             "question_type": "综合写作",
             "scoring_mode": "holistic_essay",
             "dimensions": [
-                {"dimension": "content", "weight": 40},
-                {"dimension": "reasoning", "weight": 25},
+                {"dimension": "content", "weight": 30},
                 {"dimension": "structure", "weight": 20},
-                {"dimension": "expression", "weight": 10},
-                {"dimension": "format", "weight": 5},
+                {"dimension": "reasoning", "weight": 20},
+                {"dimension": "material", "weight": 15},
+                {"dimension": "expression", "weight": 15},
             ],
             "points": [],
         }
@@ -284,11 +438,11 @@ class GradingV5Test(unittest.TestCase):
             {
                 "point_matches": [],
                 "dimension_scores": [
-                    {"dimension": "content", "score": 32, "reason": "内容尚可"},
-                    {"dimension": "reasoning", "score": 20, "reason": "论证尚可"},
+                    {"dimension": "content", "score": 24, "reason": "立意尚可"},
                     {"dimension": "structure", "score": 16, "reason": "结构尚可"},
-                    {"dimension": "expression", "score": 8, "reason": "表达尚可"},
-                    {"dimension": "format", "score": 4, "reason": "格式尚可"},
+                    {"dimension": "reasoning", "score": 16, "reason": "论证尚可"},
+                    {"dimension": "material", "score": 12, "reason": "素材尚可"},
+                    {"dimension": "expression", "score": 12, "reason": "表达尚可"},
                 ],
             },
             rubric,
