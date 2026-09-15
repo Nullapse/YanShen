@@ -841,7 +841,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
                 server.server_close()
                 thread.join(timeout=5)
 
-    def test_api_grade_repairs_only_hard_overflow_once_and_preserves_other_sections(self):
+    def test_api_grade_never_calls_ai_to_repair_generated_answers(self):
         with tempfile.TemporaryDirectory() as directory:
             user_db = Path(directory) / "api-word-budget.sqlite3"
             prepare_user_database(user_db, SEED)
@@ -895,7 +895,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
                 ) as completion:
                     with urlopen(Request(f"{base_url}/attempts/{overflow_attempt_id}/grade", data=b"", method="POST"), timeout=10):
                         pass
-                    self.assertEqual(completion.call_count, 2)
+                    self.assertEqual(completion.call_count, 1)
 
                 with patch(
                     "gongkao.web.controllers.grading.chat_completion",
@@ -906,7 +906,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
                 ) as completion:
                     with urlopen(Request(f"{base_url}/attempts/{failed_attempt_id}/grade", data=b"", method="POST"), timeout=10) as response:
                         failed_html = response.read().decode("utf-8")
-                    self.assertEqual(completion.call_count, 2)
+                    self.assertEqual(completion.call_count, 1)
 
                 with connect(user_db) as conn:
                     short_saved = conn.execute(
@@ -919,19 +919,20 @@ class ReleaseRuntimeTest(unittest.TestCase):
                         "SELECT * FROM grading_reports WHERE attempt_id = ?", (failed_attempt_id,)
                     ).fetchone()
                 self.assertIsNotNone(short_saved)
-                self.assertIn("状态：符合字数要求，篇幅偏短", short_saved["report_text"])
+                self.assertIn("核心判断：短答案也保留", short_saved["report_text"])
                 self.assertIsNotNone(repaired_saved)
                 self.assertIn("核心判断：必须逐字保留", repaired_saved["report_text"])
                 self.assertIn("1. 也必须逐字保留", repaired_saved["report_text"])
-                self.assertIn(repaired_body, repaired_saved["report_text"])
-                self.assertNotIn("甲" * 250, repaired_saved["report_text"])
-                self.assertIn("localized revised-answer repair", repaired_saved["raw_response"])
+                self.assertIn("甲" * 250, repaired_saved["report_text"])
+                self.assertNotIn(repaired_body, repaired_saved["report_text"])
+                self.assertNotIn("localized revised-answer repair", repaired_saved["raw_response"])
                 self.assertIsNotNone(failed_saved)
                 self.assertEqual(failed_saved["status"], "ok")
-                self.assertIn("丙" * 250, failed_saved["report_text"])
+                self.assertIn("甲" * 250, failed_saved["report_text"])
+                self.assertNotIn("丙" * 250, failed_saved["report_text"])
                 self.assertIn("批改报告", failed_html)
                 self.assertIn("修改版答案超出字数限制", failed_html)
-                self.assertIn("丙" * 250, failed_html)
+                self.assertNotIn("丙" * 250, failed_html)
                 self.assertNotIn("临时报告", failed_html)
             finally:
                 server.shutdown()
@@ -981,7 +982,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
                         "SELECT COUNT(*) FROM grading_reports WHERE attempt_id = ?", (rejected_id,)
                     ).fetchone()[0]
                 self.assertEqual(accepted_count, 1)
-                self.assertEqual(rejected_count, 0)
+                self.assertEqual(rejected_count, 1)
             finally:
                 server.shutdown()
                 server.server_close()
@@ -1473,6 +1474,41 @@ class ReleaseRuntimeTest(unittest.TestCase):
         self.assertNotIn("<th>维度</th>", html)
         self.assertIn("踩点对比", html)
 
+    def test_report_markdown_hides_material_reading_and_optimization_suggestions(self):
+        html = markdownish(
+            "## 总体评分\n- 总分：15/20\n\n"
+            "## 材料领读\n材料信息 -> 转化要点 -> 答案\n\n"
+            "## 优化建议\n1. 表达规范\n\n"
+            "## 名师标杆答案与采分对照\n1. 标答要点"
+        )
+        self.assertIn("总体评分", html)
+        self.assertNotIn("材料领读", html)
+        self.assertNotIn("优化建议", html)
+        self.assertIn("名师标杆答案与采分对照", html)
+
+    def test_report_markdown_renders_master_benchmark_points_and_legend(self):
+        report = (
+            "## 名师标杆答案与采分对照\n"
+            "1. [标答点|hit|+2分 / 满分2分|准确命中原词|材料2第3段|深化数字转型]\n"
+            "2. [标答点|partial|+1分 / 满分2分|仅覆盖部分要义|粉笔答案原句|完善服务机制]\n"
+            "3. [标答点|miss|+0分 / 满分2分|未命中要点|材料4第1段|优化审批流程]"
+        )
+        html = markdownish(report)
+        self.assertIn("master-benchmark-legend", html)
+        self.assertIn("完全得分", html)
+        self.assertIn("未得分", html)
+        self.assertIn('class="master-point-span status-hit"', html)
+        self.assertIn('data-point-status="hit"', html)
+        self.assertIn('data-point-score="+2分 / 满分2分"', html)
+        self.assertIn('data-point-eval="准确命中原词"', html)
+        self.assertIn('data-point-source="材料2第3段"', html)
+        self.assertIn("深化数字转型", html)
+        self.assertIn('class="master-point-span status-partial"', html)
+        self.assertIn('data-point-status="partial"', html)
+        self.assertIn("完善服务机制", html)
+        self.assertIn('class="master-point-span status-miss"', html)
+        self.assertIn("优化审批流程", html)
+
     def test_regular_report_table_does_not_get_score_table_layout(self):
         html = markdownish("| 项目 | 说明 |\n| --- | --- |\n| 总分 | 20分 |\n")
         self.assertIn("report-table", html)
@@ -1674,14 +1710,14 @@ class ReleaseRuntimeTest(unittest.TestCase):
         self.assertIn("data-attempt-note-status", script_source)
         self.assertIn("navigator.sendBeacon", script_source)
         self.assertIn(".attempt-note-panel", style_source)
-        self.assertIn("build_revised_answer_retry_prompt", server_source)
+        self.assertNotIn("build_revised_answer_retry_prompt", server_source)
         self.assertIn("report_answer_snapshot(", server_source)
         self.assertIn(
             "markdownish(display_report_text, report_return_to, report_source_text",
             server_source,
         )
-        self.assertIn("parse_revised_answer_repair", server_source)
-        self.assertIn("replace_revised_answer_body", server_source)
+        self.assertNotIn("parse_revised_answer_repair", server_source)
+        self.assertNotIn("replace_revised_answer_body", server_source)
         self.assertIn("revised_answer_word_count_status", server_source)
         self.assertIn("report-word-limit-warning", server_source)
         self.assertNotIn("AI 局部压缩后仍超出字数限制", server_source)
@@ -1782,7 +1818,7 @@ class ReleaseRuntimeTest(unittest.TestCase):
         self.assertIn('["yellow", "orange", "pink", "purple", "blue", "green"]', script)
         self.assertIn("removeHighlightOverlap", script)
         self.assertIn("normalizeMaterialHighlights", script)
-        self.assertIn("showToolbarForHighlight", script)
+        self.assertIn("showCancelConfirm", script)
         self.assertIn("!selection.isCollapsed", script)
         self.assertIn("if (!toolbar.hidden && !toolbar.contains(event.target))", script)
         self.assertIn("dataset.highlightStart", script)
@@ -2360,6 +2396,8 @@ class ReleaseRuntimeTest(unittest.TestCase):
                 self.assertIn("AI 批改与教练", html)
                 self.assertIn("沿用批改 API", html)
                 self.assertIn("单独设置", html)
+                self.assertIn("测试批改 API 连通性", html)
+                self.assertIn("测试教练 API 连通性", html)
                 body = urlencode(
                     {
                         "mode": "api",
@@ -2381,6 +2419,24 @@ class ReleaseRuntimeTest(unittest.TestCase):
                 request = Request(f"{base}/settings", data=body, method="POST")
                 with urlopen(request, timeout=10) as response:
                     self.assertIn("设置已保存", response.read().decode("utf-8"))
+
+                test_body = urlencode(
+                    {
+                        "mode": "api",
+                        "provider_name": "GradingAI",
+                        "api_base_url": "https://grading.example",
+                        "model": "grading-model",
+                        "temperature": "0.2",
+                        "api_key": "test-key-direct",
+                        "settings_action": "test",
+                    }
+                ).encode("utf-8")
+                test_request = Request(f"{base}/settings", data=test_body, method="POST")
+                with patch("gongkao.web.controllers.settings.chat_completion", return_value=("测试回复OK", "{}")):
+                    with urlopen(test_request, timeout=10) as response:
+                        test_resp_text = response.read().decode("utf-8")
+                        self.assertIn("批改 API 连通测试成功", test_resp_text)
+                        self.assertIn("测试回复OK", test_resp_text)
             finally:
                 server.shutdown()
                 server.server_close()

@@ -143,19 +143,20 @@ class ImportAndPackageTest(unittest.TestCase):
         self.assertIn("我的答案", package)
         self.assertIn("建议作答区间：270—288字", package)
         self.assertIn("硬限制：必须低于300字", package)
-        self.assertIn("建议作答区间”只用于指导首轮生成", package)
-        self.assertIn("共性核心点", package)
-        self.assertIn("不得把已经写出的原句判为未命中", package)
-        self.assertIn("实际字数：X 字；建议区间：A—B 字；硬限制：低于 N 字", package)
-        self.assertIn("系统保存报告时会按网格规则重新计算", package)
-        self.assertIn("原文可视化批注", package)
-        self.assertIn("[亮点|原文短句|为什么有效||positive|]", package)
-        self.assertIn("踩点对比", package)
-        self.assertIn("材料领读", package)
-        self.assertIn("修改版答案", package)
+        self.assertIn("粉笔答案是内容给分点的唯一来源", package)
+        self.assertIn("材料只用于核验明显事实错误", package)
+        self.assertIn("不能要求与粉笔答案逐字相同", package)
+        self.assertIn("字数只统计用户作答纯正文", package)
+        self.assertIn("批改标签、得分说明、材料出处和诊断文字均不计入", package)
+        self.assertIn("用户作答诊断", package)
+        self.assertIn("真实阅卷式划点", package)
+        self.assertIn("20分题通常5—10点", package)
+        self.assertIn("采分点分析", package)
+        self.assertIn("参考答案可靠性说明", package)
+        self.assertNotIn("## 修改版答案", package)
         self.assertNotIn("来源链接", package)
-        self.assertIn("本题仅有 1 份机构答案，样本不足", package)
-        self.assertIn("可以结合现有机构答案、题干任务和材料原文自行分析", package)
+        self.assertIn("本题只有 1 份粉笔标准答案", package)
+        self.assertIn("内容采分点只能从这份答案逐句切分", package)
 
         sufficient_reference_package = build_grading_package(
             question,
@@ -188,7 +189,7 @@ class ImportAndPackageTest(unittest.TestCase):
         material_only_package = build_grading_package(question, [], attempt)
         self.assertIn("本次未提供参考答案", material_only_package)
         self.assertIn("仅依据题目、作答要求和材料", material_only_package)
-        self.assertIn("本题未提供机构答案，样本不足", material_only_package)
+        self.assertIn("本题未提供参考答案，只能依据题干和材料建立评分基准", material_only_package)
 
         uncached_basis_package = build_grading_package(
             question,
@@ -203,7 +204,8 @@ class ImportAndPackageTest(unittest.TestCase):
             },
         )
         self.assertIn("本题尚未生成 AI 智能评分基准", uncached_basis_package)
-        self.assertIn("独立提炼 4—12 个有材料依据", uncached_basis_package)
+        self.assertIn("合理归并为少量完整给分点", uncached_basis_package)
+        self.assertIn("20分题通常5—10点", uncached_basis_package)
         self.assertNotIn("错误的本地聚类候选", uncached_basis_package)
         self.assertNotIn("feature-hash-v1", uncached_basis_package)
 

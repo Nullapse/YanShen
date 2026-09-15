@@ -1,0 +1,8 @@
+*
+!.gitignore
+!project.json
+!graph.json
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*

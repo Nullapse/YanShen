@@ -67,7 +67,6 @@ class GradingResult(TypedDict, total=False):
     optimization_suggestions: list[str]
     reference_fusion: str
     overall_summary: str
-    revised_answer: str
     score: float
     display_score: float
     display_max_score: float | int
@@ -78,3 +77,8 @@ class GradingResult(TypedDict, total=False):
     review: dict
     summary: dict
     word_limit: str
+    essay_band: str
+    essay_band_label: str
+    essay_band_reason: str
+    essay_band_declared: str
+    essay_high_band_eligible: bool

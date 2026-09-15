@@ -1,3 +1,4 @@
+import html as html_lib
 import json
 import re
 from hashlib import sha256
@@ -37,11 +38,11 @@ def _extract_matching_quote(quote, reason, answer_text):
     return ""
 
 
-RUBRIC_VERSION = "rubric-v5"
+RUBRIC_VERSION = "rubric-v8-fenbi-score-tree"
 
-RESULT_VERSION = "grading-result-v6"
+RESULT_VERSION = "grading-result-v11-essay-holistic-only"
 
-PIPELINE_VERSION = "smart-grading-v5"
+PIPELINE_VERSION = "smart-grading-v10-essay-holistic-only"
 
 CONSENSUS_MAX_MATERIAL_CLAUSES = 240
 
@@ -50,7 +51,7 @@ QUESTION_TYPE_PROFILES = {
     "综合分析": {"content": 55, "reasoning": 25, "structure": 10, "expression": 10},
     "提出对策": {"content": 60, "feasibility": 20, "structure": 10, "expression": 10},
     "公文写作": {"content": 50, "format": 20, "structure": 20, "expression": 10},
-    "综合写作": {"content": 40, "reasoning": 25, "structure": 20, "expression": 10, "format": 5},
+    "综合写作": {"content": 30, "structure": 20, "reasoning": 20, "material": 15, "expression": 15},
 }
 
 CRITERION_LABELS = {
@@ -59,6 +60,7 @@ CRITERION_LABELS = {
     "expression": "表达准确、规范、简洁，避免歧义和重复",
     "format": "文种、身份、称谓、落款和字数格式符合要求",
     "reasoning": "论点、论据与论证关系完整，材料转化合理",
+    "material": "立意与论证使用题目和材料信息，案例、政策及事实依据准确具体",
     "feasibility": "对策回应问题，主体、对象和措施明确，具有针对性与可执行性",
 }
 
@@ -97,9 +99,9 @@ def _word_budget_guidance(budget):
     minimum = int(budget.get("minimum") or 0)
     parts = []
     if suggested_min and suggested_max:
-        parts.append(f"修改版答案目标为 {suggested_min}—{suggested_max} 格")
+        parts.append(f"用户作答建议区间为 {suggested_min}—{suggested_max} 格")
     if hard_max:
-        parts.append(f"最终结果必须严格低于 {hard_max} 格，等于 {hard_max} 也超限")
+        parts.append(f"用户作答必须严格低于 {hard_max} 格，等于 {hard_max} 也超限")
     elif minimum:
         parts.append(f"题目要求不少于 {minimum} 格")
     if not parts:
@@ -131,16 +133,28 @@ def _canonical_organization(reference):
 
 
 def _full_reference_context(references):
-    return [
-        {
-            "reference_id": int(reference["id"]),
-            "organization": _canonical_organization(reference),
-            "answer_text": str(reference.get("answer_text") or "").strip(),
-            "scoring_points": str(reference.get("scoring_points") or "").strip(),
-            "notes": str(reference.get("notes") or "").strip(),
-        }
-        for reference in dedupe_references(references)
-    ]
+    output = []
+    for reference in dedupe_references(references):
+        score_tree = None
+        raw_score_tree = reference.get("score_tree_json") or reference.get("score_tree")
+        if isinstance(raw_score_tree, dict):
+            score_tree = raw_score_tree
+        elif isinstance(raw_score_tree, str) and raw_score_tree.strip():
+            try:
+                score_tree = json.loads(raw_score_tree)
+            except json.JSONDecodeError:
+                score_tree = None
+        output.append(
+            {
+                "reference_id": int(reference["id"]),
+                "organization": _canonical_organization(reference),
+                "answer_text": html_lib.unescape(str(reference.get("answer_text") or "")).replace("\xa0", " ").replace("\u2003", " ").strip(),
+                "scoring_points": html_lib.unescape(str(reference.get("scoring_points") or "")).replace("\xa0", " ").replace("\u2003", " ").strip(),
+                "notes": html_lib.unescape(str(reference.get("notes") or "")).replace("\xa0", " ").replace("\u2003", " ").strip(),
+                "score_tree": score_tree,
+            }
+        )
+    return output
 
 
 def question_display_max_score(question):
@@ -260,6 +274,7 @@ def rubric_source_hash(question, materials, references):
                     "id": reference.get("id"),
                     "organization": _canonical_organization(reference),
                     "answer_text": reference.get("answer_text"),
+                    "score_tree_json": reference.get("score_tree_json") or "",
                 }
                 for reference in dedupe_references(references)
             ],

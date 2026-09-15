@@ -1,6 +1,7 @@
 """Grading workflow and report controllers."""
 
 from ...answer_formatting import normalize_answer_format_json
+from ...grading_pipeline.report import build_user_mirrored_answer
 from ..runtime import (
     ACTIVE_JOB_STATUSES,
     AiConfigError,
@@ -10,7 +11,6 @@ from ..runtime import (
     attempt_grading_references,
     build_ai_prompt,
     build_grading_package,
-    build_revised_answer_retry_prompt,
     chat_completion,
     connect,
     count_cjk_chars,
@@ -24,6 +24,7 @@ from ..runtime import (
     grading_references_from_form,
     grading_report_return_path,
     hide_internal_score_calibration,
+    inline_markdown,
     invalidate_question_rubrics,
     json,
     layout,
@@ -34,10 +35,8 @@ from ..runtime import (
     nonnegative_int,
     normalize_revised_answer_word_count,
     parse_qs,
-    parse_revised_answer_repair,
     pre,
     re,
-    replace_revised_answer_body,
     report_answer_snapshot,
     return_path_from_form,
     return_path_from_query,
@@ -197,11 +196,20 @@ class GradingController:
             custom_reference_answer,
             grading_basis,
         )
-        package_basis_note = (
-            "当前批改包已包含智能批改生成并经材料引文校验的 AI 评分基准。"
-            if cache_info["cached"]
-            else "本题尚未生成 AI 智能评分基准。批改包不会再导出本地聚类候选；Codex 会依据题目、材料和参考答案重新提炼采分点。"
-        )
+        rubric_source = ""
+        if grading_basis.get("kind") == "fenbi_tree":
+            package_basis_note = "当前批改包已包含粉笔得分详情生成的固定踩分树，AI 只逐点判断，不重新划点或重算权重。"
+        elif grading_basis.get("kind") == "cached_rubric":
+            rubric = grading_basis.get("rubric") or {}
+            rubric_source = rubric.get("source") or rubric.get("scoring_mode") or ""
+            if cache_info["cached"] and rubric_source in {"fenbi_score_tree", "fenbi_tree"}:
+                package_basis_note = "当前批改包已包含粉笔得分详情生成的固定踩分树，AI 只逐点判断，不重新划点或重算权重。"
+            elif cache_info["cached"]:
+                package_basis_note = "当前批改包已包含智能批改生成并经材料引文校验的 AI 评分基准。"
+            else:
+                package_basis_note = "本题尚未生成 AI 智能评分基准。批改包不会再导出本地聚类候选；Codex 会依据题目、材料和参考答案重新提炼采分点。"
+        else:
+            package_basis_note = "本题尚未生成 AI 智能评分基准。批改包不会再导出本地聚类候选；Codex 会依据题目、材料和参考答案重新提炼采分点。"
         refs_html = tabbed_references(refs, f"attempt-{attempt_id}")
         material_annotations = {row["material_number"]: row for row in annotations if row["target_type"] == "material"}
         annotation_by_type = {
@@ -266,10 +274,22 @@ class GradingController:
                     evidence, result, rubric, validation = [], {}, {}, {}
                 if result.get("dimension_scores"):
                     dimension_cards = []
+                    is_essay = question["question_type"] == "综合写作"
+                    dim_friendly_titles = {
+                        "content": "立意与素材" if is_essay else "内容要点",
+                        "reasoning": "论证深度" if is_essay else "论点论证",
+                        "structure": "框架结构",
+                        "material": "素材运用" if is_essay else "材料依据",
+                        "expression": "申论语言" if is_essay else "语言表达",
+                        "format": "卷面格式" if is_essay else "格式规范",
+                        "feasibility": "对策可行性",
+                    }
                     for dimension in result.get("dimension_scores", []):
+                        dim_key = dimension.get("dimension", "")
+                        label = dim_friendly_titles.get(dim_key, dimension.get("label") or dim_key or "评分维度")
                         dimension_cards.append(
                             '<div class="grading-dimension-card">'
-                            f"<span>{esc(dimension.get('label') or dimension.get('dimension') or '评分维度')}</span>"
+                            f"<span>{esc(label)}</span>"
                             f"<strong>{esc(format(float(dimension.get('display_score') or 0), 'g'))}"
                             f"<small>/{esc(format(float(dimension.get('display_max_score') or 0), 'g'))}</small></strong>"
                             f"<p>{esc(dimension.get('reason') or '')}</p>"
@@ -321,7 +341,6 @@ class GradingController:
                     "request_retry": "请求失败后重试",
                     "schema_repair": "修复返回结构",
                     "independent_review": "独立复核",
-                    "revised_answer_compression": "压缩超字数修改稿",
                 }
                 call_items = []
                 for call in validation.get("api_calls") or []:
@@ -356,10 +375,18 @@ class GradingController:
                     ):
                         selected = " selected" if match.get("status") == value else ""
                         status_options.append(f'<option value="{value}"{selected}>{label}</option>')
+                    point_meta = (
+                        f"论点/论据校核 {coverage_percent}%"
+                        if is_essay
+                        else (
+                            f"AI 覆盖判断 {coverage_percent}% · "
+                            f"建议权重 {esc(point.get('weight', match.get('weight', 0)))}"
+                        )
+                    )
                     feedback_items.append(f"""
                     <form class="grading-point-feedback" method="post" action="/grading-reports/{report["id"]}/feedback">
                       <input type="hidden" name="point_key" value="{esc(match.get("point_key"))}">
-                      <div><strong>{esc(point.get("label") or match.get("point_key"))}</strong><small>AI 覆盖判断 {coverage_percent}% · 建议权重 {esc(point.get("weight", match.get("weight", 0)))}</small></div>
+                      <div><strong>{esc(point.get("label") or match.get("point_key"))}</strong><small>{point_meta}</small></div>
                       <select name="corrected_status">{"".join(status_options)}</select>
                       <input name="corrected_quote" value="{esc(match.get("answer_quote"))}" placeholder="用户答案中的连续原句">
                       <input name="note" value="" placeholder="纠正理由（可选）">
@@ -431,6 +458,7 @@ class GradingController:
               <div class="smart-grade-status {"is-error" if payload["status"] in {"failed", "interrupted"} else ""}" data-grading-job data-job-id="{payload["job_id"]}" data-job-status="{esc(payload["status"])}">
                 <div><strong data-grading-job-message>{esc(payload["message"])}</strong><span data-grading-job-progress>{payload["progress"]}%</span></div>
                 <progress max="100" value="{payload["progress"]}" data-grading-job-bar></progress>
+                <p class="muted job-eta-tip" style="margin:6px 0 0;font-size:12px;color:var(--muted);line-height:1.4;">💡 提示：AI 正在执行多步评分与推导，智能批改（含深度思考）通常需 1~3 分钟，请耐心等待勿关闭页面。</p>
                 <p data-grading-job-error>{esc(payload["error"])}</p>
               </div>"""
         report_section = f"""
@@ -444,6 +472,39 @@ class GradingController:
           <a href="/attempts/{attempt_id}/package.md">下载批改包</a>
           <form method="post" action="/attempts/{attempt_id}/delete" data-confirm="确认删除这次作答和对应批改报告吗？"><button class="menu-danger" type="submit">删除本次作答</button></form>
         """
+        user_mirrored_html = ""
+        if reports:
+            latest_report = reports[-1]
+            latest_ctx = report_contexts.get(latest_report["id"])
+            latest_res = {}
+            latest_rubric = {}
+            if latest_ctx:
+                try:
+                    latest_res = json.loads(latest_ctx["result_json"] or "{}")
+                    latest_rubric = json.loads(latest_ctx["rubric_snapshot_json"] or "{}")
+                except (TypeError, json.JSONDecodeError):
+                    latest_res, latest_rubric = {}, {}
+            u_ans = (
+                latest_res.get("answer_snapshot")
+                or latest_rubric.get("answer_snapshot")
+                or attempt["answer_text"]
+                or ""
+            ).strip()
+            if u_ans:
+                scale = float(latest_res.get("display_max_score") or latest_rubric.get("display_max_score") or 100) / 100
+                mirrored_text = build_user_mirrored_answer(u_ans, latest_res, latest_rubric, scale)
+                paras = [p.strip() for p in mirrored_text.split("\n") if p.strip()]
+                body_content = "".join(f"<p>{inline_markdown(p)}</p>" for p in paras)
+                char_count = count_cjk_chars(u_ans)
+                user_mirrored_html = f"""
+            <section class="tool-panel user-original-answer-dock">
+              <div class="user-dock-header">
+                <span class="user-dock-title">📝 我的作答原文</span>
+                <span class="user-dock-count">{char_count} 字</span>
+              </div>
+              <div class="user-dock-body">{body_content}</div>
+              <div class="user-dock-tip">💡 绿色为完全得分点，黄色为部分得分点；未标记文字为未得分表述</div>
+            </section>"""
         body = f"""
         {workflow_header("grading", question, question=question, attempt=attempt, more_html=more_html, context_return=context_return)}
         <section class="grading-layout grading-result-first" data-resizable-attempt-pane data-resize-storage-key="gongkao.gradingPaneWidth.v2" data-default-side-width="480" data-default-side-ratio="0.42" data-min-main-width="440" data-min-side-width="360">
@@ -460,7 +521,7 @@ class GradingController:
           </article>
           <button class="pane-resizer" type="button" aria-label="调整批改侧栏宽度" data-pane-resizer></button>
           <aside class="grading-tools" data-session-scroll="grading-tools">
-            <details class="grading-context-disclosure grading-compare-panel"{' open data-default-open="1"' if reports else ""}>
+            <details class="grading-context-disclosure grading-compare-panel"{' data-default-open="1"' if not reports else ""}>
               <summary>查看题目、材料与参考答案</summary>
               <div class="grading-context-body">
                 <section><h2>题目</h2><p class="paper-line">第{question["question_number"] or "?"}题 · {esc(question["question_type"])}</p><div class="preline prompt-strong">{pre(question["prompt"])}</div><div class="preline">{pre(question["requirements"])}</div></section>
@@ -468,6 +529,7 @@ class GradingController:
                 <section><h2>参考答案</h2>{refs_html}</section>
               </div>
             </details>
+            {user_mirrored_html}
             <section class="tool-panel api-grade-panel grading-primary-action">
               <p class="eyebrow">Grading</p><h2>{"重新批改" if reports else "开始批改"}</h2>
               <p class="muted">模型：{esc(settings["provider_name"])} / {esc(settings["model"])}</p>
@@ -565,22 +627,7 @@ class GradingController:
                     report_text,
                     attempt["word_limit"] if attempt else "",
                 )
-                status = revised_answer_word_count_status(
-                    report_text,
-                    attempt["word_limit"] if attempt else "",
-                )
-                if status["over_limit"]:
-                    self.page_attempt_detail(
-                        f"/attempts/{attempt_id}",
-                        [
-                            (
-                                "error",
-                                f"修改版答案未低于字数硬限制，至少还需压缩 {status['over_by']} 字，已拒绝保存。手工报告不会自动调用 API 返修。",
-                            )
-                        ],
-                    )
-                    return
-                conn.execute(
+                cursor = conn.execute(
                     """
                     INSERT INTO grading_reports (
                         attempt_id, provider, model, report_text, prompt_text, status
@@ -596,6 +643,10 @@ class GradingController:
                             ensure_ascii=False,
                         ),
                     ),
+                )
+                conn.execute(
+                    "DELETE FROM grading_reports WHERE attempt_id = ? AND id <> ?",
+                    (attempt_id, cursor.lastrowid),
                 )
         self.redirect(f"/attempts/{attempt_id}")
 
@@ -764,41 +815,10 @@ class GradingController:
                 prompt,
                 {"thinking": "enabled" if use_deep_thinking else "disabled"},
             )
-            report_text = normalize_revised_answer_word_count(
-                report_text,
-                question["word_limit"] or "",
-            )
             stored_raw = raw
-            status = revised_answer_word_count_status(
-                report_text,
-                question["word_limit"] or "",
-            )
-            if status["over_limit"]:
-                retry_prompt = build_revised_answer_retry_prompt(
-                    prompt,
-                    report_text,
-                    question["word_limit"] or "",
-                )
-                repair_response, repair_raw = chat_completion(
-                    settings,
-                    retry_prompt,
-                    {"thinking": "disabled"},
-                )
-                repaired_answer = parse_revised_answer_repair(repair_response)
-                stored_raw = f"{raw}\n\n--- localized revised-answer repair ---\n{repair_raw}"
-                if repaired_answer:
-                    report_text = replace_revised_answer_body(
-                        report_text,
-                        repaired_answer,
-                        question["word_limit"] or "",
-                    )
         except (AiConfigError, AiRequestError) as exc:
             self.page_attempt_detail(f"/attempts/{attempt_id}", [("error", str(exc))])
             return
-        status = revised_answer_word_count_status(
-            report_text,
-            question["word_limit"] or "",
-        )
         with connect(self.db_path) as conn:
             cursor = conn.execute(
                 """
@@ -809,6 +829,10 @@ class GradingController:
                 (attempt_id, settings["provider_name"], settings["model"], report_text, prompt, stored_raw),
             )
             report_id = cursor.lastrowid
+            conn.execute(
+                "DELETE FROM grading_reports WHERE attempt_id = ? AND id <> ?",
+                (attempt_id, report_id),
+            )
         self.redirect(
             local_url(
                 f"/attempts/{attempt_id}",

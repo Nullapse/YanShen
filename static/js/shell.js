@@ -188,6 +188,45 @@ export function initializeShellControls(signal) {
     });
     syncConnectionMode();
   });
+
+  document.querySelectorAll("[data-provider-group]").forEach((group) => {
+    const scope = group.dataset.providerGroup;
+    const form = group.closest("form");
+    if (!form) return;
+    const radios = Array.from(group.querySelectorAll("input[type='radio']"));
+    const urlInput = form.querySelector(`[data-provider-base-url='${scope}']`);
+    const modelInput = form.querySelector(`[data-provider-model='${scope}']`);
+    const tags = Array.from(form.querySelectorAll(`[data-model-tags='${scope}'] [data-fill-model]`));
+
+    tags.forEach((tag) => {
+      tag.addEventListener("click", () => {
+        if (modelInput) {
+          modelInput.value = tag.dataset.fillModel;
+          modelInput.focus();
+        }
+      }, signal ? { signal } : undefined);
+    });
+
+    const syncPreset = () => {
+      const selected = radios.find((r) => r.checked)?.value;
+      if (!selected || !urlInput) return;
+      if (selected === "official") {
+        urlInput.value = "https://api.deepseek.com";
+        if (modelInput && (!modelInput.value || modelInput.value.startsWith("deepseek-v4"))) {
+          modelInput.value = "deepseek-chat";
+        }
+      } else if (selected === "opencode") {
+        urlInput.value = "https://opencode.ai/zen/go/v1";
+        if (modelInput && (!modelInput.value || modelInput.value === "deepseek-chat")) {
+          modelInput.value = "deepseek-v4-flash";
+        }
+      }
+    };
+
+    radios.forEach((radio) => {
+      radio.addEventListener("change", syncPreset, signal ? { signal } : undefined);
+    });
+  });
 }
 
 

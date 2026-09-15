@@ -40,6 +40,8 @@ GET_ROUTE_GROUPS = {
         Route("page_home", exact="/home"),
     ),
     "library": (
+        Route("page_paper_new", exact="/papers/new", arguments="query"),
+        Route("page_question_new", prefix="/papers/", suffix="/questions/new", arguments="path"),
         Route("page_index", exact="/", arguments="query"),
         Route("page_papers", exact="/papers", arguments="query"),
         Route("page_favorites", exact="/favorites", arguments="query"),
@@ -91,6 +93,15 @@ GET_ROUTE_GROUPS = {
 
 
 POST_ROUTE_GROUPS = {
+    "library": (
+        Route("handle_paper_parse_text", exact="/papers/parse-text"),
+        Route("handle_paper_url_import", exact="/papers/import-url"),
+        Route("handle_paper_url_bridge_payload", exact="/papers/import-url/bridge/payload"),
+        Route("handle_paper_create", exact="/papers/new"),
+        Route("handle_question_create", prefix="/papers/", suffix="/questions/new", arguments="path"),
+        Route("handle_reference_create", prefix="/questions/", suffix="/references/new", arguments="path"),
+        Route("handle_question_ai_solve", prefix="/questions/", suffix="/solve", arguments="path"),
+    ),
     "settings": (
         Route("handle_import", exact="/import"),
         Route("handle_text_annotations", exact="/annotations"),

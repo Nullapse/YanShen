@@ -2,8 +2,10 @@ import hashlib
 import json
 import re
 import time
+import uuid
 from contextlib import ExitStack
 from typing import Any, Dict, TypedDict
+from urllib.parse import urlparse
 
 from .agent_context import pack_messages, receipt, result_id, stable_prefix
 from .agent_modules import classify_module_heuristic
@@ -29,7 +31,7 @@ from .agent_store import add_step, complete_run, create_run, fail_run
 from .agent_tools import (
     input_summary,
 )
-from .ai import resolve_api_key
+from .ai import DEFAULT_USER_AGENT, resolve_api_key
 from .ai_config import load_effective_agent_settings
 from .db import connect
 
@@ -102,6 +104,13 @@ def _load_sqlite_checkpointer(db_path, stack):
 
 def _normalize_base_url(value):
     base = (value or "").strip().rstrip("/")
+    parsed = urlparse(base)
+    if parsed.netloc.endswith("opencode.ai") or "opencode.ai" in parsed.netloc:
+        scheme = parsed.scheme or "https"
+        netloc = parsed.netloc or "opencode.ai"
+        path = parsed.path.rstrip("/")
+        if path in {"", "/", "/go", "/go/v1", "/zen/go", "/zen/go/v1", "/go/v1/chat/completions"}:
+            return f"{scheme}://{netloc}/zen/go/v1"
     if base.endswith("/chat/completions"):
         return base[: -len("/chat/completions")]
     return base
@@ -329,6 +338,12 @@ def _graph_for(settings, db_path, stack=None):
 
     ChatOpenAI, StateGraph, START, END = _load_langgraph()
     temperature = settings.get("temperature")
+    parsed_base = urlparse(settings.get("api_base_url") or "")
+    default_headers = {
+        "User-Agent": DEFAULT_USER_AGENT,
+    }
+    if parsed_base.netloc.endswith("opencode.ai") or "opencode" in parsed_base.netloc:
+        default_headers["x-opencode-session"] = f"yanshen-{uuid.uuid4().hex[:12]}"
     llm = ChatOpenAI(
         model=settings["model"],
         api_key=resolve_api_key(settings),
@@ -337,6 +352,7 @@ def _graph_for(settings, db_path, stack=None):
         timeout=45,
         max_retries=0,
         max_tokens=2048,
+        default_headers=default_headers,
     )
 
     def prepare_node(state):

@@ -1,6 +1,7 @@
 """Compose the built-in HTTP server from grouped page controllers."""
 
 from ..agent_indexer import AgentIndexWorker
+from ..services.url_importer import FENBI_PAGE_HOSTS
 from .controllers import (
     AgentController,
     GradingController,
@@ -18,6 +19,7 @@ from .runtime import (
     BaseHTTPRequestHandler,
     Path,
     ThreadingHTTPServer,
+    connect,
     dispatch_get,
     dispatch_post,
     json,
@@ -25,6 +27,7 @@ from .runtime import (
     mimetypes,
     parse_qs,
     prepare_user_database,
+    prune_builtin_papers,
     quote,
     safe_static_path,
     seed_db_path,
@@ -93,10 +96,29 @@ class Handler(
         if not dispatch_post(self, path):
             self.send_error(404)
 
+    def do_OPTIONS(self):
+        """Handle the preflight used by the Fenbi-to-local browser bridge."""
+
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        origin = self._allowed_bridge_origin()
+        if path != "/papers/import-url/bridge/payload" or not origin:
+            self.send_error(404)
+            return
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", origin)
+        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Max-Age", "300")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+        self.send_header("Vary", "Origin")
+        self.end_headers()
+
     def send_html(self, content, status=200):
         raw = content.encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
         self.wfile.write(raw)
@@ -111,11 +133,20 @@ class Handler(
         self.end_headers()
         self.wfile.write(raw)
 
-    def send_json(self, payload, status=200):
+    def _allowed_bridge_origin(self):
+        origin = (self.headers.get("Origin") or "").strip()
+        allowed = {f"https://{host}" for host in FENBI_PAGE_HOSTS}
+        allowed.update({f"http://{host}" for host in FENBI_PAGE_HOSTS})
+        return origin if origin in allowed else None
+
+    def send_json(self, payload, status=200, cors_origin=None):
         raw = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
+        if cors_origin:
+            self.send_header("Access-Control-Allow-Origin", cors_origin)
+            self.send_header("Vary", "Origin")
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
         self.wfile.write(raw)
@@ -134,8 +165,10 @@ class Handler(
         self.send_header("Content-Type", mimetypes.guess_type(path.name)[0] or "application/octet-stream")
         self.send_header("Content-Length", str(len(data)))
         # ES module imports are not versioned per-file; force revalidation so a
-        # WebView2 cache can never mix JS/CSS from older builds with new HTML.
-        self.send_header("Cache-Control", "no-cache")
+        # WebView cache can never mix JS/CSS from older builds with new HTML.
+        self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+        self.send_header("Pragma", "no-cache")
+        self.send_header("Expires", "0")
         if download:
             self.send_header("Content-Disposition", f"attachment; filename*=UTF-8''{quote(path.name)}")
         self.end_headers()
@@ -159,6 +192,9 @@ class LoggingHTTPServer(ThreadingHTTPServer):
 def create_server(host="127.0.0.1", port=5000, db_path=None):
     resolved_db_path = Path(db_path) if db_path else user_db_path()
     prepare_user_database(resolved_db_path, seed_db_path())
+    if resolved_db_path.resolve() == user_db_path().resolve():
+        with connect(resolved_db_path) as conn:
+            prune_builtin_papers(conn)
     server = LoggingHTTPServer((host, port), Handler)
     server.app_context = ApplicationContext.create(resolved_db_path, ROOT)
     if db_path is None:

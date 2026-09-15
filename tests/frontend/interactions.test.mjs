@@ -358,3 +358,213 @@ test("saved paragraph alignment is restored and serialized", async () => {
   assert.equal(practice.paragraphAlignmentsJson(editor), '["center","left","right"]');
   dom.window.close();
 });
+
+test("provider preset switching syncs base url and quick tag fills model", async () => {
+  const dom = installDom(`
+    <form class="settings-panel">
+      <div class="mode-grid provider-mode-grid" data-provider-group="grading">
+        <label class="mode-card"><input type="radio" name="provider_preset" value="official">官方</label>
+        <label class="mode-card"><input type="radio" name="provider_preset" value="opencode" checked>Go</label>
+        <label class="mode-card"><input type="radio" name="provider_preset" value="custom">自定义</label>
+      </div>
+      <input name="api_base_url" value="https://opencode.ai/zen/go/v1" data-provider-base-url="grading">
+      <input name="model" value="deepseek-v4-flash" data-provider-model="grading">
+      <div data-model-tags="grading">
+        <button type="button" data-fill-model="deepseek-reasoner">R1</button>
+      </div>
+    </form>
+  `);
+  const { initializeShellControls } = await import(`../../static/js/shell.js?provider-preset=${Date.now()}`);
+  initializeShellControls(new AbortController().signal);
+
+  const officialRadio = document.querySelector("input[value='official']");
+  const urlInput = document.querySelector("[data-provider-base-url='grading']");
+  const modelInput = document.querySelector("[data-provider-model='grading']");
+  const tagButton = document.querySelector("[data-fill-model='deepseek-reasoner']");
+
+  officialRadio.checked = true;
+  officialRadio.dispatchEvent(new Event("change", { bubbles: true }));
+
+  assert.equal(urlInput.value, "https://api.deepseek.com");
+  assert.equal(modelInput.value, "deepseek-chat");
+
+  tagButton.click();
+  assert.equal(modelInput.value, "deepseek-reasoner");
+
+  dom.window.close();
+});
+
+test("master answer popover opens on click and displays diagnosis, score, and material source", async () => {
+  const dom = installDom(`
+    <div class="report-content">
+      <div class="master-benchmark-legend">
+        <span class="legend-badge status-hit">完全得分</span>
+        <span class="legend-badge status-miss">未得分</span>
+      </div>
+      <p>
+        1. <span class="master-point-span status-hit"
+                 tabindex="0" role="button"
+                 data-point-status="hit"
+                 data-point-status-name="完全得分"
+                 data-point-score="+2分 / 满分2分"
+                 data-point-eval="你的作答准确命中原词：『深化数字赋能』。核心语义完整。"
+                 data-point-source="材料2第3段：『大力推进产业数字化转型』">深化数字赋能</span>
+        2. <span class="master-point-span status-miss"
+                 tabindex="0" role="button"
+                 data-point-status="miss"
+                 data-point-status-name="未得分"
+                 data-point-score="+0分 / 满分2分"
+                 data-point-eval="你的作答未体现该得分点。"
+                 data-point-source="材料4第1段：『健全涉企服务快速响应机制』">健全涉企服务响应机制</span>
+      </p>
+    </div>
+  `);
+  const { initializeMasterAnswerPopovers } = await import(`../../static/js/grading.js?master-popover=${Date.now()}`);
+  initializeMasterAnswerPopovers(new AbortController().signal);
+
+  const hitSpan = document.querySelector(".master-point-span.status-hit");
+  const missSpan = document.querySelector(".master-point-span.status-miss");
+
+  // Click hit span
+  hitSpan.click();
+  let popover = document.querySelector(".point-popover-card");
+  assert.ok(popover, "Popover should open on click");
+  assert.ok(popover.classList.contains("status-hit"));
+  assert.ok(popover.textContent.includes("完全得分"));
+  assert.ok(popover.textContent.includes("+2分 / 满分2分"));
+  assert.ok(popover.textContent.includes("深化数字赋能"));
+  assert.ok(popover.textContent.includes("材料2第3段"));
+  assert.ok(hitSpan.classList.contains("active-popover-target"));
+
+  // Click close button
+  const closeBtn = popover.querySelector(".point-popover-close");
+  closeBtn.click();
+  assert.equal(document.querySelector(".point-popover-card"), null);
+  assert.ok(!hitSpan.classList.contains("active-popover-target"));
+
+  // Click miss span
+  missSpan.click();
+  popover = document.querySelector(".point-popover-card");
+  assert.ok(popover, "Popover should open for miss span");
+  assert.ok(popover.classList.contains("status-miss"));
+  assert.ok(popover.textContent.includes("未得分"));
+  assert.ok(popover.textContent.includes("健全涉企服务快速响应机制"));
+
+  // Press Escape
+  document.dispatchEvent(new dom.window.KeyboardEvent("keydown", { key: "Escape" }));
+  assert.equal(document.querySelector(".point-popover-card"), null);
+
+  dom.window.close();
+});
+
+test("user original answer popovers open on click for point, redundancy, and typo spans", async () => {
+  const dom = installDom(`
+    <div class="report-content">
+      <div class="user-original-stats">
+        <span class="stat-pill efficiency">作答总字数 280字 ｜ 采分有效 190字（68%）</span>
+        <span class="stat-pill waste">冗余废话 90字（32%）</span>
+      </div>
+      <div class="user-structure-alert">⚠️ 考场体例结构扣分诊断：未体现三县主体结构</div>
+      <p>
+        <span class="user-point-span status-hit"
+              tabindex="0" role="button"
+              data-user-status="hit"
+              data-user-status-name="完全命中"
+              data-user-score="+2.5分 / 满分2.5分"
+              data-user-label="建立契约化服务">健全涉企契约服务</span>
+        <span class="user-redundant-span"
+              tabindex="0" role="button"
+              data-redundant-wasted="28字"
+              data-redundant-reason="自创泛化套话，脱离采分要义">在全县范围内大力倡导责任意识与大局观</span>
+        <span class="user-typo-span"
+              tabindex="0" role="button"
+              data-typo-reason="疑为“召开”">招考</span>
+      </p>
+    </div>
+  `);
+  const { initializeMasterAnswerPopovers } = await import(`../../static/js/grading.js?user-popover=${Date.now()}`);
+  initializeMasterAnswerPopovers(new AbortController().signal);
+
+  const pointSpan = document.querySelector(".user-point-span");
+  const redundantSpan = document.querySelector(".user-redundant-span");
+  const typoSpan = document.querySelector(".user-typo-span");
+
+  // 1. Point span
+  pointSpan.click();
+  let popover = document.querySelector(".point-popover-card");
+  assert.ok(popover, "Popover should open for user point span");
+  assert.ok(popover.textContent.includes("完全命中"));
+  assert.ok(popover.textContent.includes("建立契约化服务"));
+  assert.ok(popover.textContent.includes("+2.5分 / 满分2.5分"));
+
+  // 2. Redundant span
+  redundantSpan.click();
+  popover = document.querySelector(".point-popover-card");
+  assert.ok(popover, "Popover should switch to redundancy span");
+  assert.ok(popover.textContent.includes("考场冗余废话诊断"));
+  assert.ok(popover.textContent.includes("28字"));
+  assert.ok(popover.textContent.includes("自创泛化套话"));
+
+  // 3. Typo span
+  typoSpan.click();
+  popover = document.querySelector(".point-popover-card");
+  assert.ok(popover, "Popover should switch to typo span");
+  assert.ok(popover.textContent.includes("错词/病句诊断"));
+  assert.ok(popover.textContent.includes("疑为“召开”"));
+
+  dom.window.close();
+});
+
+test("bilateral synchronized hover and peer master popover data", async () => {
+  const dom = installDom(`
+    <div class="left-pane">
+      <span class="master-point-span status-hit"
+            data-point-key="point-tech"
+            data-point-status="hit"
+            data-point-status-name="完全得分"
+            data-point-score="+1.5分"
+            data-point-eval="你的作答准确命中了数字赋能机制。"
+            data-point-source="材料2第1段：『推进数字化改革』">数字赋能机制</span>
+    </div>
+    <div class="right-pane">
+      <span class="user-point-span status-hit"
+            data-point-key="point-tech"
+            data-user-status="hit"
+            data-user-status-name="完全命中"
+            data-user-score="+1.5分"
+            data-user-label="数字化赋能">推进数字化</span>
+    </div>
+  `);
+  const { initializeMasterAnswerPopovers } = await import(`../../static/js/grading.js?bilateral=${Date.now()}`);
+  initializeMasterAnswerPopovers(new AbortController().signal);
+
+  const masterSpan = document.querySelector(".master-point-span");
+  const userSpan = document.querySelector(".user-point-span");
+
+  // Hover on user span -> both get .is-peer-hovered
+  userSpan.dispatchEvent(new Event("mouseenter"));
+  assert.ok(userSpan.classList.contains("is-peer-hovered"));
+  assert.ok(masterSpan.classList.contains("is-peer-hovered"));
+
+  // Mouse leave -> removed
+  userSpan.dispatchEvent(new Event("mouseleave"));
+  assert.ok(!userSpan.classList.contains("is-peer-hovered"));
+  assert.ok(!masterSpan.classList.contains("is-peer-hovered"));
+
+  // Hover on master span -> both get .is-peer-hovered
+  masterSpan.dispatchEvent(new Event("mouseenter"));
+  assert.ok(userSpan.classList.contains("is-peer-hovered"));
+  assert.ok(masterSpan.classList.contains("is-peer-hovered"));
+  masterSpan.dispatchEvent(new Event("mouseleave"));
+
+  // Click user span -> popover enriched with peer master evaluation and material source
+  userSpan.click();
+  const popover = document.querySelector(".point-popover-card");
+  assert.ok(popover, "Popover opens for user span");
+  assert.ok(popover.textContent.includes("你的作答准确命中了数字赋能机制。"));
+  assert.ok(popover.textContent.includes("数字赋能机制"));
+  assert.ok(popover.textContent.includes("推进数字化改革"));
+
+  dom.window.close();
+});
+

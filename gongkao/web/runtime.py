@@ -39,16 +39,13 @@ from ..agent_store import (
     recent_runs,
 )
 from ..ai import AiConfigError, AiRequestError, chat_completion, masked_key, resolve_api_key
-from ..db import connect, init_db, prepare_user_database
+from ..db import connect, init_db, prepare_user_database, prune_builtin_papers
 from ..grading import (
     build_ai_prompt,
     build_grading_package,
-    build_revised_answer_retry_prompt,
     count_cjk_chars,
     normalize_revised_answer_word_count,
-    parse_revised_answer_repair,
     referenced_material_numbers,
-    replace_revised_answer_body,
     revised_answer_word_count_status,
     select_relevant_materials,
     should_use_whole_paper_materials,
@@ -1122,6 +1119,7 @@ def link_agent_evidence_refs(html_text, return_to=""):
 
 def inline_markdown(value, return_to=""):
     text = esc(value)
+    text = text.replace("&amp;emsp;", "&emsp;")
     text = re.sub(
         r"\[(GKS-\d+-Q\d+)\]\([^)]+\)",
         lambda match: (
@@ -1145,11 +1143,133 @@ def inline_markdown(value, return_to=""):
         text,
         flags=re.I | re.S,
     )
+
+    def _render_master_point(m):
+        parts = [p.strip() for p in m.group(1).split("|")]
+        if len(parts) >= 6:
+            status, score, my_eval, source, point_key = parts[0], parts[1], parts[2], parts[3], parts[4]
+            content = "|".join(parts[5:])
+        elif len(parts) == 5:
+            status, score, my_eval, source, content = parts[0], parts[1], parts[2], parts[3], parts[4]
+            point_key = ""
+        else:
+            return m.group(0)
+
+        status_clean = (
+            "hit"
+            if status in ("hit", "完全得分", "满分", "完全命中")
+            else ("partial" if status in ("partial", "部分得分", "部分命中") else "miss")
+        )
+        status_name = (
+            "完全得分"
+            if status_clean == "hit"
+            else ("部分得分" if status_clean == "partial" else "未得分")
+        )
+        pkey_attr = f' data-point-key="{point_key}"' if point_key else ""
+        return (
+            f'<span class="master-point-span status-{status_clean}"{pkey_attr} '
+            f'tabindex="0" role="button" '
+            f'data-point-status="{status_clean}" '
+            f'data-point-status-name="{status_name}" '
+            f'data-point-score="{score}" '
+            f'data-point-eval="{my_eval}" '
+            f'data-point-source="{source}">'
+            f'{content}</span>'
+        )
+
+    def _render_master_title(m):
+        return f'<div class="master-answer-title">{_render_master_point(m)}</div>'
+
+    text = re.sub(
+        r"\[标答标题\|([^\]]+)\]",
+        _render_master_title,
+        text,
+    )
+    text = re.sub(
+        r"\[标答点\|([^\]]+)\]",
+        _render_master_point,
+        text,
+    )
+    text = re.sub(
+        r"&lt;div class=&quot;master-answer-title&quot;&gt;(.*?)&lt;/div&gt;",
+        r'<div class="master-answer-title">\1</div>',
+        text,
+    )
+
+    def _render_user_point(m):
+        parts = [p.strip() for p in m.group(1).split("|")]
+        if len(parts) >= 5:
+            status, score, label, point_key = parts[0], parts[1], parts[2], parts[3]
+            content = "|".join(parts[4:])
+        elif len(parts) == 4:
+            status, score, label, content = parts[0], parts[1], parts[2], parts[3]
+            point_key = ""
+        else:
+            return m.group(0)
+
+        status_clean = (
+            "hit"
+            if status in ("hit", "完全得分", "满分", "完全命中")
+            else ("partial" if status in ("partial", "部分得分", "部分命中") else "miss")
+        )
+        status_name = (
+            "完全命中"
+            if status_clean == "hit"
+            else ("部分命中" if status_clean == "partial" else "未命中")
+        )
+        pkey_attr = f' data-point-key="{point_key}"' if point_key else ""
+        return (
+            f'<span class="user-point-span status-{status_clean}"{pkey_attr} '
+            f'tabindex="0" role="button" '
+            f'data-user-status="{status_clean}" '
+            f'data-user-status-name="{status_name}" '
+            f'data-user-score="{score}" '
+            f'data-user-label="{label}">'
+            f'{content}</span>'
+        )
+
+    def _render_user_redundant(m):
+        wasted = m.group(1).strip()
+        reason = m.group(2).strip()
+        content = m.group(3).strip()
+        return (
+            f'<span class="user-redundant-span" '
+            f'tabindex="0" role="button" '
+            f'data-redundant-wasted="{wasted}" '
+            f'data-redundant-reason="{reason}">'
+            f'{content}</span>'
+        )
+
+    def _render_user_typo(m):
+        reason = m.group(1).strip()
+        content = m.group(2).strip()
+        return (
+            f'<span class="user-typo-span" '
+            f'tabindex="0" role="button" '
+            f'data-typo-reason="{reason}">'
+            f'{content}</span>'
+        )
+
+    text = re.sub(
+        r"\[作答点\|([^\]]+)\]",
+        _render_user_point,
+        text,
+    )
+    text = re.sub(
+        r"\[冗余\|([^|]+)\|([^|]+)\|([^\]]+)\]",
+        _render_user_redundant,
+        text,
+    )
+    text = re.sub(
+        r"\[错词\|([^|]+)\|([^\]]+)\]",
+        _render_user_typo,
+        text,
+    )
     return text
 
 
 GRADING_ANNOTATION_PATTERN = re.compile(
-    r"\[(好|可改|删|补|亮点|润色|修改|删减|补充|关键)\|([^\]]+)\]"
+    r"\[(好|可改|删|补|亮点|润色|修改|删减|补充|关键|立意|论点|论据|论证|过渡|语言)\|([^\]]+)\]"
 )
 
 GRADING_ANNOTATION_META = {
@@ -1163,6 +1283,12 @@ GRADING_ANNOTATION_META = {
     "补": ("建议补充", "add", "high"),
     "补充": ("建议补充", "add", "high"),
     "关键": ("关键问题", "critical", "critical"),
+    "立意": ("立意精批", "critical", "critical"),
+    "论点": ("论点精批", "revise", "medium"),
+    "论据": ("论据精批", "polish", "low"),
+    "论证": ("论证精批", "revise", "medium"),
+    "过渡": ("过渡衔接", "polish", "low"),
+    "语言": ("语言表达", "polish", "low"),
 }
 
 GRADING_SEVERITIES = {"positive", "low", "medium", "high", "critical"}
@@ -1363,7 +1489,8 @@ def _is_table_separator(line):
 
 
 def markdownish(value, return_to="", source_text="", annotation_scope="grading-annotation"):
-    lines = (value or "").splitlines()
+    safe_value = str(value or "").replace("&emsp;", "　").replace("&ensp;", " ").replace("&nbsp;", " ")
+    lines = safe_value.splitlines()
     output = []
     in_list = False
     in_ol = False
@@ -1385,7 +1512,7 @@ def markdownish(value, return_to="", source_text="", annotation_scope="grading-a
             close_lists()
             index += 1
             continue
-        if line == "## 维度评分":
+        if line in ("## 我的作答原文", "## 维度评分", "## 材料领读", "## 优化建议", "## 机构参考答案对照") or line.startswith("## 机构参考答案"):
             close_lists()
             index += 1
             while index < len(lines) and not lines[index].strip().startswith("## "):
@@ -1432,6 +1559,67 @@ def markdownish(value, return_to="", source_text="", annotation_scope="grading-a
         if line.startswith("### "):
             close_lists()
             output.append(f"<h3>{inline_markdown(line[4:], return_to)}</h3>")
+        elif line in ("## 修改版答案", "## 名师修改版范文", "## 名师标杆答案与采分对照") or line.endswith("参考答案与采分对照") or line.endswith("参考答案"):
+            close_lists()
+            output.append(f"<h2>{inline_markdown(line[3:], return_to)}</h2>")
+            if line == "## 名师标杆答案与采分对照" or line.endswith("参考答案与采分对照"):
+                output.append(
+                    '<div class="master-benchmark-legend">'
+                    '<div class="legend-items">'
+                    '<span class="legend-badge status-hit"><i class="legend-dot hit"></i> 完全得分</span>'
+                    '<span class="legend-badge status-partial"><i class="legend-dot partial"></i> 部分得分</span>'
+                    '<span class="legend-badge status-miss"><i class="legend-dot miss"></i> 未得分</span>'
+                    '</div>'
+                    '<span class="legend-tip">💡 点击标答中带有颜色的重点词句，可查看作答诊断、得分原因及材料出处</span>'
+                    '</div>'
+                )
+            index += 1
+            revised_lines = []
+            while index < len(lines) and not lines[index].strip().startswith("## "):
+                revised_lines.append(lines[index])
+                index += 1
+            stream_indices = [i for i, line in enumerate(revised_lines) if line.strip().startswith("### ")]
+            if len(stream_indices) >= 2:
+                pre_stream_lines = revised_lines[:stream_indices[0]]
+                for p_line in pre_stream_lines:
+                    p_str = p_line.strip()
+                    if p_str:
+                        output.append(f'<p class="revised-answer-meta">{inline_markdown(p_str, return_to)}</p>')
+                tabs_html = []
+                panels_html = []
+                for s_idx, match_idx in enumerate(stream_indices):
+                    header_line = revised_lines[match_idx].strip()
+                    title = header_line.removeprefix("### ").strip()
+                    next_idx = stream_indices[s_idx + 1] if s_idx + 1 < len(stream_indices) else len(revised_lines)
+                    stream_body_lines = revised_lines[match_idx + 1:next_idx]
+                    stream_content_html = markdownish("\n".join(stream_body_lines), return_to, source_text, annotation_scope)
+                    tab_id = f"{annotation_scope}-stream-tab-{s_idx}"
+                    panel_id = f"{annotation_scope}-stream-panel-{s_idx}"
+                    is_active = s_idx == 0
+                    tabs_html.append(
+                        f'<button class="content-tab{" active-tab" if is_active else ""}" id="{tab_id}" '
+                        f'type="button" role="tab" aria-selected="{"true" if is_active else "false"}" '
+                        f'aria-controls="{panel_id}" data-tab-target="{panel_id}">{esc(title)}</button>'
+                    )
+                    panels_html.append(
+                        f'<article class="tab-panel{" active-panel" if is_active else ""}" id="{panel_id}" '
+                        f'role="tabpanel" aria-labelledby="{tab_id}"{" hidden" if not is_active else ""}>'
+                        f'<div class="revised-stream-body">{stream_content_html}</div></article>'
+                    )
+                output.append(
+                    f'<div class="tabbed-content revised-answer-tabs" data-tabs>'
+                    f'<div class="content-tabs" role="tablist" aria-label="修改版答案双流派">{"".join(tabs_html)}</div>'
+                    f'{"".join(panels_html)}</div>'
+                )
+                continue
+            else:
+                lines = lines[:index - len(revised_lines)] + revised_lines + lines[index:]
+                index = index - len(revised_lines)
+                continue
+        elif "机构参考答案审计" in line or "机构参考答案点评" in line:
+            close_lists()
+            heading_text = line.lstrip("#").strip()
+            output.append(f'<h2 class="institution-audit-heading">{inline_markdown(heading_text, return_to)}</h2>')
         elif line.startswith("## "):
             close_lists()
             output.append(f"<h2>{inline_markdown(line[3:], return_to)}</h2>")
@@ -1455,6 +1643,9 @@ def markdownish(value, return_to="", source_text="", annotation_scope="grading-a
                 in_ol = True
             list_item = re.sub(r"^\d+[.、]\s+", "", line)
             output.append(f"<li>{inline_markdown(list_item, return_to)}</li>")
+        elif line.startswith("[标答标题|") or line.startswith("<div") or line.startswith("<section"):
+            close_lists()
+            output.append(inline_markdown(line, return_to))
         else:
             close_lists()
             output.append(f"<p>{inline_markdown(line, return_to)}</p>")

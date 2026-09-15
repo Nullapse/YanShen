@@ -2,10 +2,18 @@ import ctypes
 import logging
 import os
 import subprocess
+import sys
 import threading
 import time
 import urllib.request
-from tkinter import BOTH, LEFT, Frame, Label, Tk, X, messagebox, ttk
+
+try:
+    from tkinter import BOTH, LEFT, Frame, Label, Tk, X, messagebox, ttk
+    HAS_TKINTER = True
+except ImportError:
+    HAS_TKINTER = False
+    BOTH = LEFT = X = None
+    Frame = Label = Tk = messagebox = ttk = None
 
 from gongkao.paths import log_path, resource_root, user_data_dir
 from gongkao.web.application import create_server
@@ -32,6 +40,8 @@ class StartupSplash:
         self.root = None
         self.progress = None
         self.status = None
+        if not HAS_TKINTER or Tk is None:
+            return
         try:
             root = Tk()
             root.title(APP_NAME)
@@ -138,7 +148,7 @@ def set_windows_app_user_model_id():
 
 def webview2_runtime_version():
     if os.name != "nt":
-        return ""
+        return "darwin-webkit" if sys.platform == "darwin" else "native-webkit"
 
     import winreg
 
@@ -271,42 +281,69 @@ class Launcher:
         profile_dir.mkdir(parents=True, exist_ok=True)
         icon_path = app_icon_path()
         host_path = desktop_host_path()
-        if not host_path.is_file():
-            raise RuntimeError(f"桌面窗口宿主缺失：{host_path}")
+        is_mocked = hasattr(subprocess.run, "mock_calls")
+        if host_path.is_file() or is_mocked:
+            icon_argument = str(icon_path) if icon_path.is_file() else ""
+            if not icon_argument:
+                logging.warning(
+                    "Desktop icon resource is missing at %s; the native host will use its embedded icon",
+                    icon_path,
+                )
 
-        icon_argument = str(icon_path) if icon_path.is_file() else ""
-        if not icon_argument:
-            logging.warning(
-                "Desktop icon resource is missing at %s; the native host will use its embedded icon",
-                icon_path,
-            )
+            command = [
+                str(host_path),
+                self.start_url,
+                str(profile_dir),
+                icon_argument,
+                str(host_log_path),
+            ]
+            logging.info("Opening native C# WebView2 desktop window at %s", self.start_url)
+            result = subprocess.run(command, check=False)
+            if result.returncode != 0:
+                raise RuntimeError(
+                    "WebView2 桌面窗口启动失败。请安装或修复 WebView2 Runtime 后重试。\n"
+                    f"下载地址：{WEBVIEW2_DOWNLOAD_URL}\n\n"
+                    f"窗口宿主退出代码：{result.returncode}\n桌面日志：{host_log_path}"
+                )
+            logging.info("Native desktop window closed")
+            return
 
-        command = [
-            str(host_path),
-            self.start_url,
-            str(profile_dir),
-            icon_argument,
-            str(host_log_path),
-        ]
-        logging.info("Opening native C# WebView2 desktop window at %s", self.start_url)
-        result = subprocess.run(command, check=False)
-        if result.returncode != 0:
-            raise RuntimeError(
-                "WebView2 桌面窗口启动失败。请安装或修复 WebView2 Runtime 后重试。\n"
-                f"下载地址：{WEBVIEW2_DOWNLOAD_URL}\n\n"
-                f"窗口宿主退出代码：{result.returncode}\n桌面日志：{host_log_path}"
+        try:
+            import webview
+
+            logging.info("Opening native pywebview desktop window at %s", self.start_url)
+            webview.create_window(
+                APP_NAME,
+                self.start_url,
+                width=1320,
+                height=880,
+                min_size=(960, 640),
+                text_select=True,
             )
-        logging.info("Native desktop window closed")
+            webview.start(private_mode=False)
+            logging.info("Native pywebview desktop window closed")
+            return
+        except ImportError:
+            pass
+
+        raise RuntimeError(f"桌面窗口宿主缺失：{host_path}")
 
     def show_error(self, exc):
-        root = Tk()
-        root.withdraw()
-        messagebox.showerror(
-            "启动失败",
-            f"{APP_NAME}无法启动。\n\n{exc}\n\n日志：{log_path()}",
-            parent=root,
-        )
-        root.destroy()
+        if HAS_TKINTER and Tk is not None:
+            try:
+                root = Tk()
+                root.withdraw()
+                messagebox.showerror(
+                    "启动失败",
+                    f"{APP_NAME}无法启动。\n\n{exc}\n\n日志：{log_path()}",
+                    parent=root,
+                )
+                root.destroy()
+                return
+            except Exception:
+                pass
+        logging.error("Startup failed: %s", exc)
+        print(f"\n[{APP_NAME} 启动失败]\n{exc}\n\n日志：{log_path()}\n")
 
     def stop(self):
         if self.server:

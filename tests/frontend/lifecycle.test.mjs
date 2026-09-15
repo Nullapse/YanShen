@@ -79,6 +79,94 @@ test("mounting a partial page aborts the previous page lifecycle", async () => {
   dom.window.close();
 });
 
+test("paper builder mounts its controls after partial navigation replaces the page", async () => {
+  const dom = installDom("http://localhost/papers/new");
+  document.querySelector("main").innerHTML = `
+    <input id="field-paper-name">
+    <div id="materials-container"></div>
+    <div id="questions-container"></div>
+    <button id="btn-save-paper" type="button"></button>
+    <span id="submit-status"></span>
+    <input id="url-import-input" value="https://spa.fenbi.com/ti/exam/solution/1_2_3r9r4m3?routecs=shenlun">
+    <button id="url-import-button" type="button">解析并预览</button>
+    <div id="url-import-status"></div>
+    <div id="url-import-preview" hidden></div>
+    <script id="url-import-seed" type="application/json">null</script>
+  `;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({
+    json: async () => ({
+      requires_browser_bridge: true,
+      message: "需要浏览器桥接",
+      bookmarklet: "javascript:void(0)",
+    }),
+  });
+  try {
+    const { initializePaperBuilder } = await import(`../../static/js/paper-builder.js?partial=${Date.now()}`);
+    initializePaperBuilder();
+
+    assert.equal(document.querySelectorAll("#materials-container .material-card").length, 1);
+    assert.equal(document.querySelectorAll("#questions-container .question-card-item").length, 1);
+    assert.equal(typeof window.addQuestionField, "function");
+
+    document.querySelector("#url-import-button").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.match(document.querySelector("#url-import-status").textContent, /需要浏览器桥接/);
+    assert.equal(document.querySelector("#url-import-preview").hidden, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+    dom.window.close();
+  }
+});
+
+test("paper builder asks for Fenbi credentials without showing the bookmark workflow", async () => {
+  const dom = installDom("http://localhost/papers/new");
+  document.querySelector("main").innerHTML = `
+    <input id="field-paper-name">
+    <div id="materials-container"></div>
+    <div id="questions-container"></div>
+    <button id="btn-save-paper" type="button"></button>
+    <span id="submit-status"></span>
+    <input id="url-import-input" value="https://spa.fenbi.com/ti/exam/solution/1_2_3r9r4m3?routecs=shenlun">
+    <button id="url-import-button" type="button">直接导入并预览</button>
+    <details id="url-import-credentials">
+      <textarea id="url-import-cookie"></textarea>
+      <input id="url-import-device-id">
+      <input id="url-import-remember" type="checkbox" checked>
+      <button id="url-import-clear-credentials" type="button"></button>
+      <span id="url-import-credential-state">尚未保存</span>
+    </details>
+    <div id="url-import-status"></div>
+    <div id="url-import-preview" hidden></div>
+    <script id="url-import-seed" type="application/json">null</script>
+  `;
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    assert.equal(body.remember_session, true);
+    assert.equal(body.cookie_text, "");
+    return {
+      json: async () => ({
+        requires_credentials: true,
+        message: "需要补充粉笔 Cookie",
+        credentials: { configured: false, cookie_count: 0, device_id_present: false },
+      }),
+    };
+  };
+  try {
+    const { initializePaperBuilder } = await import(`../../static/js/paper-builder.js?credentials=${Date.now()}`);
+    initializePaperBuilder();
+    document.querySelector("#url-import-button").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.equal(document.querySelector("#url-import-credentials").open, true);
+    assert.match(document.querySelector("#url-import-status").textContent, /需要补充粉笔 Cookie/);
+    assert.match(document.querySelector("#url-import-preview").textContent, /Cookie-Editor/);
+  } finally {
+    globalThis.fetch = originalFetch;
+    dom.window.close();
+  }
+});
+
 test("multiline annotations do not paint blank line fragments", async () => {
   const dom = installDom("http://localhost/attempts/7");
   const annotations = await import(`../../static/js/annotations.js?render=${Date.now()}`);
@@ -250,5 +338,31 @@ test("deep thinking is enabled by default and persists across page mounts", asyn
   document.body.append(secondForm);
   grading.initializeDeepThinkingPreference(secondForm, new AbortController().signal);
   assert.equal(secondForm.querySelector("[data-deep-thinking-preference]").checked, false);
+  dom.window.close();
+});
+
+test("annotation displays draft note badge and single-click shows cancel confirm", async () => {
+  const dom = installDom("http://localhost/attempts/8");
+  const annotations = await import(`../../static/js/annotations.js?draft=${Date.now()}`);
+  const material = document.createElement("div");
+  material.setAttribute("data-material-highlight", "");
+  material.dataset.materialId = "4";
+  material.dataset.highlightScope = "attempt-8";
+  material.dataset.savedAnnotations = JSON.stringify([{
+    start: 0,
+    end: 4,
+    color: "green",
+    note: "核心抓手",
+  }]);
+  material.textContent = "数字化政务建设推进";
+  document.body.append(material);
+
+  annotations.renderTextAnnotations(material);
+
+  const draftBadge = material.querySelector(".highlight-draft-badge");
+  assert.ok(draftBadge, "Draft badge should be rendered");
+  assert.equal(draftBadge.querySelector(".draft-badge-tag").textContent, "草稿");
+  assert.equal(draftBadge.querySelector(".draft-badge-text").textContent, "核心抓手");
+
   dom.window.close();
 });

@@ -13,24 +13,242 @@ from .contracts import GradingResult
 from .evidence_resolution import resolve_answer_evidence
 from .rubric import _default_criteria
 
+_DIAGNOSTIC_KEYWORDS = (
+    "准确", "全面", "精准", "规范", "概括", "提炼", "表述", "宽泛", "笼统",
+    "大而化之", "口语", "口语化", "偏弱", "欠缺", "缺失", "遗漏", "未体现", "未提及",
+    "缺少", "未写出", "未包含", "成效", "机制", "对象", "举措", "措施",
+    "并列", "要素", "不够", "略欠", "不完整", "较弱", "偏离", "差异", "深度",
+)
+
+
+_ESSAY_BAND_RANGES = {
+    "A": (80.0, 100.0, "一类文（优秀）"),
+    "B": (70.0, 79.0, "二类文（良好）"),
+    "C": (60.0, 69.0, "三类文（中上）"),
+    "D": (50.0, 59.0, "四类文（一般）"),
+    "E": (0.0, 49.0, "五类文（较弱）"),
+}
+
+_ESSAY_BAND_ALIASES = {
+    "a": "A",
+    "一类": "A",
+    "一类文": "A",
+    "优秀": "A",
+    "excellent": "A",
+    "b": "B",
+    "二类": "B",
+    "二类文": "B",
+    "良好": "B",
+    "good": "B",
+    "c": "C",
+    "三类": "C",
+    "三类文": "C",
+    "中上": "C",
+    "d": "D",
+    "四类": "D",
+    "四类文": "D",
+    "一般": "D",
+    "e": "E",
+    "五类": "E",
+    "五类文": "E",
+    "较弱": "E",
+}
+
+_ESSAY_HIGH_BAND_EVIDENCE_KEYS = (
+    "precise_task_and_theme",
+    "clear_thesis",
+    "coherent_argument_structure",
+    "material_accurate_and_specific",
+    "major_arguments_fully_developed",
+    "depth_or_innovation",
+    "no_fact_or_logic_hard_error",
+)
+
+_ESSAY_SECOND_BAND_EVIDENCE_KEYS = tuple(
+    key for key in _ESSAY_HIGH_BAND_EVIDENCE_KEYS if key != "depth_or_innovation"
+)
+
+_ESSAY_HIGH_BAND_DIAGNOSTIC_RE = re.compile(
+    r"(?:关键)?事实(?:偏差|错误)|材料误读|论证(?:空泛|薄弱|不足)|未能结合.{0,12}(?:材料|案例)"
+    r"|主要(?:部分|段落).{0,8}(?:缺少|不足)"
+)
+
+
+def _normalize_essay_band(value):
+    """Normalize the model's whole-essay band without treating it as proof."""
+    text = str(value or "").strip().lower()
+    if not text:
+        return ""
+    if text in _ESSAY_BAND_ALIASES:
+        return _ESSAY_BAND_ALIASES[text]
+    compact = re.sub(r"\s+", "", text)
+    if compact in _ESSAY_BAND_ALIASES:
+        return _ESSAY_BAND_ALIASES[compact]
+    class_match = re.search(r"(?:第)?([1-5一二三四五])\s*类(?:文|文章)?", compact)
+    if class_match:
+        return {
+            "1": "A", "一": "A",
+            "2": "B", "二": "B",
+            "3": "C", "三": "C",
+            "4": "D", "四": "D",
+            "5": "E", "五": "E",
+        }[class_match.group(1)]
+    range_match = re.search(r"(\d{2})\s*[—\-~至到]\s*(\d{2,3})", compact)
+    if range_match:
+        lower = float(range_match.group(1))
+        if lower >= 80:
+            return "A"
+        if lower >= 70:
+            return "B"
+        if lower >= 60:
+            return "C"
+        if lower >= 50:
+            return "D"
+        return "E"
+    return ""
+
+
+def _essay_band_for_score(score):
+    value = float(score or 0)
+    if value >= 80:
+        return "A"
+    if value >= 70:
+        return "B"
+    if value >= 60:
+        return "C"
+    if value >= 50:
+        return "D"
+    return "E"
+
+
+def _essay_evidence_is_true(value):
+    if isinstance(value, str):
+        return value.strip().lower() not in {"", "0", "false", "no", "否", "不"}
+    return bool(value)
+
+
+def _essay_high_band_is_eligible(raw, diagnostic):
+    evidence = raw.get("high_band_evidence")
+    if not isinstance(evidence, dict):
+        evidence = raw.get("band_evidence")
+    if not isinstance(evidence, dict):
+        return False
+    if not all(_essay_evidence_is_true(evidence.get(key)) for key in _ESSAY_HIGH_BAND_EVIDENCE_KEYS):
+        return False
+    return not _ESSAY_HIGH_BAND_DIAGNOSTIC_RE.search(str(diagnostic or ""))
+
+
+def _essay_second_band_is_eligible(raw, diagnostic):
+    evidence = raw.get("high_band_evidence")
+    if not isinstance(evidence, dict):
+        evidence = raw.get("band_evidence")
+    if not isinstance(evidence, dict):
+        return False
+    if not all(_essay_evidence_is_true(evidence.get(key)) for key in _ESSAY_SECOND_BAND_EVIDENCE_KEYS):
+        return False
+    return not _ESSAY_HIGH_BAND_DIAGNOSTIC_RE.search(str(diagnostic or ""))
+
+
+def _resolve_essay_band(raw, raw_score, diagnostic):
+    """Apply the conservative Yuan Dong five-band ceiling to an essay score."""
+    declared = _normalize_essay_band(raw.get("overall_band"))
+    inferred = _essay_band_for_score(raw_score)
+    reasons = []
+    if declared:
+        band = declared
+    else:
+        # A missing first-round band cannot justify either a first- or
+        # second-class score. The model is explicitly asked to provide it;
+        # omission therefore falls back to the top of the third band.
+        band = "C" if raw_score >= 70 else inferred
+        reasons.append("未提供整篇五档定级，按保守规则不直接进入一、二类文")
+
+    if band == "A" and not _essay_high_band_is_eligible(raw, diagnostic):
+        band = "B" if raw_score >= 70 else inferred
+        reasons.append("缺少一类文所需的完整高分证据，或诊断存在硬伤")
+    if band == "B" and not _essay_second_band_is_eligible(raw, diagnostic):
+        band = "C" if raw_score >= 60 else inferred
+        reasons.append("缺少二类文要求的切题、论证、材料和展开证据，或诊断存在硬伤")
+
+    lower, upper, label = _ESSAY_BAND_RANGES[band]
+    if raw_score < lower:
+        band = inferred
+        lower, upper, label = _ESSAY_BAND_RANGES[band]
+        reasons.append("整篇档位与维度合计不一致，采用实际合计所在档位")
+    if raw_score > upper:
+        reasons.append(f"按{label}上限约束维度合计")
+    return {
+        "band": band,
+        "label": label,
+        "lower": lower,
+        "upper": upper,
+        "reason": "；".join(reasons) or f"按{label}完成先定档，再分配各维度分。",
+        "declared": declared,
+        "high_band_eligible": _essay_high_band_is_eligible(raw, diagnostic),
+        "second_band_eligible": _essay_second_band_is_eligible(raw, diagnostic),
+    }
+
+
+def _rescale_dimension_scores(dimensions, target):
+    """Lower dimension scores proportionally when the essay band sets a ceiling."""
+    current = sum(float(item.get("score") or 0) for item in dimensions)
+    target = max(0.0, float(target or 0))
+    if current <= target + 0.001:
+        return False
+    if target <= 0:
+        for item in dimensions:
+            item["score"] = 0.0
+        return True
+    factor = target / current
+    for item in dimensions:
+        item["score"] = round(float(item.get("score") or 0) * factor, 1)
+    difference = round(target - sum(float(item.get("score") or 0) for item in dimensions), 1)
+    if difference:
+        for item in reversed(dimensions):
+            candidate = round(float(item.get("score") or 0) + difference, 1)
+            maximum = float(item.get("max_score") or 0)
+            if 0 <= candidate <= maximum:
+                item["score"] = candidate
+                break
+    return True
+
 
 def _coverage_factor(candidate, status):
+    """Map a teacher-style completion band to an auditable score fraction."""
     if status == "hit":
         return 1.0
     if status == "miss":
         return 0.0
-    raw = candidate.get("coverage_ratio", candidate.get("coverage", 0.5))
+    level = str(candidate.get("score_level") or "").strip().lower()
+    bands = {
+        "mostly": 0.75,
+        "大部分": 0.75,
+        "half": 0.5,
+        "一半": 0.5,
+        "slight": 0.25,
+        "少量": 0.25,
+    }
+    if level in bands:
+        return bands[level]
     try:
-        if isinstance(raw, str) and raw.strip().endswith("%"):
-            value = float(raw.strip()[:-1]) / 100
-        else:
-            value = float(raw)
-            if value > 1:
-                value /= 100
+        raw = float(candidate.get("coverage_ratio", 0.5))
+        if raw > 1:
+            raw /= 100
     except (TypeError, ValueError):
-        value = 0.5
-    value = max(0.1, min(0.9, value))
-    return round(value * 20) / 20
+        raw = 0.5
+    return min((0.25, 0.5, 0.75), key=lambda value: abs(value - raw))
+
+
+def _semantic_overlap(left, right):
+    clean_left = re.sub(r"[^\w]", "", str(left or "").lower())
+    clean_right = re.sub(r"[^\w]", "", str(right or "").lower())
+    if not clean_left or not clean_right:
+        return 0.0
+    if clean_left in clean_right or clean_right in clean_left:
+        return 1.0
+    left_grams = {clean_left[index:index + 2] for index in range(max(0, len(clean_left) - 1))}
+    right_grams = {clean_right[index:index + 2] for index in range(max(0, len(clean_right) - 1))}
+    return len(left_grams & right_grams) / max(1, len(left_grams))
 
 
 def _consistent_point_reason(status, reason, point):
@@ -69,8 +287,8 @@ def _validated_reference_fusion(value, rubric):
     if count == 1:
         source = f"（{organization_text}）" if organization_text else ""
         return (
-            f"本题仅有 1 份机构参考答案{source}，用于辅助核对采分点；"
-            "评分同时依据题干任务与材料原文，不把单份答案视为唯一标准。"
+            f"本题仅有 1 份粉笔参考答案{source}，内容给分点只从该答案合理划分；"
+            "材料仅用于核验明显错误，不新增或扩写扣分条件。"
         )
     prefix = f"本题已纳入 {count} 份机构参考答案"
     if organization_text:
@@ -99,16 +317,37 @@ def validate_grading_result(
     if not isinstance(raw, dict):
         raise ValueError("批改结果不是 JSON 对象")
 
-    points = sorted(
-        [point for point in rubric.get("points", []) if isinstance(point, dict) and point.get("point_key")],
-        key=lambda point: (-float(point.get("weight") or 0), point.get("point_key") or ""),
-    )
+    points = [
+        point for point in rubric.get("points", [])
+        if isinstance(point, dict) and point.get("point_key")
+    ]
     point_by_key = {point["point_key"]: point for point in points}
-    candidates = {
-        str(item.get("point_key") or ""): item
-        for item in (raw.get("point_matches") or [])
+    raw_point_matches = [
+        item for item in (raw.get("point_matches") or [])
         if isinstance(item, dict) and item.get("point_key")
-    }
+    ]
+    candidate_keys = [str(item.get("point_key") or "") for item in raw_point_matches]
+    if len(candidate_keys) != len(set(candidate_keys)):
+        raise ValueError("批改结果包含重复 point_key，无法保证逐点判定唯一")
+    candidates = {str(item.get("point_key") or ""): item for item in raw_point_matches}
+    is_essay = rubric.get("question_type") == "综合写作"
+    scoring_mode = "holistic_essay" if is_essay else (
+        rubric.get("scoring_mode") or "point_based"
+    )
+    blank_answer = not str(answer_text or "").strip()
+    if scoring_mode == "point_based" and not blank_answer:
+        missing_point_keys = [
+            point["point_key"]
+            for point in points
+            if (point.get("coverage_role") or ("required" if point.get("required_for_full_score", True) else "bonus"))
+            in {"required", "alternative"}
+            and point["point_key"] not in candidates
+            and not (point.get("source_point_key") and point["source_point_key"] in candidates)
+        ]
+        if missing_point_keys:
+            raise ValueError(
+                "批改结果缺少必需给分点判定：" + "、".join(missing_point_keys[:6])
+            )
     matches = []
     for point in points:
         candidate = candidates.get(point["point_key"])
@@ -118,6 +357,38 @@ def validate_grading_result(
         status = candidate.get("status")
         if status not in {"hit", "partial", "miss"}:
             status = "miss"
+        missing_elements = [
+            _clean(value, 100)
+            for value in (candidate.get("missing_elements") or [])
+            if _clean(value)
+        ][:6]
+        reference_boundary = point.get("reference_quote") or point.get("canonical_expression") or ""
+        if status == "hit":
+            missing_elements = []
+        elif status == "partial" and reference_boundary:
+            if not missing_elements:
+                if candidate.get("reason"):
+                    missing_elements = [_clean(candidate.get("reason"), 100)]
+                else:
+                    missing_elements = ["作答概括不够全面或不够准确"]
+            supported_missing = [
+                value for value in missing_elements
+                if _semantic_overlap(value, reference_boundary) >= 0.2
+                or any(keyword in value for keyword in _DIAGNOSTIC_KEYWORDS)
+            ]
+            has_diagnostic_reason = any(
+                keyword in str(candidate.get("reason") or "") for keyword in _DIAGNOSTIC_KEYWORDS
+            )
+            if not supported_missing and not has_diagnostic_reason:
+                status = "hit"
+                missing_elements = []
+                candidate = {
+                    **candidate,
+                    "reason": "用户表述与粉笔给分点核心意思一致；材料中的额外例子或细节不作为扣分条件。",
+                    "score_level": "full",
+                }
+            else:
+                missing_elements = supported_missing or missing_elements
         quote = _clean(candidate.get("answer_quote"), 240)
         resolution = (
             resolve_answer_evidence(quote, answer_text)
@@ -126,6 +397,10 @@ def validate_grading_result(
         )
         if resolution["status"] == "resolved":
             quote = _clean(resolution.get("quote"), 240)
+        elif scoring_mode == "point_based" and not blank_answer and status in {"hit", "partial"}:
+            raise ValueError(
+                f"给分点 {point['point_key']} 的得分证据无法在用户原文中定位，拒绝生成不一致分数"
+            )
         coverage = _coverage_factor(candidate, status)
         coverage_role = point.get("coverage_role") or (
             "required" if point.get("required_for_full_score", True) else "bonus"
@@ -135,6 +410,10 @@ def validate_grading_result(
                 "point_key": point["point_key"],
                 "status": status,
                 "coverage_ratio": coverage,
+                "score_level": "full" if status == "hit" else (
+                    "none" if status == "miss" else {0.75: "mostly", 0.5: "half", 0.25: "slight"}[coverage]
+                ),
+                "awarded_score": round(float(point.get("weight") or 0) * coverage, 3),
                 "answer_quote": quote,
                 "reason": _consistent_point_reason(status, candidate.get("reason"), point),
                 "weight": round(float(point.get("weight") or 0), 3),
@@ -143,23 +422,16 @@ def validate_grading_result(
                 "evidence_status": resolution["status"],
                 "evidence_spans": resolution.get("spans") or [],
                 "confidence": max(0.0, min(1.0, float(candidate.get("confidence") or 0.7))),
-                "missing_elements": [
-                    _clean(value, 100)
-                    for value in (candidate.get("missing_elements") or [])
-                    if _clean(value)
-                ][:6],
+                "missing_elements": missing_elements,
             }
         )
 
     content_weight = float(
         (QUESTION_TYPE_PROFILES.get(rubric.get("question_type")) or QUESTION_TYPE_PROFILES["归纳概括"])["content"]
     )
-    scoring_mode = rubric.get("scoring_mode") or (
-        "holistic_essay" if rubric.get("question_type") == "综合写作" else "point_based"
-    )
     weighted_coverage = round(
         sum(
-            match["weight"] * match["coverage_ratio"]
+            match["awarded_score"]
             for match in matches
             if match.get("coverage_role") in {"required", "alternative"}
             and not (
@@ -183,46 +455,58 @@ def validate_grading_result(
     if not dimension_by_name or round(sum(item["max_score"] for item in dimension_by_name.values()), 4) != 100:
         raise ValueError("评分维度满分未闭合到100分")
 
-    raw_dimensions = {
-        str(item.get("dimension") or ""): item
-        for item in (raw.get("dimension_scores") or [])
-        if isinstance(item, dict) and item.get("dimension")
-    }
-    normalized_dimensions = []
-    blank_answer = not str(answer_text or "").strip()
-    for dimension, definition in dimension_by_name.items():
-        candidate = raw_dimensions.get(dimension)
-        if candidate is None and not blank_answer:
-            raise ValueError(f"批改结果缺少 {dimension} 维度得分")
-        try:
-            score = 0.0 if blank_answer else float(candidate.get("score"))
-        except (TypeError, ValueError):
-            raise ValueError(f"{dimension} 维度得分不是有效数字")
-        if score != score or score < 0 or score > definition["max_score"]:
-            raise ValueError(f"{dimension} 维度得分超出有效范围")
-        normalized_dimensions.append(
+    if scoring_mode == "fenbi_tree":
+        content_score = 0.0 if blank_answer else round(weighted_coverage, 1)
+        normalized_dimensions = [
             {
-                **definition,
-                "score": round(score, 1),
-                "reason": "空白答案。" if blank_answer else _clean(candidate.get("reason"), 300),
+                "dimension": "content",
+                "label": "粉笔踩分树",
+                "max_score": 100.0,
+                "score": round(content_score, 1),
+                "reason": "空白答案。" if blank_answer else "按粉笔踩分树逐点判定。",
             }
-        )
+        ]
+        adjustment_reason = _clean(raw.get("holistic_adjustment_reason"), 360)
+    else:
+        raw_dimensions = {
+            str(item.get("dimension") or ""): item
+            for item in (raw.get("dimension_scores") or [])
+            if isinstance(item, dict) and item.get("dimension")
+        }
+        normalized_dimensions = []
+        for dimension, definition in dimension_by_name.items():
+            candidate = raw_dimensions.get(dimension)
+            if candidate is None and not blank_answer:
+                raise ValueError(f"批改结果缺少 {dimension} 维度得分")
+            try:
+                score = 0.0 if blank_answer else float(candidate.get("score"))
+            except (TypeError, ValueError):
+                raise ValueError(f"{dimension} 维度得分不是有效数字")
+            if score != score or score < 0 or score > definition["max_score"]:
+                raise ValueError(f"{dimension} 维度得分超出有效范围")
+            normalized_dimensions.append(
+                {
+                    **definition,
+                    "score": round(score, 1),
+                    "reason": "空白答案。" if blank_answer else _clean(candidate.get("reason"), 300),
+                }
+            )
 
-    content_score = next(
-        (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
-        0.0,
-    )
-    adjustment_reason = _clean(raw.get("holistic_adjustment_reason"), 360)
-    if not blank_answer and scoring_mode == "point_based":
-        content_score = min(content_weight, weighted_coverage)
-        for dimension in normalized_dimensions:
-            if dimension["dimension"] == "content":
-                dimension["score"] = round(content_score, 1)
-                dimension["reason"] = _clean(
-                    dimension.get("reason") or "内容分由必答采分点覆盖确定。",
-                    300,
-                )
-                break
+        content_score = next(
+            (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
+            0.0,
+        )
+        adjustment_reason = _clean(raw.get("holistic_adjustment_reason"), 360)
+        if not blank_answer and scoring_mode == "point_based":
+            content_score = min(content_weight, weighted_coverage)
+            for dimension in normalized_dimensions:
+                if dimension["dimension"] == "content":
+                    dimension["score"] = round(content_score, 1)
+                    dimension["reason"] = _clean(
+                        dimension.get("reason") or "内容分由原子采分点逐点累加确定（命中全分、部分命中半分、未命中零分）。",
+                        300,
+                    )
+                    break
 
     valid_evidence_ids = {card.get("evidence_id") for card in evidence if card.get("role") == "personalization"}
     history_stable = (
@@ -291,34 +575,92 @@ def validate_grading_result(
             }
         )
 
+    redundancies = []
+    for item in raw.get("redundancies") or []:
+        if not isinstance(item, dict):
+            continue
+        quote = _clean(item.get("quote"), 200)
+        if not quote:
+            continue
+        quote_clean = re.sub(r"\s+", "", quote)
+        answer_clean = re.sub(r"\s+", "", str(answer_text or ""))
+        if quote_clean and quote_clean in answer_clean:
+            wasted = int(item.get("wasted_chars") or len(quote))
+            redundancies.append(
+                {
+                    "quote": quote,
+                    "wasted_chars": wasted,
+                    "reason": _clean(item.get("reason"), 240) or "脱离采分要义的冗余修饰",
+                    "suggestion": _clean(item.get("suggestion"), 200) or "建议精简或删除",
+                }
+            )
+
     raw_score = round(sum(item["score"] for item in normalized_dimensions), 1)
-    score, score_calibration = apply_score_calibration(raw_score, calibration_policy)
-    if blank_answer:
-        score = 0.0
-        score_calibration["adjustment"] = 0.0
-    if raw_score > 0 and score != raw_score:
-        remaining = round(score - raw_score, 1)
-        if remaining < 0:
-            total = sum(item["score"] for item in normalized_dimensions) or 1
-            for dimension in normalized_dimensions:
-                share = remaining * dimension["score"] / total
-                dimension["score"] = round(max(0.0, dimension["score"] + share), 1)
-        else:
-            headroom = sum(item["max_score"] - item["score"] for item in normalized_dimensions) or 1
-            for dimension in normalized_dimensions:
-                share = remaining * (dimension["max_score"] - dimension["score"]) / headroom
-                dimension["score"] = round(min(dimension["max_score"], dimension["score"] + share), 1)
-        difference = round(score - sum(item["score"] for item in normalized_dimensions), 1)
-        if difference:
-            for dimension in normalized_dimensions:
-                candidate = round(dimension["score"] + difference, 1)
-                if 0 <= candidate <= dimension["max_score"]:
-                    dimension["score"] = candidate
-                    break
-        content_score = next(
-            (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
-            0.0,
-        )
+    essay_diagnostic = " ".join(item.get("reason") or "" for item in normalized_dimensions)
+    essay_band_info = (
+        _resolve_essay_band(raw, raw_score, essay_diagnostic)
+        if scoring_mode == "holistic_essay"
+        else None
+    )
+    if scoring_mode == "fenbi_tree":
+        score = 0.0 if blank_answer else round(weighted_coverage, 1)
+        score_calibration = {
+            "raw_score": round(score, 1),
+            "score": round(score, 1),
+            "adjustment": 0.0,
+            "calibrated": False,
+            "reason": "粉笔踩分树逐点判分，不做整体校准。",
+        }
+        content_score = score
+    else:
+        score, score_calibration = apply_score_calibration(raw_score, calibration_policy)
+        if blank_answer:
+            score = 0.0
+            score_calibration["adjustment"] = 0.0
+        if raw_score > 0 and score != raw_score:
+            remaining = round(score - raw_score, 1)
+            if remaining < 0:
+                total = sum(item["score"] for item in normalized_dimensions) or 1
+                for dimension in normalized_dimensions:
+                    share = remaining * dimension["score"] / total
+                    dimension["score"] = round(max(0.0, dimension["score"] + share), 1)
+            else:
+                headroom = sum(item["max_score"] - item["score"] for item in normalized_dimensions) or 1
+                for dimension in normalized_dimensions:
+                    share = remaining * (dimension["max_score"] - dimension["score"]) / headroom
+                    dimension["score"] = round(min(dimension["max_score"], dimension["score"] + share), 1)
+            difference = round(score - sum(item["score"] for item in normalized_dimensions), 1)
+            if difference:
+                for dimension in normalized_dimensions:
+                    candidate = round(dimension["score"] + difference, 1)
+                    if 0 <= candidate <= dimension["max_score"]:
+                        dimension["score"] = candidate
+                        break
+            content_score = next(
+                (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
+                0.0,
+            )
+        if scoring_mode == "holistic_essay" and essay_band_info:
+            score_calibration.update(
+                {
+                    "essay_band": essay_band_info["band"],
+                    "essay_band_label": essay_band_info["label"],
+                    "essay_band_cap": essay_band_info["upper"],
+                    "essay_band_reason": essay_band_info["reason"],
+                    "essay_band_high_evidence": essay_band_info["high_band_eligible"],
+                }
+            )
+            if score > essay_band_info["upper"]:
+                uncapped_score = score
+                _rescale_dimension_scores(normalized_dimensions, essay_band_info["upper"])
+                score = round(essay_band_info["upper"], 1)
+                score_calibration["essay_band_adjustment"] = round(score - uncapped_score, 1)
+                score_calibration["adjustment"] = round(score - raw_score, 1)
+                score_calibration["score"] = score
+                content_score = next(
+                    (item["score"] for item in normalized_dimensions if item["dimension"] == "content"),
+                    0.0,
+                )
 
     review_reasons = []
     for match in matches:
@@ -330,7 +672,6 @@ def validate_grading_result(
             review_reasons.append(f"unresolved_required_evidence:{match['point_key']}")
     if scoring_mode == "holistic_essay" and abs(content_score - weighted_coverage) > content_weight * 0.35:
         review_reasons.append("essay_content_diagnostic_divergence")
-    essay_diagnostic = " ".join(item.get("reason") or "" for item in normalized_dimensions)
     if (
         scoring_mode == "holistic_essay"
         and raw_score >= 70
@@ -353,7 +694,7 @@ def validate_grading_result(
         dimension["display_max_score"] = round(dimension["max_score"] * display_scale, 2)
         dimension["display_score"] = round(dimension["score"] * display_scale, 2)
 
-    return {
+    result = {
         "schema_version": RESULT_VERSION,
         "score_status": score_status,
         "point_matches": matches,
@@ -372,6 +713,7 @@ def validate_grading_result(
         "weighted_coverage_score": weighted_coverage,
         "holistic_adjustment_reason": adjustment_reason,
         "annotations": annotations[:12],
+        "redundancies": redundancies[:10],
         "reference_fusion": _validated_reference_fusion(raw.get("reference_fusion"), rubric),
         "material_reading": [_clean(value, 360) for value in (raw.get("material_reading") or []) if _clean(value)][:12],
         "optimization_suggestions": [
@@ -381,7 +723,6 @@ def validate_grading_result(
         "overall_summary": _clean(raw.get("overall_summary"), 360)
         or ("空白答案，未完成作答。" if blank_answer else "请结合维度得分与采分点分析查看。"),
         "summary": raw.get("summary") if isinstance(raw.get("summary"), dict) else {},
-        "revised_answer": str(raw.get("revised_answer") or "").strip(),
         "score": score,
         "display_score": display_score,
         "display_max_score": int(display_max_score) if display_max_score.is_integer() else display_max_score,
@@ -391,3 +732,14 @@ def validate_grading_result(
         "review": review,
         "validation_errors": review_reasons,
     }
+    if essay_band_info:
+        result.update(
+            {
+                "essay_band": essay_band_info["band"],
+                "essay_band_label": essay_band_info["label"],
+                "essay_band_reason": essay_band_info["reason"],
+                "essay_band_declared": essay_band_info["declared"],
+                "essay_high_band_eligible": essay_band_info["high_band_eligible"],
+            }
+        )
+    return result

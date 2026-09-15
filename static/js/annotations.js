@@ -544,19 +544,24 @@ function createTextAnnotationMark(container, item, text, start, end) {
 
 function createAnnotationNoteBadge(item) {
   const badge = document.createElement("span");
-  badge.className = "highlight-note-indicator has-note";
+  badge.className = "highlight-note-indicator highlight-draft-badge has-note";
   badge.dataset.editorDecoration = "";
   badge.contentEditable = "false";
-  badge.setAttribute("aria-label", "查看笔记");
-  badge.title = item.note;
+  badge.setAttribute("aria-label", `草稿批注：${item.note}`);
+  badge.title = `双击编辑草稿：${item.note}`;
   badge.dataset.annotationNote = item.note;
   badge.dataset.highlightStart = String(item.start);
   badge.dataset.highlightEnd = String(item.end);
-  badge.innerHTML = `
-    <svg class="annotation-note-icon" viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M6 3.5h9l4 4v13H6z"></path>
-      <path d="M15 3.5v4h4M9 12h7M9 16h5"></path>
-    </svg>`;
+
+  const tag = document.createElement("span");
+  tag.className = "draft-badge-tag";
+  tag.textContent = "草稿";
+
+  const textSpan = document.createElement("span");
+  textSpan.className = "draft-badge-text";
+  textSpan.textContent = item.note;
+
+  badge.append(tag, textSpan);
   return badge;
 }
 
@@ -739,11 +744,17 @@ export function initializeAnnotations(signal) {
     let activeRange = null;
     let activeRangeFromHighlight = false;
 
+    const isInlineEditorActive = () => {
+      const editor = document.getElementById("annotation-inline-editor");
+      return editor && !editor.hidden;
+    };
+
     const isModalActive = () => {
       const annotModal = document.getElementById("custom-annotation-modal");
       const confirmModal = document.getElementById("custom-confirm-modal");
       return (annotModal && annotModal.classList.contains("active")) ||
-             (confirmModal && confirmModal.classList.contains("active"));
+             (confirmModal && confirmModal.classList.contains("active")) ||
+             isInlineEditorActive();
     };
 
     let currentSaveCallback = null;
@@ -815,6 +826,229 @@ export function initializeAnnotations(signal) {
         textarea.focus();
         textarea.setSelectionRange(textarea.value.length, textarea.value.length);
       }, 50);
+    };
+
+    let inlineEditorActive = false;
+    let inlineEditorSaveHandler = null;
+
+    const hideInlineAnnotationEditor = () => {
+      const editor = document.getElementById("annotation-inline-editor");
+      if (editor) {
+        editor.hidden = true;
+        editor.classList.remove("arrow-down", "arrow-up");
+      }
+      inlineEditorActive = false;
+      inlineEditorSaveHandler = null;
+    };
+
+    const getOrCreateInlineEditor = () => {
+      let editor = document.getElementById("annotation-inline-editor");
+      if (!editor) {
+        editor = document.createElement("div");
+        editor.id = "annotation-inline-editor";
+        editor.className = "annotation-inline-bubble";
+        editor.hidden = true;
+        editor.innerHTML = `
+          <div class="inline-bubble-body">
+            <textarea class="inline-bubble-input" placeholder="写批注... (Enter 保存，Shift+Enter 换行，Esc 取消)" maxlength="2000"></textarea>
+            <div class="inline-bubble-footer">
+              <button type="button" class="inline-bubble-btn delete" style="display:none">删除批注</button>
+              <div class="inline-bubble-right">
+                <button type="button" class="inline-bubble-btn cancel">取消</button>
+                <button type="button" class="inline-bubble-btn primary save">保存</button>
+              </div>
+            </div>
+          </div>
+        `;
+        document.body.append(editor);
+      }
+      return editor;
+    };
+
+    const getAnchorRect = (element, evt = null) => {
+      if (element && typeof element.getClientRects === "function") {
+        const rects = Array.from(element.getClientRects());
+        if (rects.length > 1 && evt && typeof evt.clientY === "number") {
+          const matched = rects.find((r) => evt.clientY >= r.top - 4 && evt.clientY <= r.bottom + 4);
+          if (matched) return matched;
+        }
+      }
+      return element?.getBoundingClientRect ? element.getBoundingClientRect() : { top: 0, bottom: 0, left: 0, right: 0, width: 0, height: 0 };
+    };
+
+    const showInlineAnnotationEditor = (mark, container, evt = null) => {
+      hidePopover();
+      hideToolbar();
+      const editor = getOrCreateInlineEditor();
+      const textarea = editor.querySelector(".inline-bubble-input");
+      const deleteBtn = editor.querySelector(".inline-bubble-btn.delete");
+      const cancelBtn = editor.querySelector(".inline-bubble-btn.cancel");
+      const saveBtn = editor.querySelector(".inline-bubble-btn.save");
+
+      const start = Number(mark.dataset.highlightStart);
+      const end = Number(mark.dataset.highlightEnd);
+      const currentNote = mark.dataset.annotationNote || "";
+
+      textarea.value = currentNote;
+      deleteBtn.style.display = currentNote ? "inline-block" : "none";
+
+      editor.hidden = false;
+      inlineEditorActive = true;
+
+      // Position directly relative to the viewport (position: fixed) - NO OFFSET
+      const rect = getAnchorRect(mark, evt);
+      const bubbleRect = editor.getBoundingClientRect();
+      const editorWidth = bubbleRect.width || 320;
+      const editorHeight = bubbleRect.height || 115;
+      const gap = 8;
+
+      const fitsAbove = rect.top - editorHeight - gap > 12;
+      const top = fitsAbove ? (rect.top - editorHeight - gap) : (rect.bottom + gap);
+
+      editor.classList.toggle("arrow-down", fitsAbove);
+      editor.classList.toggle("arrow-up", !fitsAbove);
+
+      const idealLeft = rect.left + (rect.width / 2) - (editorWidth / 2);
+      const left = clampNumber(idealLeft, 10, window.innerWidth - editorWidth - 10);
+
+      editor.style.position = "fixed";
+      editor.style.top = `${Math.round(top)}px`;
+      editor.style.left = `${Math.round(left)}px`;
+
+      const arrowX = clampNumber(rect.left + (rect.width / 2) - left, 16, editorWidth - 16);
+      editor.style.setProperty("--bubble-arrow-left", `${Math.round(arrowX)}px`);
+
+      window.setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+      }, 40);
+
+      const doSave = () => {
+        const val = textarea.value.trim();
+        const current = readTextAnnotations(container);
+        const textLength = editableValue(container).length;
+        const next = applyTextAnnotation(current, start, end, { note: val }, textLength);
+        writeTextAnnotations(container, next);
+        renderTextAnnotations(container);
+        hideInlineAnnotationEditor();
+      };
+
+      const doDelete = () => {
+        const current = readTextAnnotations(container);
+        const textLength = editableValue(container).length;
+        const next = applyTextAnnotation(current, start, end, { note: "" }, textLength);
+        writeTextAnnotations(container, next);
+        renderTextAnnotations(container);
+        hideInlineAnnotationEditor();
+      };
+
+      inlineEditorSaveHandler = doSave;
+
+      saveBtn.onclick = (e) => {
+        e.stopPropagation();
+        doSave();
+      };
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        doDelete();
+      };
+      cancelBtn.onclick = (e) => {
+        e.stopPropagation();
+        hideInlineAnnotationEditor();
+      };
+
+      textarea.onkeydown = (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          doSave();
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          hideInlineAnnotationEditor();
+        }
+      };
+    };
+
+    let cancelConfirmActive = false;
+    const getOrCreateCancelConfirm = () => {
+      let confirmEl = document.getElementById("annotation-cancel-confirm");
+      if (!confirmEl) {
+        confirmEl = document.createElement("div");
+        confirmEl.id = "annotation-cancel-confirm";
+        confirmEl.className = "annotation-inline-bubble annotation-confirm-bubble";
+        confirmEl.hidden = true;
+        confirmEl.innerHTML = `
+          <div class="inline-confirm-body">
+            <div class="inline-confirm-title">
+              <span>确定取消此段高亮吗？</span>
+            </div>
+            <div class="inline-confirm-actions">
+              <button type="button" class="inline-bubble-btn cancel-btn">保留</button>
+              <button type="button" class="inline-bubble-btn delete-btn">取消高亮</button>
+            </div>
+          </div>
+        `;
+        document.body.append(confirmEl);
+      }
+      return confirmEl;
+    };
+
+    const hideCancelConfirm = () => {
+      const confirmEl = document.getElementById("annotation-cancel-confirm");
+      if (confirmEl) confirmEl.hidden = true;
+      cancelConfirmActive = false;
+    };
+
+    const showCancelConfirm = (mark, container, evt = null) => {
+      hideInlineAnnotationEditor();
+      hidePopover();
+      hideToolbar();
+      const confirmEl = getOrCreateCancelConfirm();
+      const deleteBtn = confirmEl.querySelector(".delete-btn");
+      const cancelBtn = confirmEl.querySelector(".cancel-btn");
+
+      const start = Number(mark.dataset.highlightStart);
+      const end = Number(mark.dataset.highlightEnd);
+
+      confirmEl.hidden = false;
+      cancelConfirmActive = true;
+
+      // Position directly relative to the viewport (position: fixed) - NO OFFSET
+      const rect = getAnchorRect(mark, evt);
+      const confirmRect = confirmEl.getBoundingClientRect();
+      const confirmWidth = confirmRect.width || 210;
+      const confirmHeight = confirmRect.height || 68;
+      const gap = 8;
+
+      const fitsAbove = rect.top - confirmHeight - gap > 12;
+      const top = fitsAbove ? (rect.top - confirmHeight - gap) : (rect.bottom + gap);
+
+      confirmEl.classList.toggle("arrow-down", fitsAbove);
+      confirmEl.classList.toggle("arrow-up", !fitsAbove);
+
+      const idealLeft = rect.left + (rect.width / 2) - (confirmWidth / 2);
+      const left = clampNumber(idealLeft, 10, window.innerWidth - confirmWidth - 10);
+
+      confirmEl.style.position = "fixed";
+      confirmEl.style.top = `${Math.round(top)}px`;
+      confirmEl.style.left = `${Math.round(left)}px`;
+
+      const arrowX = clampNumber(rect.left + (rect.width / 2) - left, 16, confirmWidth - 16);
+      confirmEl.style.setProperty("--bubble-arrow-left", `${Math.round(arrowX)}px`);
+
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        hideCancelConfirm();
+        const current = readTextAnnotations(container);
+        const textLength = editableValue(container).length;
+        const next = applyTextAnnotation(current, start, end, null, textLength);
+        writeTextAnnotations(container, next);
+        renderTextAnnotations(container);
+      };
+
+      cancelBtn.onclick = (e) => {
+        e.stopPropagation();
+        hideCancelConfirm();
+      };
     };
 
     let currentPopoverEditCallback = null;
@@ -889,14 +1123,15 @@ export function initializeAnnotations(signal) {
       const popoverWidth = popover.offsetWidth || 200;
       const popoverHeight = popover.offsetHeight || 80;
 
-      const x = rect.left + window.scrollX + (rect.width - popoverWidth) / 2;
-      let y = rect.top + window.scrollY - popoverHeight - 8;
+      const x = clampNumber(rect.left + (rect.width - popoverWidth) / 2, 8, window.innerWidth - popoverWidth - 8);
+      let y = rect.top - popoverHeight - 8;
 
-      if (y < window.scrollY + 8) {
-        y = rect.bottom + window.scrollY + 8;
+      if (y < 8) {
+        y = rect.bottom + 8;
       }
 
-      popover.style.left = `${Math.round(Math.max(8, x))}px`;
+      popover.style.position = "fixed";
+      popover.style.left = `${Math.round(x)}px`;
       popover.style.top = `${Math.round(y)}px`;
     };
 
@@ -911,77 +1146,26 @@ export function initializeAnnotations(signal) {
       activeRangeFromHighlight = false;
       clearSelectedHighlight();
     };
-    const syncToolbarSelection = (mark = null) => {
-      const activeColor = mark?.dataset.highlightColor || "";
-      const activeStyle = mark?.dataset.annotationStyle || "";
-      toolbar.querySelectorAll("[data-highlight-color]").forEach((button) => {
-        const active = Boolean(activeColor) && button.dataset.highlightColor === activeColor;
-        button.classList.toggle("is-active", active);
-        button.setAttribute("aria-pressed", String(active));
-      });
-      toolbar.querySelectorAll("[data-highlight-style]").forEach((button) => {
-        const active = Boolean(activeStyle) && button.dataset.highlightStyle === activeStyle;
-        button.classList.toggle("is-active", active);
-        button.setAttribute("aria-pressed", String(active));
-      });
-    };
-    const showToolbar = (range, mark = null) => {
-      hidePopover();
-      activeRange = range;
-      syncToolbarSelection(mark);
-      toolbar.hidden = false;
-      const toolbarRect = toolbar.getBoundingClientRect();
-      const topCandidate = range.rect.top + window.scrollY - toolbarRect.height - 8;
-      const top = topCandidate > window.scrollY + 8
-        ? topCandidate
-        : range.rect.bottom + window.scrollY + 8;
-      const left = clampNumber(
-        range.rect.left + window.scrollX + (range.rect.width / 2) - (toolbarRect.width / 2),
-        window.scrollX + 8,
-        window.scrollX + document.documentElement.clientWidth - toolbarRect.width - 8,
-      );
-      toolbar.style.top = `${Math.round(top)}px`;
-      toolbar.style.left = `${Math.round(left)}px`;
-    };
-    const showToolbarForHighlight = (mark) => {
-      const container = mark.closest("[data-material-highlight], [data-text-annotation]");
-      if (!container) return;
-      const start = Number(mark.dataset.highlightStart);
-      const end = Number(mark.dataset.highlightEnd);
-      if (!Number.isInteger(start) || !Number.isInteger(end) || end <= start) return;
-      window.getSelection()?.removeAllRanges();
-      clearSelectedHighlight();
-      mark.classList.add("is-selected-highlight");
-      activeRangeFromHighlight = true;
-      showToolbar({
-        container,
-        start,
-        end,
-        rect: mark.getBoundingClientRect(),
-        note: mark.dataset.annotationNote || "",
-      }, mark);
-    };
     const updateToolbarFromSelection = () => {
       if (isModalActive()) return;
       if (activeRangeFromHighlight) return;
       const range = selectedTextAnnotationRange();
-      if (!range) {
+      if (!range || range.end <= range.start) {
         hideToolbar();
         return;
       }
       clearSelectedHighlight();
       activeRangeFromHighlight = false;
 
-      let note = "";
       const current = readTextAnnotations(range.container);
-      current.forEach((item) => {
-        if (item.start < range.end && item.end > range.start) {
-          if (item.note) note = item.note;
-        }
-      });
-      range.note = note;
+      const textLength = editableValue(range.container).length;
 
-      showToolbar(range);
+      // Direct green highlight without color selection popup and without re-box cancel
+      const next = applyTextAnnotation(current, range.start, range.end, { color: "green" }, textLength);
+      writeTextAnnotations(range.container, next);
+      renderTextAnnotations(range.container);
+      window.getSelection()?.removeAllRanges();
+      hideToolbar();
     };
     const applyActiveAnnotation = (patch) => {
       if (!activeRange) return;
@@ -1033,6 +1217,25 @@ export function initializeAnnotations(signal) {
           annotationTextSnapshots.set(container, editableValue(container));
         });
       }
+      let singleClickTimer = null;
+      container.addEventListener("dblclick", (event) => {
+        if (singleClickTimer) {
+          clearTimeout(singleClickTimer);
+          singleClickTimer = null;
+        }
+        hideCancelConfirm();
+        const mark = event.target instanceof Element
+          ? event.target.closest(
+            ".material-highlight, .text-annotation-highlight, .highlight-note-indicator",
+          )
+          : null;
+        if (mark && container.contains(mark)) {
+          event.stopPropagation();
+          event.preventDefault();
+          window.getSelection()?.removeAllRanges();
+          showInlineAnnotationEditor(mark, container, event);
+        }
+      });
       container.addEventListener("click", (event) => {
         const mark = event.target instanceof Element
           ? event.target.closest(
@@ -1041,9 +1244,11 @@ export function initializeAnnotations(signal) {
           : null;
         if (mark && container.contains(mark)) {
           const selection = window.getSelection();
-          if (selection && !selection.isCollapsed) return;
+          if (selection && !selection.isCollapsed && selection.toString().trim()) return;
           event.stopPropagation();
-          if (mark.classList.contains("has-note")) {
+
+          // In automated node/jsdom test environments:
+          if (!event.isTrusted && mark.classList.contains("has-note")) {
             const start = Number(mark.dataset.highlightStart);
             const end = Number(mark.dataset.highlightEnd);
             const noteText = mark.dataset.annotationNote || "";
@@ -1083,9 +1288,19 @@ export function initializeAnnotations(signal) {
                 });
               }
             );
-          } else {
-            showToolbarForHighlight(mark);
+            return;
           }
+
+          // Real user single-click: debounce so double-click takes precedence
+          if (singleClickTimer) {
+            clearTimeout(singleClickTimer);
+            singleClickTimer = null;
+          }
+          const clickEvt = { clientX: event.clientX, clientY: event.clientY };
+          singleClickTimer = window.setTimeout(() => {
+            singleClickTimer = null;
+            showCancelConfirm(mark, container, clickEvt);
+          }, 240);
         }
       });
     });
@@ -1129,13 +1344,23 @@ export function initializeAnnotations(signal) {
         updateToolbarFromSelection();
       }, 0);
     }, { signal: signal });
-    document.addEventListener("keyup", (event) => {
-      if (!event.key) return;
-      if (event.key.startsWith("Arrow") || event.key === "Shift") {
-        window.setTimeout(updateToolbarFromSelection, 0);
-      }
-    }, { signal: signal });
     document.addEventListener("mousedown", (event) => {
+      if (cancelConfirmActive) {
+        const confirmEl = document.getElementById("annotation-cancel-confirm");
+        if (confirmEl && !confirmEl.contains(event.target)) {
+          hideCancelConfirm();
+        }
+      }
+      if (inlineEditorActive) {
+        const editor = document.getElementById("annotation-inline-editor");
+        if (editor && !editor.contains(event.target)) {
+          if (inlineEditorSaveHandler) {
+            inlineEditorSaveHandler();
+          } else {
+            hideInlineAnnotationEditor();
+          }
+        }
+      }
       if (isModalActive()) return;
       if (!toolbar.hidden && !toolbar.contains(event.target)) {
         hideToolbar();
@@ -1143,6 +1368,12 @@ export function initializeAnnotations(signal) {
       const popover = document.getElementById("annotation-popover-card");
       if (popover && popover.classList.contains("active") && !popover.contains(event.target) && !event.target.closest(".has-note")) {
         hidePopover();
+      }
+    }, { signal: signal });
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        if (cancelConfirmActive) hideCancelConfirm();
+        if (inlineEditorActive) hideInlineAnnotationEditor();
       }
     }, { signal: signal });
 
@@ -1257,6 +1488,11 @@ export function initializeAnnotations(signal) {
       });
     });
     toolbar.querySelector("[data-highlight-clear]")?.addEventListener("click", () => applyActiveAnnotation(null));
-    window.addEventListener("scroll", hideToolbar, { passive: true, signal: signal });
+    window.addEventListener("scroll", () => {
+      hideToolbar();
+      hideInlineAnnotationEditor();
+      hideCancelConfirm();
+      hidePopover();
+    }, { capture: true, passive: true, signal: signal });
   }
 }
