@@ -628,13 +628,20 @@ def rubric_cache_status(conn, question_id, references, question, materials):
     source_hash = rubric_source_hash(question, materials, references)
     row = conn.execute(
         """
-        SELECT id, updated_at FROM grading_rubrics
+        SELECT id, updated_at, rubric_json FROM grading_rubrics
          WHERE question_id = ? AND reference_set_hash = ? AND source_hash = ?
            AND rubric_version = ? AND status = 'ready'
       ORDER BY updated_at DESC LIMIT 1
         """,
         (question_id, ref_hash, source_hash, RUBRIC_VERSION),
     ).fetchone()
+    if row and question.get("question_type") == "综合写作":
+        try:
+            rubric = json.loads(row["rubric_json"])
+            if not is_current_holistic_essay_rubric(rubric):
+                return {"cached": False, "rubric_id": None, "updated_at": None}
+        except Exception:
+            return {"cached": False, "rubric_id": None, "updated_at": None}
     return {
         "cached": bool(row),
         "rubric_id": row["id"] if row else None,

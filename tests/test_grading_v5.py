@@ -18,6 +18,7 @@ from gongkao.grading_pipeline.rubric import (
     manual_grading_basis,
     normalize_essay_coverage_roles,
 )
+from gongkao.grading_pipeline.orchestration import rubric_cache_status
 from gongkao.grading_pipeline.validation import validate_grading_result
 
 
@@ -497,6 +498,48 @@ class GradingV5Test(unittest.TestCase):
         normalize_essay_coverage_roles(rubric)
         self.assertEqual([p["coverage_role"] for p in rubric["points"]], ["required", "alternative", "alternative"])
         self.assertEqual(rubric["points"][2]["alternative_group"], "essay-evidence")
+
+    def test_rubric_cache_status_rejects_legacy_fenbi_essay_tree(self):
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        conn.execute(
+            """
+            CREATE TABLE grading_rubrics (
+                id INTEGER PRIMARY KEY,
+                question_id INTEGER,
+                reference_set_hash TEXT,
+                source_hash TEXT,
+                rubric_version TEXT,
+                rubric_json TEXT,
+                status TEXT,
+                updated_at TEXT
+            )
+            """
+        )
+        legacy_tree_rubric = {
+            "scoring_mode": "fenbi_tree",
+            "question_type": "综合写作",
+            "dimensions": [{"dimension": "content", "weight": 100}],
+            "points": [{"point_key": "fenbi-1", "weight": 100}],
+        }
+        from gongkao.grading_pipeline.common import reference_set_hash, rubric_source_hash, RUBRIC_VERSION
+        question = {"id": 100, "question_type": "综合写作", "prompt": "写作题", "requirements": ""}
+        references = [{"id": 1, "organization": "粉笔", "answer_text": "参考范文"}]
+        materials = []
+        ref_hash = reference_set_hash(references)
+        source_hash = rubric_source_hash(question, materials, references)
+        conn.execute(
+            """
+            INSERT INTO grading_rubrics (
+                question_id, reference_set_hash, source_hash, rubric_version,
+                rubric_json, status, updated_at
+            ) VALUES (?, ?, ?, ?, ?, 'ready', CURRENT_TIMESTAMP)
+            """,
+            (100, ref_hash, source_hash, RUBRIC_VERSION, json.dumps(legacy_tree_rubric)),
+        )
+        status = rubric_cache_status(conn, 100, references, question, materials)
+        self.assertFalse(status["cached"])
+        self.assertIsNone(status["rubric_id"])
 
 
 if __name__ == "__main__":
