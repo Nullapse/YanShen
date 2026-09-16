@@ -28,6 +28,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Verify release tag matches application version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: python
+        run: |
+          import ast
+          import os
+          from pathlib import Path
+
+          module = ast.parse(Path("gongkao/web/runtime.py").read_text(encoding="utf-8"))
+          version = next(
+              ast.literal_eval(node.value)
+              for node in module.body
+              if isinstance(node, ast.Assign)
+              and any(isinstance(target, ast.Name) and target.id == "APP_VERSION" for target in node.targets)
+          )
+          tag = os.environ["GITHUB_REF_NAME"]
+          if tag != f"v{version}":
+              raise SystemExit(f"Release tag {tag} does not match APP_VERSION {version}")
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
