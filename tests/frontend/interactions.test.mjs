@@ -201,6 +201,55 @@ test("highlighting paragraphs across a blank line keeps exactly one blank paragr
   dom.window.close();
 });
 
+test("annotation notes keep their target when the window scrolls", async () => {
+  const dom = installDom('<main><div data-material-highlight data-material-id="1">材料正文</div></main>');
+  const annotations = await import("../../static/js/annotations.js");
+  const controller = new AbortController();
+  annotations.initializeAnnotations(controller.signal);
+  const material = document.querySelector("[data-material-highlight]");
+  annotations.writeTextAnnotations(material, [{ start: 0, end: 2, color: "yellow" }]);
+  annotations.renderTextAnnotations(material);
+  material.querySelector(".material-highlight").click();
+  document.querySelector("[data-highlight-note]").click();
+  window.dispatchEvent(new Event("scroll"));
+  const modal = document.querySelector("#custom-annotation-modal");
+  modal.querySelector("textarea").value = "滚动后仍可保存";
+  modal.querySelector(".save").click();
+  assert.equal(annotations.readTextAnnotations(material)[0].note, "滚动后仍可保存");
+  assert.equal(modal.classList.contains("active"), false);
+  controller.abort();
+  dom.window.close();
+});
+
+test("annotation dialogs and popovers work after repeated partial navigation", async () => {
+  const dom = installDom("<main></main>");
+  const annotations = await import("../../static/js/annotations.js");
+  for (let page = 1; page <= 3; page += 1) {
+    document.querySelector("main").innerHTML = `<div data-material-highlight data-material-id="${page}">材料正文</div>`;
+    const controller = new AbortController();
+    annotations.initializeAnnotations(controller.signal);
+    const material = document.querySelector("[data-material-highlight]");
+    annotations.writeTextAnnotations(material, [{ start: 0, end: 2, color: "yellow", note: "原批注" }]);
+    annotations.renderTextAnnotations(material);
+    material.querySelector(".has-note").click();
+    document.querySelector(".annotation-popover-content").click();
+    const modal = document.querySelector("#custom-annotation-modal");
+    assert.equal(modal.classList.contains("active"), true);
+    modal.querySelector("textarea").value = `第${page}页批注`;
+    modal.querySelector(".save").click();
+    assert.equal(annotations.readTextAnnotations(material)[0].note, `第${page}页批注`);
+    material.querySelector(".has-note").click();
+    document.querySelector(".annotation-popover-content").click();
+    controller.abort();
+    assert.equal(document.querySelector("#custom-annotation-modal"), null);
+    assert.equal(document.querySelector("#annotation-popover-card"), null);
+    assert.equal(document.querySelector("[data-highlight-toolbar]"), null);
+  }
+  await new Promise((resolve) => window.setTimeout(resolve, 60));
+  assert.equal(document.activeElement, document.body);
+  dom.window.close();
+});
+
 test("workflow more menu opens on click and its actions remain clickable", async () => {
   const dom = installDom(`
     <div data-workflow-menu>

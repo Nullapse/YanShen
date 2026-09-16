@@ -707,6 +707,7 @@ export function selectedMaterialRange() {
 
 
 export function initializeAnnotations(signal) {
+  if (signal?.aborted) return;
   const annotationContainers = Array.from(new Set([
     ...document.querySelectorAll("[data-material-highlight]"),
     ...document.querySelectorAll("[data-text-annotation]"),
@@ -738,6 +739,17 @@ export function initializeAnnotations(signal) {
 
     let activeRange = null;
     let activeRangeFromHighlight = false;
+    const ownedOverlays = [toolbar];
+    let focusTimer = null;
+    let hoverTimeout = null;
+    signal?.addEventListener("abort", () => {
+      window.clearTimeout(focusTimer);
+      window.clearTimeout(hoverTimeout);
+      currentSaveCallback = null;
+      hidePopover();
+      hideToolbar();
+      ownedOverlays.forEach((overlay) => overlay.remove());
+    }, { once: true });
 
     const isModalActive = () => {
       const annotModal = document.getElementById("custom-annotation-modal");
@@ -767,6 +779,7 @@ export function initializeAnnotations(signal) {
           </div>
         `;
         document.body.append(modal);
+        ownedOverlays.push(modal);
 
         const textarea = modal.querySelector(".annotation-modal-textarea");
         const counter = modal.querySelector(".annotation-modal-counter");
@@ -776,6 +789,7 @@ export function initializeAnnotations(signal) {
         textarea.addEventListener("input", updateCounter);
 
         const closeModal = () => {
+          window.clearTimeout(focusTimer);
           modal.classList.remove("active");
           currentSaveCallback = null;
         };
@@ -811,7 +825,9 @@ export function initializeAnnotations(signal) {
       modal.querySelector(".annotation-modal-counter").textContent = `${textarea.value.length} / 2000`;
       currentSaveCallback = onSave;
       modal.classList.add("active");
-      window.setTimeout(() => {
+      window.clearTimeout(focusTimer);
+      focusTimer = window.setTimeout(() => {
+        if (signal?.aborted || !modal.isConnected || !modal.classList.contains("active")) return;
         textarea.focus();
         textarea.setSelectionRange(textarea.value.length, textarea.value.length);
       }, 50);
@@ -830,6 +846,7 @@ export function initializeAnnotations(signal) {
           <button type="button" class="annotation-popover-delete" aria-label="删除批注" title="删除批注">×</button>
         `;
         document.body.append(popover);
+        ownedOverlays.push(popover);
 
         popover.addEventListener("mouseenter", () => {
           window.clearTimeout(hoverTimeout);
@@ -962,6 +979,7 @@ export function initializeAnnotations(signal) {
       }, mark);
     };
     const updateToolbarFromSelection = () => {
+      if (signal?.aborted) return;
       if (isModalActive()) return;
       if (activeRangeFromHighlight) return;
       const range = selectedTextAnnotationRange();
@@ -983,13 +1001,13 @@ export function initializeAnnotations(signal) {
 
       showToolbar(range);
     };
-    const applyActiveAnnotation = (patch) => {
-      if (!activeRange) return;
-      const textLength = editableValue(activeRange.container).length;
-      const current = readTextAnnotations(activeRange.container);
-      const next = applyTextAnnotation(current, activeRange.start, activeRange.end, patch, textLength);
-      writeTextAnnotations(activeRange.container, next);
-      renderTextAnnotations(activeRange.container);
+    const applyActiveAnnotation = (patch, range = activeRange) => {
+      if (!range || signal?.aborted || !range.container.isConnected) return;
+      const textLength = editableValue(range.container).length;
+      const current = readTextAnnotations(range.container);
+      const next = applyTextAnnotation(current, range.start, range.end, patch, textLength);
+      writeTextAnnotations(range.container, next);
+      renderTextAnnotations(range.container);
       window.getSelection()?.removeAllRanges();
       hideToolbar();
     };
@@ -1018,7 +1036,7 @@ export function initializeAnnotations(signal) {
           writeTextAnnotations(container, next);
           renderTextAnnotations(container);
           annotationTextSnapshots.set(container, afterText);
-        });
+        }, { signal });
       }
       if (container.isContentEditable) {
         container.addEventListener("input", () => {
@@ -1027,11 +1045,11 @@ export function initializeAnnotations(signal) {
           const next = syncTextAnnotationsForEdit(readTextAnnotations(container), beforeText, afterText);
           writeTextAnnotations(container, next);
           annotationTextSnapshots.set(container, afterText);
-        });
+        }, { signal });
         container.addEventListener("blur", () => {
           renderTextAnnotations(container);
           annotationTextSnapshots.set(container, editableValue(container));
-        });
+        }, { signal });
       }
       container.addEventListener("click", (event) => {
         const mark = event.target instanceof Element
@@ -1087,7 +1105,7 @@ export function initializeAnnotations(signal) {
             showToolbarForHighlight(mark);
           }
         }
-      });
+      }, { signal });
     });
     document.querySelectorAll("[data-clear-active-material-highlights]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -1104,7 +1122,7 @@ export function initializeAnnotations(signal) {
           writeTextAnnotations(container, previousAnnotations);
           renderTextAnnotations(container);
         });
-      });
+      }, { signal });
     });
     document.querySelectorAll("[data-clear-text-annotations]").forEach((button) => {
       button.addEventListener("click", () => {
@@ -1120,7 +1138,7 @@ export function initializeAnnotations(signal) {
           writeTextAnnotations(container, previousAnnotations);
           renderTextAnnotations(container);
         });
-      });
+      }, { signal });
     });
     document.addEventListener("mouseup", () => {
       window.setTimeout(() => {
@@ -1146,7 +1164,6 @@ export function initializeAnnotations(signal) {
       }
     }, { signal: signal });
 
-    let hoverTimeout = null;
     document.addEventListener("mouseover", (event) => {
       const mark = event.target.closest(".has-note");
       const popover = document.getElementById("annotation-popover-card");
@@ -1232,18 +1249,20 @@ export function initializeAnnotations(signal) {
     });
     toolbar.querySelector("[data-highlight-note]")?.addEventListener("click", () => {
       if (!activeRange) return;
-      const container = activeRange.container;
+      // Keep the modal's target independent of transient toolbar selection.
+      const range = { ...activeRange };
+      const container = range.container;
       const currentAnnotations = readTextAnnotations(container);
       let currentNote = "";
       currentAnnotations.forEach((item) => {
-        if (item.start < activeRange.end && item.end > activeRange.start) {
+        if (item.start < range.end && item.end > range.start) {
           if (item.note) currentNote = item.note;
         }
       });
       showAnnotationModal(currentNote, (note) => {
         let hasColorOrStyle = false;
         currentAnnotations.forEach((item) => {
-          if (item.start < activeRange.end && item.end > activeRange.start) {
+          if (item.start < range.end && item.end > range.start) {
             if (item.color || item.style) {
               hasColorOrStyle = true;
             }
@@ -1253,7 +1272,7 @@ export function initializeAnnotations(signal) {
         if (!hasColorOrStyle) {
           patch.color = "yellow";
         }
-        applyActiveAnnotation(patch);
+        applyActiveAnnotation(patch, range);
       });
     });
     toolbar.querySelector("[data-highlight-clear]")?.addEventListener("click", () => applyActiveAnnotation(null));
