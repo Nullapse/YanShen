@@ -54,6 +54,7 @@ from ..runtime import (
     start_or_continue_chat_async,
     valid_module_id,
 )
+from .settings import _clean_base_url
 
 
 class AgentController:
@@ -695,7 +696,7 @@ class AgentController:
         length = int(self.headers.get("Content-Length", "0"))
         data = self.rfile.read(length).decode("utf-8") if length else ""
         provider_name = form_value(data, "provider_name", "DeepSeek")
-        api_base_url = form_value(data, "api_base_url", "https://api.deepseek.com")
+        api_base_url = _clean_base_url(form_value(data, "api_base_url", "https://api.deepseek.com"))
         model = form_value(data, "model", "deepseek-v4-pro")
         api_key = form_value(data, "api_key", "")
         api_key_env = form_value(data, "api_key_env", "")
@@ -723,7 +724,7 @@ class AgentController:
         data = self.rfile.read(length).decode("utf-8") if length else ""
         settings = {
             "provider_name": form_value(data, "provider_name", "DeepSeek"),
-            "api_base_url": form_value(data, "api_base_url", "https://api.deepseek.com"),
+            "api_base_url": _clean_base_url(form_value(data, "api_base_url", "https://api.deepseek.com")),
             "model": form_value(data, "model", "deepseek-v4-pro"),
             "api_key": form_value(data, "api_key", ""),
             "api_key_env": form_value(data, "api_key_env", ""),

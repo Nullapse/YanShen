@@ -1,8 +1,10 @@
-"""Settings, import, export, and local-record management controllers."""
+import time
+from urllib.parse import urlparse
 
 from ..runtime import (
     back_link,
     cgi,
+    chat_completion,
     connect,
     create_import_record,
     esc,
@@ -21,6 +23,32 @@ from ..runtime import (
     settings_credits,
     user_data_dir,
 )
+
+
+def _clean_base_url(raw_url: str) -> str:
+    url_str = (raw_url or "").strip().rstrip("/")
+    if not url_str:
+        return "https://api.deepseek.com"
+    parsed = urlparse(url_str)
+    if parsed.netloc.endswith("opencode.ai") or "opencode.ai" in parsed.netloc:
+        scheme = parsed.scheme or "https"
+        netloc = parsed.netloc or "opencode.ai"
+        path = parsed.path.rstrip("/")
+        if path in {"", "/", "/go", "/go/v1", "/zen/go", "/zen/go/v1", "/go/v1/chat/completions"}:
+            return f"{scheme}://{netloc}/zen/go/v1"
+    return url_str
+
+
+def detect_provider_preset(provider_name: str, api_base_url: str) -> str:
+    url = (api_base_url or "").lower().strip()
+    name = (provider_name or "").lower().strip()
+    if "opencode.ai" in url or "opencode" in name:
+        return "opencode"
+    if "api.deepseek.com" in url:
+        return "official"
+    if not url and ("deepseek" in name or not name):
+        return "official"
+    return "custom"
 
 
 class SettingsController:
@@ -186,8 +214,23 @@ class SettingsController:
         grading_basic = " checked" if (settings["grading_mode"] or "basic") == "basic" else ""
         agent_inherits_grading = " checked" if agent_settings["use_grading_api"] else ""
         agent_uses_custom = " checked" if not agent_settings["use_grading_api"] else ""
-        key_status = masked_key(settings["api_key"]) or f"环境变量：{esc(settings['api_key_env'] or '未设置')}"
-        agent_key_status = masked_key(agent_settings["api_key"]) or (
+
+        provider_preset = detect_provider_preset(settings["provider_name"], settings["api_base_url"])
+        preset_official = " checked" if provider_preset == "official" else ""
+        preset_opencode = " checked" if provider_preset == "opencode" else ""
+        preset_custom = " checked" if provider_preset == "custom" else ""
+
+        agent_provider_preset = detect_provider_preset(
+            agent_settings["provider_name"], agent_settings["api_base_url"]
+        )
+        agent_preset_official = " checked" if agent_provider_preset == "official" else ""
+        agent_preset_opencode = " checked" if agent_provider_preset == "opencode" else ""
+        agent_preset_custom = " checked" if agent_provider_preset == "custom" else ""
+
+        key_status = f"已保存：{masked_key(settings['api_key'])}" if settings["api_key"] else (
+            f"环境变量：{esc(settings['api_key_env'] or '未设置')}"
+        )
+        agent_key_status = f"已保存：{masked_key(agent_settings['api_key'])}" if agent_settings["api_key"] else (
             f"环境变量：{esc(agent_settings['api_key_env'] or '未设置')}"
         )
         body = f"""
@@ -208,15 +251,54 @@ class SettingsController:
               <label class="mode-card"><input type="radio" name="grading_mode" value="basic"{grading_basic}><strong>基础批改（默认·快速）</strong><span>直接批改当前题，等待更短，更快生成完整批改报告。</span></label>
               <label class="mode-card"><input type="radio" name="grading_mode" value="enhanced"{grading_enhanced}><strong>智能批改</strong><span>综合本题材料与参考答案共识评分，并结合历史提供改进建议。</span></label>
             </div>
+            <h3>服务商与接入方式</h3>
+            <div class="mode-grid provider-mode-grid" data-provider-group="grading">
+              <label class="mode-card">
+                <input type="radio" name="provider_preset" value="official"{preset_official}>
+                <strong>DeepSeek 官方</strong>
+                <span>直连官方接口（api.deepseek.com）</span>
+              </label>
+              <label class="mode-card">
+                <input type="radio" name="provider_preset" value="opencode"{preset_opencode}>
+                <strong>OpenCode Go</strong>
+                <span>国内中转专线，内置 Session 路由</span>
+              </label>
+              <label class="mode-card">
+                <input type="radio" name="provider_preset" value="custom"{preset_custom}>
+                <strong>自定义中转</strong>
+                <span>OneAPI、硅基流动等任意 OpenAI 兼容中转</span>
+              </label>
+            </div>
             <div class="settings-fields">
-              <label><span>服务商名称</span><input name="provider_name" value="{esc(settings["provider_name"])}" placeholder="DeepSeek"></label>
-              <label><span>Base URL</span><input name="api_base_url" value="{esc(settings["api_base_url"])}" placeholder="https://api.deepseek.com"></label>
-              <label><span>模型名</span><input name="model" value="{esc(settings["model"])}" placeholder="deepseek-v4-pro"></label>
+              <label style="grid-column: span 2;">
+                <span>API Key <small style="color: var(--muted); font-weight: normal;">(自由配置 · 本地安全加密保存)</small></span>
+                <input type="password" name="api_key" value="" autocomplete="off" placeholder="{esc(key_status)}">
+              </label>
+              <label data-provider-base-url-label="grading">
+                <span>Base URL</span>
+                <input name="api_base_url" value="{esc(settings["api_base_url"])}" placeholder="https://api.deepseek.com" data-provider-base-url="grading">
+              </label>
+              <label data-provider-model-label="grading">
+                <span>模型名</span>
+                <input name="model" value="{esc(settings["model"])}" placeholder="deepseek-chat" data-provider-model="grading">
+              </label>
+              <div class="model-quick-tags" data-model-tags="grading" style="grid-column: span 2; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: -4px 0 4px;">
+                <span style="font-size: 12px; color: var(--muted);">常用模型快捷选择：</span>
+                <button type="button" class="button small ghost" data-fill-model="deepseek-chat" style="padding: 2px 8px; min-height: 26px; font-size: 12px;">deepseek-chat (V3)</button>
+                <button type="button" class="button small ghost" data-fill-model="deepseek-reasoner" style="padding: 2px 8px; min-height: 26px; font-size: 12px;">deepseek-reasoner (R1)</button>
+                <button type="button" class="button small ghost" data-fill-model="deepseek-v4-flash" style="padding: 2px 8px; min-height: 26px; font-size: 12px;">deepseek-v4-flash</button>
+                <button type="button" class="button small ghost" data-fill-model="deepseek-v4-pro" style="padding: 2px 8px; min-height: 26px; font-size: 12px;">deepseek-v4-pro</button>
+              </div>
               <label><span>Temperature</span><input name="temperature" value="{esc(settings["temperature"])}" inputmode="decimal"></label>
               <label><span>API Key 环境变量</span><input name="api_key_env" value="{esc(settings["api_key_env"])}" placeholder="DEEPSEEK_API_KEY"></label>
-              <label><span>API Key</span><input name="api_key" value="" autocomplete="off" placeholder="{esc(key_status)}"></label>
             </div>
-            <label class="check-line"><input type="checkbox" name="clear_api_key" value="1"> 清除已保存的 API Key</label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin: 4px 0 10px;">
+              <label class="check-line" style="margin: 0;"><input type="checkbox" name="clear_api_key" value="1"> 清除已保存的 API Key</label>
+              <span style="font-size: 12px; color: var(--muted);">若不修改 Key，输入框留空保存即可继续沿用</span>
+            </div>
+            <p class="settings-hint-note" style="margin: 0 0 14px; font-size: 12px; color: var(--muted, #667570); line-height: 1.6;">
+              💡 <strong>中转支持说明</strong>：已原生支持任意 OpenAI 兼容中转（OneAPI、NewAPI、硅基流动、自建反代等）。如使用第三方中转，请选择「自定义中转」，并填入服务商 Base URL（通常以 <code>/v1</code> 结尾）和分配的 API Key。
+            </p>
             <p class="warning-note">API 自动模式会把题目、整卷材料、参考答案和你的答案发送给你配置的模型服务。</p>
             <section class="coach-api-settings" id="ai-coach-settings" data-coach-api-settings>
               <div class="settings-subheading">
@@ -228,19 +310,58 @@ class SettingsController:
               </div>
               <div class="coach-api-collapsible" data-coach-api-fields aria-hidden="true">
                 <div class="coach-api-collapsible-inner">
+                  <div class="mode-grid provider-mode-grid" data-provider-group="agent" style="margin-top: 6px;">
+                    <label class="mode-card">
+                      <input type="radio" name="agent_provider_preset" value="official"{agent_preset_official}>
+                      <strong>DeepSeek 官方</strong>
+                      <span>直连官方 API</span>
+                    </label>
+                    <label class="mode-card">
+                      <input type="radio" name="agent_provider_preset" value="opencode"{agent_preset_opencode}>
+                      <strong>OpenCode Go</strong>
+                      <span>国内中转专线</span>
+                    </label>
+                    <label class="mode-card">
+                      <input type="radio" name="agent_provider_preset" value="custom"{agent_preset_custom}>
+                      <strong>自定义中转</strong>
+                      <span>OpenAI 兼容中转</span>
+                    </label>
+                  </div>
                   <div class="settings-fields">
-                    <label><span>服务商名称</span><input name="agent_provider_name" value="{esc(agent_settings["provider_name"])}" placeholder="DeepSeek"></label>
-                    <label><span>Base URL</span><input name="agent_api_base_url" value="{esc(agent_settings["api_base_url"])}" placeholder="https://api.deepseek.com"></label>
-                    <label><span>模型名</span><input name="agent_model" value="{esc(agent_settings["model"])}" placeholder="deepseek-v4-pro"></label>
+                    <label style="grid-column: span 2;">
+                      <span>教练 API Key <small style="color: var(--muted); font-weight: normal;">(自由配置 · 本地安全加密保存)</small></span>
+                      <input type="password" name="agent_api_key" value="" autocomplete="off" placeholder="{esc(agent_key_status)}">
+                    </label>
+                    <label data-provider-base-url-label="agent">
+                      <span>Base URL</span>
+                      <input name="agent_api_base_url" value="{esc(agent_settings["api_base_url"])}" placeholder="https://api.deepseek.com" data-provider-base-url="agent">
+                    </label>
+                    <label data-provider-model-label="agent">
+                      <span>模型名</span>
+                      <input name="agent_model" value="{esc(agent_settings["model"])}" placeholder="deepseek-chat" data-provider-model="agent">
+                    </label>
+                    <div class="model-quick-tags" data-model-tags="agent" style="grid-column: span 2; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin: -4px 0 4px;">
+                      <span style="font-size: 12px; color: var(--muted);">常用模型快捷选择：</span>
+                      <button type="button" class="button small ghost" data-fill-model="deepseek-chat" style="padding: 2px 8px; min-height: 26px; font-size: 12px;">deepseek-chat (V3)</button>
+                      <button type="button" class="button small ghost" data-fill-model="deepseek-reasoner" style="padding: 2px 8px; min-height: 26px; font-size: 12px;">deepseek-reasoner (R1)</button>
+                      <button type="button" class="button small ghost" data-fill-model="deepseek-v4-flash" style="padding: 2px 8px; min-height: 26px; font-size: 12px;">deepseek-v4-flash</button>
+                      <button type="button" class="button small ghost" data-fill-model="deepseek-v4-pro" style="padding: 2px 8px; min-height: 26px; font-size: 12px;">deepseek-v4-pro</button>
+                    </div>
                     <label><span>Temperature</span><input name="agent_temperature" value="{esc(agent_settings["temperature"])}" inputmode="decimal"></label>
                     <label><span>API Key 环境变量</span><input name="agent_api_key_env" value="{esc(agent_settings["api_key_env"])}" placeholder="DEEPSEEK_API_KEY"></label>
-                    <label><span>API Key</span><input name="agent_api_key" value="" autocomplete="off" placeholder="{esc(agent_key_status)}"></label>
                   </div>
-                  <label class="check-line"><input type="checkbox" name="clear_agent_api_key" value="1"> 清除已保存的教练 API Key</label>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin: 4px 0 10px;">
+                    <label class="check-line" style="margin: 0;"><input type="checkbox" name="clear_agent_api_key" value="1"> 清除已保存的教练 API Key</label>
+                    <span style="font-size: 12px; color: var(--muted);">若不修改 Key，输入框留空保存即可继续沿用</span>
+                  </div>
                 </div>
               </div>
             </section>
-            <button class="button primary" type="submit">保存设置</button>
+            <div class="settings-actions-group" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:20px;">
+              <button class="button primary" type="submit" name="settings_action" value="save">保存设置</button>
+              <button class="button secondary" type="submit" name="settings_action" value="test">测试批改 API 连通性</button>
+              <button class="button ghost" type="submit" name="settings_action" value="test_coach">测试教练 API 连通性</button>
+            </div>
             </form>
           </div>
 
@@ -356,26 +477,44 @@ class SettingsController:
         with connect(self.db_path) as conn:
             current = conn.execute("SELECT * FROM ai_settings WHERE id = 1").fetchone()
             current_agent = conn.execute("SELECT * FROM agent_ai_settings WHERE id = 1").fetchone()
+
+            # 1. 批改 API 服务商预设与连接参数
+            provider_preset = form.get("provider_preset", [""])[0]
+            if provider_preset == "official":
+                provider_name = "DeepSeek 官方"
+                clean_api_base_url = "https://api.deepseek.com"
+                default_model = "deepseek-chat"
+            elif provider_preset == "opencode":
+                provider_name = "OpenCode Go"
+                clean_api_base_url = "https://opencode.ai/zen/go/v1"
+                default_model = "deepseek-v4-flash"
+            elif provider_preset == "custom":
+                provider_name = form.get("provider_name", ["自定义中转"])[0].strip() or "自定义中转"
+                clean_api_base_url = _clean_base_url(form.get("api_base_url", ["https://api.deepseek.com"])[0])
+                default_model = "deepseek-chat"
+            else:
+                provider_name = form.get("provider_name", [current["provider_name"]])[0].strip() or "DeepSeek"
+                clean_api_base_url = _clean_base_url(form.get("api_base_url", [current["api_base_url"]])[0])
+                default_model = current["model"] or "deepseek-chat"
+
+            model = form.get("model", [""])[0].strip() or default_model
+
             api_key = form.get("api_key", [""])[0].strip()
             if form.get("clear_api_key", [""])[0] == "1":
                 api_key = ""
             elif not api_key:
                 api_key = current["api_key"]
-            agent_api_key = form.get("agent_api_key", [""])[0].strip()
-            if form.get("clear_agent_api_key", [""])[0] == "1":
-                agent_api_key = ""
-            elif not agent_api_key:
-                agent_api_key = current_agent["api_key"]
+
             try:
                 temperature = float(form.get("temperature", ["0.2"])[0] or 0.2)
             except ValueError:
                 temperature = 0.2
-            try:
-                agent_temperature = float(
-                    form.get("agent_temperature", [str(current_agent["temperature"])])[0] or 0.2
-                )
-            except ValueError:
-                agent_temperature = 0.2
+
+            api_key_env = form.get("api_key_env", ["DEEPSEEK_API_KEY"])[0].strip()
+            grading_mode = form.get("grading_mode", ["basic"])[0]
+            if grading_mode not in {"enhanced", "basic"}:
+                grading_mode = "basic"
+
             conn.execute(
                 """
                 UPDATE ai_settings
@@ -386,17 +525,55 @@ class SettingsController:
                 """,
                 (
                     form.get("mode", ["api"])[0],
-                    form.get("provider_name", ["DeepSeek"])[0].strip() or "DeepSeek",
-                    form.get("api_base_url", ["https://api.deepseek.com"])[0].strip() or "https://api.deepseek.com",
+                    provider_name,
+                    clean_api_base_url,
                     api_key,
-                    form.get("api_key_env", ["DEEPSEEK_API_KEY"])[0].strip(),
-                    form.get("model", ["deepseek-v4-pro"])[0].strip() or "deepseek-v4-pro",
+                    api_key_env,
+                    model,
                     temperature,
-                    form.get("grading_mode", ["basic"])[0]
-                    if form.get("grading_mode", ["basic"])[0] in {"enhanced", "basic"}
-                    else "basic",
+                    grading_mode,
                 ),
             )
+
+            # 2. AI 教练 API 服务商预设与连接参数
+            if "agent_connection_mode" in form:
+                use_grading_api = 0 if form.get("agent_connection_mode", ["inherit"])[0] == "custom" else 1
+            else:
+                use_grading_api = current_agent["use_grading_api"]
+
+            agent_provider_preset = form.get("agent_provider_preset", [""])[0]
+            if agent_provider_preset == "official":
+                agent_provider_name = "DeepSeek 官方"
+                clean_agent_api_base_url = "https://api.deepseek.com"
+                agent_default_model = "deepseek-chat"
+            elif agent_provider_preset == "opencode":
+                agent_provider_name = "OpenCode Go"
+                clean_agent_api_base_url = "https://opencode.ai/zen/go/v1"
+                agent_default_model = "deepseek-v4-flash"
+            elif agent_provider_preset == "custom":
+                agent_provider_name = form.get("agent_provider_name", ["自定义中转"])[0].strip() or "自定义中转"
+                clean_agent_api_base_url = _clean_base_url(form.get("agent_api_base_url", ["https://api.deepseek.com"])[0])
+                agent_default_model = "deepseek-chat"
+            else:
+                agent_provider_name = form.get("agent_provider_name", [current_agent["provider_name"]])[0].strip() or "DeepSeek"
+                clean_agent_api_base_url = _clean_base_url(form.get("agent_api_base_url", [current_agent["api_base_url"]])[0])
+                agent_default_model = current_agent["model"] or "deepseek-chat"
+
+            agent_model = form.get("agent_model", [""])[0].strip() or agent_default_model
+
+            agent_api_key = form.get("agent_api_key", [""])[0].strip()
+            if form.get("clear_agent_api_key", [""])[0] == "1":
+                agent_api_key = ""
+            elif not agent_api_key:
+                agent_api_key = current_agent["api_key"]
+
+            try:
+                agent_temperature = float(
+                    form.get("agent_temperature", [str(current_agent["temperature"])])[0] or 0.2
+                )
+            except ValueError:
+                agent_temperature = 0.2
+
             conn.execute(
                 """
                 UPDATE agent_ai_settings
@@ -405,17 +582,85 @@ class SettingsController:
                  WHERE id = 1
                 """,
                 (
-                    0 if form.get("agent_connection_mode", ["inherit"])[0] == "custom" else 1,
-                    form.get("agent_provider_name", [current_agent["provider_name"]])[0].strip()
-                    or "DeepSeek",
-                    form.get("agent_api_base_url", [current_agent["api_base_url"]])[0].strip()
-                    or "https://api.deepseek.com",
+                    use_grading_api,
+                    agent_provider_name,
+                    clean_agent_api_base_url,
                     agent_api_key,
                     form.get("agent_api_key_env", [current_agent["api_key_env"]])[0].strip(),
-                    form.get("agent_model", [current_agent["model"]])[0].strip() or "deepseek-v4-pro",
+                    agent_model,
                     agent_temperature,
                 ),
             )
+
+        settings_action = form.get("settings_action", ["save"])[0]
+        if settings_action == "test":
+            target_settings = {
+                "provider_name": provider_name,
+                "api_base_url": clean_api_base_url,
+                "api_key": api_key,
+                "api_key_env": api_key_env,
+                "model": model,
+                "temperature": 0.2,
+            }
+            start_time = time.time()
+            try:
+                content, _ = chat_completion(
+                    target_settings,
+                    "请回复五个字：API连接正常",
+                    request_options={"max_tokens": 500, "thinking": "disabled"},
+                )
+                duration = time.time() - start_time
+                reply = content.strip().replace("\n", " ")
+                self.page_settings([
+                    ("success", f"设置已保存。批改 API 连通测试成功！响应耗时 {duration:.2f} 秒。模型回复：“{reply}”")
+                ])
+                return
+            except Exception as exc:
+                self.page_settings([
+                    ("warning", "设置已保存。"),
+                    ("error", f"批改 API 连接测试失败：{exc}"),
+                ])
+                return
+
+        if settings_action == "test_coach":
+            if use_grading_api:
+                target_settings = {
+                    "provider_name": provider_name,
+                    "api_base_url": clean_api_base_url,
+                    "api_key": api_key,
+                    "api_key_env": api_key_env,
+                    "model": model,
+                    "temperature": 0.2,
+                }
+            else:
+                target_settings = {
+                    "provider_name": agent_provider_name,
+                    "api_base_url": clean_agent_api_base_url,
+                    "api_key": agent_api_key,
+                    "api_key_env": form.get("agent_api_key_env", [current_agent["api_key_env"]])[0].strip(),
+                    "model": agent_model,
+                    "temperature": 0.2,
+                }
+            start_time = time.time()
+            try:
+                content, _ = chat_completion(
+                    target_settings,
+                    "请回复五个字：API连接正常",
+                    request_options={"max_tokens": 500, "thinking": "disabled"},
+                )
+                duration = time.time() - start_time
+                reply = content.strip().replace("\n", " ")
+                self.page_settings([
+                    ("success", f"设置已保存。教练 API 连通测试成功！响应耗时 {duration:.2f} 秒。模型回复：“{reply}”")
+                ])
+                return
+            except Exception as exc:
+                self.page_settings([
+                    ("warning", "设置已保存。"),
+                    ("error", f"教练 API 连接测试失败：{exc}"),
+                ])
+                return
+
         self.page_settings([("success", "设置已保存。")])
 
     def handle_settings_local_records_clear(self):
@@ -484,7 +729,9 @@ class SettingsController:
             return
         try:
             raw = backup.file.read()
-            payload = json.loads(raw.decode("utf-8-sig"))
+            if isinstance(raw, (bytes, bytearray)) and raw.startswith(b"\xef\xbb\xbf"):
+                raw = raw[3:]
+            payload = json.loads(raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else raw)
             with connect(self.db_path) as conn:
                 counts = import_personal_data(conn, payload)
         except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:

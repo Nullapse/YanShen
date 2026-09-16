@@ -113,3 +113,53 @@ jobs:
           } else {
             gh release create $tag $files --generate-notes --verify-tag
           }
+
+  macos-build:
+    if: github.event_name != 'pull_request'
+    needs: windows-build
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies and build tools
+        shell: bash
+        run: |
+          python -m venv .venv
+          .venv/bin/python -m pip install -r requirements.txt -r requirements-build.txt
+      - name: Build macOS app
+        shell: bash
+        run: ./scripts/build_macos_app.sh
+      - name: Smoke test packaged files
+        shell: bash
+        run: |
+          test -f "dist/研申.app/Contents/MacOS/研申"
+          test -f "dist/研申.app/Contents/Resources/data/gongkao_seed.sqlite3"
+          test -d "dist/研申.app/Contents/Resources/static"
+          test -d "dist/研申.app/Contents/Resources/knowledge"
+      - name: Create archive and checksum
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME}"
+          if [[ "$version" != v* ]]; then version="dev"; fi
+          arch="$(uname -m)"
+          zip="gongkao-shenlun-${version}-macos-${arch}.zip"
+          sha="gongkao-shenlun-${version}-macos-${arch}.sha256"
+          ditto -c -k --sequesterRsrc --keepParent "dist/研申.app" "$zip"
+          shasum -a 256 "$zip" > "$sha"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gongkao-shenlun-macos
+          path: |
+            gongkao-shenlun-*-macos-*.zip
+            gongkao-shenlun-*-macos-*.sha256
+      - name: Publish macOS assets to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --generate-notes --verify-tag
+          gh release upload "$tag" gongkao-shenlun-*-macos-*.zip gongkao-shenlun-*-macos-*.sha256 --clobber

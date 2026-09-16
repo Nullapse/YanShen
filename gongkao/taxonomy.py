@@ -330,3 +330,50 @@ def classify_question_type(prompt, requirements="", fallback="综合分析"):
 
 def infer_question_type(prompt, requirements=""):
     return classify_question_type(prompt, requirements)[0]
+
+
+ANALYSIS_SUBTYPES = ("词句理解类", "观点评析类", "现象分析类", "关系分析类")
+
+
+def classify_analysis_subtype(prompt, requirements=""):
+    """Classify comprehensive analysis question into one of the 4 standard sub-types."""
+    text = re.sub(r"\s+", "", f"{prompt or ''} {requirements or ''}")
+
+    # 1. 关系分析类
+    if any(cue in text for cue in ("关系", "辩证", "相互作用", "相辅相成", "互动")):
+        return "关系分析类", "点明关系本质 -> 双向论述互动 -> 每条回扣题干核心词"
+
+    # 2. 词句理解类
+    if any(cue in text for cue in ("谈谈对", "如何理解", "谈谈理解", "内涵", "含义", "这句话", "这句话的理解")):
+        return "词句理解类", "表层含义 -> 深层内涵（分维度） -> 实质或对策方向"
+
+    # 3. 观点评析类
+    if any(cue in text for cue in ("评析", "评价", "看法", "认识", "反驳", "态度", "如何看待", "对这一观点")):
+        return "观点评析类", "亮明态度 -> 合理性与局限性（辩证分析） -> 最终结论"
+
+    # 4. 现象分析类
+    if any(cue in text for cue in ("现象", "为什么", "为何", "剖析", "原因", "问题")):
+        return "现象分析类", "概括现象 -> 原因（内因外因/主体制度环境） -> 治理对策"
+
+    return "词句理解类", "默认综合分析框架：表层含义 -> 深度阐释 -> 总结回扣"
+
+
+ESSAY_THEME_TYPES = ("单主题", "双主题AB型", "双主题ABC型", "多主题")
+
+
+def classify_essay_theme_type(prompt, requirements=""):
+    """Classify big essay theme type following Yuan Dong methodology."""
+    text = re.sub(r"\s+", "", f"{prompt or ''} {requirements or ''}")
+
+    # Check for dual/multi cues
+    if re.search(r"[与和及同跟对兼].*关系", text) or "“" in text and "”" in text:
+        quoted = re.findall(r"“([^”]+)”", text)
+        if len(quoted) >= 3:
+            return "多主题", "三个及以上核心概念协同发力，组合展开"
+        if len(quoted) == 2:
+            return "双主题AB型", "双主题对立统一：①A对B ②B对A ③AB协同"
+
+    if any(cue in text for cue in ("守正与创新", "发展与保护", "速度与质量", "刚与柔", "快与慢", "变与不变")):
+        return "双主题AB型", "辩证双核心：分论点需体现双向互动"
+
+    return "单主题", "单一核心概念：从多维度/深层次展开分论点"

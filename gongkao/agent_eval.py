@@ -4,9 +4,11 @@ import math
 import sys
 import time
 import types
+import uuid
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlparse
 
 from .agent_chat import start_or_continue_chat
 from .agent_graph import AgentRunError, create_agent_run, run_agent
@@ -14,7 +16,7 @@ from .agent_modules import classify_module_heuristic, retrieve_module_evidence
 from .agent_prompts import AGENT_PROMPT_VERSION
 from .agent_store import get_run, get_run_steps
 from .agent_tools import retrieve_candidates
-from .ai import chat_completion, resolve_api_key
+from .ai import DEFAULT_USER_AGENT, chat_completion, resolve_api_key
 from .ai_config import load_effective_agent_settings
 from .db import connect
 from .paths import resource_root
@@ -434,6 +436,13 @@ class RagasUnavailable(Exception):
 
 def _normalize_base_url(value):
     base = (value or "").strip().rstrip("/")
+    parsed = urlparse(base)
+    if parsed.netloc.endswith("opencode.ai") or "opencode.ai" in parsed.netloc:
+        scheme = parsed.scheme or "https"
+        netloc = parsed.netloc or "opencode.ai"
+        path = parsed.path.rstrip("/")
+        if path in {"", "/", "/go", "/go/v1", "/zen/go", "/zen/go/v1", "/go/v1/chat/completions"}:
+            return f"{scheme}://{netloc}/zen/go/v1"
     if base.endswith("/chat/completions"):
         return base[: -len("/chat/completions")]
     return base
@@ -597,10 +606,17 @@ def compute_ragas_metrics(settings, case, final_text, retrieved_contexts):
     user_input = case.get("goal") or case.get("title") or ""
 
     try:
+        parsed_base = urlparse(settings.get("api_base_url") or "")
+        default_headers = {
+            "User-Agent": DEFAULT_USER_AGENT,
+        }
+        if parsed_base.netloc.endswith("opencode.ai") or "opencode" in parsed_base.netloc:
+            default_headers["x-opencode-session"] = f"yanshen-{uuid.uuid4().hex[:12]}"
         client = components["OpenAI"](
             api_key=api_key,
             base_url=_normalize_base_url(settings["api_base_url"]),
             timeout=120,
+            default_headers=default_headers,
         )
         ragas_llm = components["llm_factory"](
             (settings["model"] or "").strip(),

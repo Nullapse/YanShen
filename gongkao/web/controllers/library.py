@@ -1,5 +1,29 @@
 """Question and paper library controllers."""
 
+import json
+import logging
+from urllib.parse import parse_qs, urlparse
+
+from ...ai_solver import get_question_solution, solve_question_with_ai
+from ...services.paper_builder import (
+    add_paper_question,
+    add_question_reference_answer,
+    create_custom_paper,
+    parse_raw_paper_text,
+)
+from ...services.url_importer import (
+    FENBI_CREDENTIALS,
+    IMPORT_SESSIONS,
+    MAX_BRIDGE_BYTES,
+    UrlImportError,
+    build_fenbi_bookmarklet,
+    draft_from_bridge_payload,
+    fenbi_credentials_summary,
+    fetch_source_draft,
+    parse_fenbi_credentials,
+    parse_source_url,
+    public_import_summary,
+)
 from ..runtime import (
     PAPER_WORK_STATUS_OPTIONS,
     QUESTION_WORK_STATUS_OPTIONS,
@@ -11,6 +35,7 @@ from ..runtime import (
     format_duration,
     layout,
     local_url,
+    markdownish,
     math,
     option_list,
     pagination_html,
@@ -35,6 +60,45 @@ from ..runtime import (
     workflow_header,
     year_range_filter,
 )
+
+
+def fenbi_score_tree_html(raw_tree):
+    """Render a stored Fenbi score-analysis tree as a compact nested list."""
+
+    try:
+        tree = json.loads(raw_tree) if isinstance(raw_tree, str) else raw_tree
+    except (TypeError, json.JSONDecodeError):
+        return ""
+    if not isinstance(tree, dict):
+        return ""
+
+    def render_node(node):
+        children = [child for child in (node.get("children") or []) if isinstance(child, dict)]
+        full_mark = node.get("full_mark")
+        if full_mark is not None:
+            try:
+                full_mark = float(full_mark)
+            except (TypeError, ValueError):
+                full_mark = None
+        score_suffix = f"（{full_mark:g}分）" if full_mark else ""
+        comment = str(node.get("comment") or "").strip()
+        html = (
+            "<li>"
+            f"<strong>{esc(node.get('name') or '得分分析')}</strong> {esc(score_suffix)}"
+        )
+        if comment:
+            html += f'<div class="muted" style="font-size:0.82rem;margin:0.2rem 0 0.35rem;">{esc(comment)}</div>'
+        if children:
+            html += "<ul>" + "".join(render_node(child) for child in children) + "</ul>"
+        html += "</li>"
+        return html
+
+    return (
+        '<section class="fenbi-score-tree" style="margin-top:1rem;padding:1rem;border:1px solid var(--line, #e2e8f0);border-radius:8px;background:var(--bg-card, #ffffff);">'
+        '<h3 style="margin:0 0 0.5rem;">粉笔踩分树</h3>'
+        f'<ul style="margin:0;padding-left:1.2rem;">{render_node(tree)}</ul>'
+        "</section>"
+    )
 
 
 class LibraryController:
@@ -434,7 +498,13 @@ class LibraryController:
             self.send_html(f'<div data-list-partial>{grid_html}{pager}</div>')
             return
         body = f"""
-        <section class="page-head"><div><p class="eyebrow">Question Bank</p><h1>试卷题库</h1><p class="page-lede">按地区、年份与卷种快速进入整卷训练。</p></div></section>
+        <section class="page-head">
+          <div><p class="eyebrow">Question Bank</p><h1>试卷题库</h1><p class="page-lede">按地区、年份与卷种快速进入整卷训练。</p></div>
+          <div class="actions">
+            <a class="button primary" href="/papers/new">录入新套卷</a>
+            <a class="button ghost" href="/import">批量表格导入</a>
+          </div>
+        </section>
         <section class="library-toolbar" aria-label="试卷搜索与筛选">
           <form class="library-search" method="get">
             <input type="hidden" name="per_page" value="{page_size}">
@@ -525,8 +595,11 @@ class LibraryController:
             q_tabs.append(
                 f'<a class="paper-tab{active}{state_class}" href="{tab_href}" title="{state_label}"><span class="paper-tab-number">{display_number}</span><span class="paper-tab-copy"><strong>第{number}题</strong></span><span class="paper-tab-state"><span>{state_label}</span><i class="tab-check" aria-hidden="true"></i></span></a>'
             )
+        q_tabs.append(
+            f'<a class="paper-tab add-question-tab" href="/papers/{paper_id}/questions/new" title="为此套卷添加新题目" style="border-style:dashed;opacity:0.85;"><span class="paper-tab-number">+</span><span class="paper-tab-copy"><strong>添加新题</strong></span></a>'
+        )
 
-        question_box = '<p class="muted">这套卷还没有题目。</p>'
+        question_box = f'<div class="empty-state"><h2>这套卷还没有题目</h2><p>你可以直接为这套卷录入第一道题目。</p><a class="button primary" href="/papers/{paper_id}/questions/new">+ 录入题目</a></div>'
         if current_q:
             question_href = local_url(
                 f"/questions/{current_q['id']}",
@@ -544,7 +617,7 @@ class LibraryController:
               <h2>{esc(current_q["title"])}</h2>
               <div class="preline prompt-strong">{pre(current_q["prompt"])}</div>
               <div class="paper-requirements"><strong>作答要求</strong><div class="preline">{pre(current_q["requirements"])}</div></div>
-              <div class="paper-actions"><a class="button primary" href="{question_href}">开始作答</a>{latest_attempt_link}</div>
+              <div class="paper-actions"><a class="button primary" href="{question_href}">开始作答</a>{latest_attempt_link}<a class="button ghost" href="/papers/{paper_id}/questions/new">+ 添加新题</a></div>
             </section>"""
         paper_attempt_rows = []
         for attempt in current_attempts:
@@ -673,6 +746,7 @@ class LibraryController:
                 else 0
             )
             saved_question_seconds = question_paper_duration_seconds(conn, question_id) if question["paper_id"] else 0
+            ai_solution = get_question_solution(conn, question_id)
         relevant_materials = select_relevant_materials(question, materials)
         context_return = evidence_return_path(query)
         citation_target = bool(context_return)
@@ -703,6 +777,71 @@ class LibraryController:
             saved_annotations=material_annotations,
         )
         refs_html = tabbed_references(references, f"question-{question_id}")
+        score_tree_html = ""
+        for reference in references:
+            reference = dict(reference)
+            if reference.get("score_tree_json"):
+                score_tree_html = fenbi_score_tree_html(reference["score_tree_json"])
+                if score_tree_html:
+                    break
+
+        solve_error = query.get("solve_error", [""])[0]
+        solve_error_banner = ""
+        if solve_error:
+            if solve_error == "no_api_key":
+                solve_error_banner = '<div class="banner error" style="padding:0.75rem 1rem;margin-top:1rem;margin-bottom:1rem;background:#fee2e2;border:1px solid #ef4444;border-radius:6px;color:#991b1b;font-size:0.9rem;">⚠️ 无法执行 AI 解题：尚未配置 AI API Key，请前往 <a href="/settings" style="text-decoration:underline;font-weight:600;">设置页面</a> 配置模型与 API Key。</div>'
+            else:
+                solve_error_banner = f'<div class="banner error" style="padding:0.75rem 1rem;margin-top:1rem;margin-bottom:1rem;background:#fee2e2;border:1px solid #ef4444;border-radius:6px;color:#991b1b;font-size:0.9rem;">⚠️ AI 解题遇到问题: {esc(solve_error)}</div>'
+
+        if ai_solution:
+            ai_solution_html = f"""
+            <section class="ai-solution-card" style="margin-top: 1.25rem; border: 1px solid var(--line, #e2e8f0); border-radius: 8px; padding: 1.25rem; background: var(--bg-card, #ffffff);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--line, #e2e8f0); padding-bottom: 0.75rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div>
+                  <span class="badge ok" style="margin-right: 0.5rem;">Shenlun.skill 体系自主解题</span>
+                  <strong style="font-size: 1.05rem;">名师双标答与采分点</strong>
+                  <small class="muted" style="margin-left: 0.5rem;">模型: {esc(ai_solution["model_name"] or "AI")} · {esc(format_beijing_time(ai_solution["created_at"]))}</small>
+                </div>
+                <form method="post" action="/questions/{question_id}/solve" style="margin: 0;">
+                  <button class="button small ghost" type="submit">重新推导</button>
+                </form>
+              </div>
+              <div class="tabbed-content" data-tabs>
+                <div class="content-tabs" role="tablist" aria-label="AI解题方案">
+                  <button class="content-tab active-tab" id="sol-tab-xiaomage" type="button" role="tab" aria-selected="true" aria-controls="sol-panel-xiaomage" data-tab-target="sol-panel-xiaomage">小马哥原词流标答</button>
+                  <button class="content-tab" id="sol-tab-bailu" type="button" role="tab" aria-selected="false" aria-controls="sol-panel-bailu" data-tab-target="sol-panel-bailu">白鹭提炼流标答</button>
+                  <button class="content-tab" id="sol-tab-rubric" type="button" role="tab" aria-selected="false" aria-controls="sol-panel-rubric" data-tab-target="sol-panel-rubric">客观采分点清单</button>
+                  <button class="content-tab" id="sol-tab-audit" type="button" role="tab" aria-selected="false" aria-controls="sol-panel-audit" data-tab-target="sol-panel-audit">参考答案审计纠错</button>
+                </div>
+                <article class="tab-panel active-panel" id="sol-panel-xiaomage" role="tabpanel" aria-labelledby="sol-tab-xiaomage">
+                  <div class="markdown-body" style="padding: 0.75rem 0;">{markdownish(ai_solution["xiaomage_answer"] or "未生成")}</div>
+                </article>
+                <article class="tab-panel" id="sol-panel-bailu" role="tabpanel" aria-labelledby="sol-tab-bailu" hidden>
+                  <div class="markdown-body" style="padding: 0.75rem 0;">{markdownish(ai_solution["bailu_answer"] or "未生成")}</div>
+                </article>
+                <article class="tab-panel" id="sol-panel-rubric" role="tabpanel" aria-labelledby="sol-tab-rubric" hidden>
+                  <div class="markdown-body" style="padding: 0.75rem 0;">{markdownish(ai_solution["scoring_points"] or "未生成")}</div>
+                </article>
+                <article class="tab-panel" id="sol-panel-audit" role="tabpanel" aria-labelledby="sol-tab-audit" hidden>
+                  <div class="markdown-body" style="padding: 0.75rem 0;">{markdownish(ai_solution["reference_audit"] or "无审计信息")}</div>
+                </article>
+              </div>
+            </section>
+            """
+        else:
+            ai_solution_html = f"""
+            <section class="card" style="margin-top: 1.25rem; padding: 1rem 1.25rem; border: 1px dashed var(--accent, #3b82f6); border-radius: 8px; background: rgba(59, 130, 246, 0.04);">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+                <div>
+                  <strong style="font-size: 0.98rem; display: block; margin-bottom: 0.25rem;">🤖 AI 导师自主解题 (Shenlun.skill 体系)</strong>
+                  <span class="muted" style="font-size: 0.85rem;">机构参考答案不准确？点击由 AI 导师严格依据材料，自底向上推导“小马哥原词流”与“白鹭提炼流”双标答与客观采分清单。</span>
+                </div>
+                <form method="post" action="/questions/{question_id}/solve" style="margin: 0;">
+                  <button class="button primary small" type="submit">AI 导师自主解题</button>
+                </form>
+              </div>
+            </section>
+            """
 
         attempts_html = []
         for attempt in attempts:
@@ -732,8 +871,25 @@ class LibraryController:
             <section class="reading-materials"><div class="section-heading"><div><p class="eyebrow">Reading</p><h2>本题相关材料</h2></div><span>{len(relevant_materials)} 则</span></div>{materials_html}</section>
             <details class="reference-disclosure">
               <summary><span>参考答案</span><small>{len(references)} 份，作答后再看</small></summary>
-              <div class="reference-disclosure-body">{refs_html}</div>
+              <div class="reference-disclosure-body">
+                {refs_html}
+                {score_tree_html}
+                <div style="margin-top: 1rem; padding: 1rem; border: 1px solid var(--line, #e2e8f0); border-radius: 6px; background: var(--bg-card, #ffffff);">
+                  <strong style="display:block;margin-bottom:0.5rem;font-size:0.92rem;">+ 录入新参考答案</strong>
+                  <p class="muted" style="font-size: 0.82rem; margin-bottom: 0.75rem;">录入机构（华图、粉笔、中公等）或个人答案。AI 评分将以真题材料和名师体系为主，对参考答案进行客观审计纠错。</p>
+                  <form method="post" action="/questions/{question_id}/references/new">
+                    <div style="display: flex; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
+                      <input type="text" name="organization" placeholder="机构/来源（如：粉笔、华图、自拟）" required style="flex: 1; min-width: 180px;" />
+                      <input type="number" name="score" placeholder="预估满分(选填)" style="width: 120px;" />
+                    </div>
+                    <textarea name="answer_text" rows="4" placeholder="粘贴参考答案正文..." required style="width: 100%; margin-bottom: 0.5rem; font-family: inherit; font-size: 0.88rem;"></textarea>
+                    <button class="button small secondary" type="submit">保存参考答案</button>
+                  </form>
+                </div>
+              </div>
             </details>
+            {solve_error_banner}
+            {ai_solution_html}
             <details class="answer-history">
               <summary>历史作答 <span>{len(attempts)} 次</span></summary>
               <div class="answer-history-body">{"".join(attempts_html)}</div>
@@ -983,3 +1139,811 @@ class LibraryController:
         </section>
         """
         self.send_html(layout("覆盖清单 - 研申", body, "coverage"))
+
+    def page_paper_new(self, query=None):
+        query = query or {}
+        import_session_id = (query.get("import_session") or [""])[0].strip()
+        import_session = IMPORT_SESSIONS.get(import_session_id) if import_session_id else None
+        import_draft = import_session.get("draft") if import_session else None
+        import_seed = json.dumps(import_draft, ensure_ascii=False, default=str) if import_draft else "null"
+        # Keep the JSON in a non-executable script node and escape HTML-sensitive
+        # characters so imported source text cannot break the page.
+        import_seed = (
+            import_seed.replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+            .replace("&", "\\u0026")
+        )
+        import_source_url = ""
+        if import_draft:
+            import_source_url = str(import_draft.get("source_url") or "")
+        credentials_summary = fenbi_credentials_summary(FENBI_CREDENTIALS.load())
+        body = """
+        <section class="page-head">
+          <div>
+            <p class="eyebrow">Personal Exam Builder</p>
+            <h1>新建试卷 / 录入新套卷</h1>
+            <p class="page-lede">一句话填写试卷信息，点击 ➕ 依序录入给定资料与题目（题目+一份参考答案）。</p>
+          </div>
+          <div class="actions">
+            <a class="button ghost" href="/papers">返回套卷列表</a>
+          </div>
+        </section>
+
+        <!-- URL_IMPORT_PANEL -->
+
+        <!-- 1. 试卷基本信息（一句话填写） -->
+        <section class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; border: 1px solid var(--line, #e2e8f0); border-radius: 8px; background: var(--bg-card, #ffffff);">
+          <div style="margin-bottom: 0.25rem;">
+            <label for="field-paper-name" style="display: block; font-weight: 700; font-size: 1.05rem; margin-bottom: 0.4rem; color: var(--text, #1e293b);">
+              试卷基本信息 <span style="color: #ef4444;">*</span>
+            </label>
+            <p class="muted" style="margin: 0 0 0.6rem 0; font-size: 0.88rem;">一句话填写好即可，例如：2024申论模考一、某某个人专项练习。</p>
+            <input id="field-paper-name" name="paper_name" type="text" required placeholder="输入试卷名称或一句话描述..." style="width: 100%; padding: 0.75rem 1rem; font-size: 1rem; border: 1px solid var(--line, #cbd5e1); border-radius: 6px; box-sizing: border-box;">
+          </div>
+        </section>
+
+        <!-- 2. 给定资料（使用➕，点击新增输入框，往里面按顺序输入给定资料） -->
+        <section class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; border: 1px solid var(--line, #e2e8f0); border-radius: 8px; background: var(--bg-card, #ffffff);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+              <h2 style="margin: 0; font-size: 1.15rem; color: var(--text, #1e293b);">给定资料</h2>
+              <p class="muted" style="margin: 0.25rem 0 0 0; font-size: 0.85rem;">按顺序输入给定资料，点击右侧 ➕ 即可新增资料输入框。</p>
+            </div>
+            <button type="button" class="button secondary" onclick="addMaterialField()" style="display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 600;">
+              <span style="font-size: 1.2rem; line-height: 1;">+</span> 新增给定资料
+            </button>
+          </div>
+
+          <div id="materials-container" style="display: flex; flex-direction: column; gap: 1rem;">
+            <!-- 动态资料输入框容器 -->
+          </div>
+        </section>
+
+        <!-- 3. 题目与参考答案（点击新增题目的➕，新增两个输入框，一个是题目，一个是参考答案。答案只有一份） -->
+        <section class="card" style="margin-bottom: 1.5rem; padding: 1.5rem; border: 1px solid var(--line, #e2e8f0); border-radius: 8px; background: var(--bg-card, #ffffff);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div>
+              <h2 style="margin: 0; font-size: 1.15rem; color: var(--text, #1e293b);">题目与参考答案</h2>
+              <p class="muted" style="margin: 0.25rem 0 0 0; font-size: 0.85rem;">点击 ➕ 新增题目，每道题提供题目输入框与一份参考答案输入框。AI 将依材料自主做题，参考答案仅作对照纠错。</p>
+            </div>
+            <button type="button" class="button secondary" onclick="addQuestionField()" style="display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 600;">
+              <span style="font-size: 1.2rem; line-height: 1;">+</span> 新增题目
+            </button>
+          </div>
+
+          <div id="questions-container" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            <!-- 动态题目卡片容器 -->
+          </div>
+        </section>
+
+        <!-- 4. 底部操作栏 -->
+        <section style="display: flex; align-items: center; gap: 1rem; margin-top: 1.5rem; margin-bottom: 3rem;">
+          <button type="button" class="button primary" id="btn-save-paper" onclick="submitCustomPaper()" style="font-size: 1.05rem; padding: 0.75rem 2.25rem; font-weight: 600;">
+            保存卷子并开始写题
+          </button>
+          <a class="button ghost" href="/papers">取消</a>
+          <span id="submit-status" style="font-size: 0.9rem;"></span>
+        </section>
+
+        <script>
+        function addMaterialField(initialText = '') {
+          const container = document.getElementById('materials-container');
+          const div = document.createElement('div');
+          div.className = 'material-card';
+          div.style.cssText = 'border: 1px solid var(--line, #e2e8f0); border-radius: 6px; padding: 1rem; background: var(--bg-alt, #f8fafc);';
+          div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <strong class="mat-badge" style="color: var(--blue, #2563eb); font-size: 0.95rem;">给定资料</strong>
+              <button type="button" class="button ghost small" onclick="removeMaterialField(this)" style="color: #ef4444; padding: 0.2rem 0.5rem;" title="删除此篇资料">✕ 删除</button>
+            </div>
+            <textarea class="mat-content" rows="6" placeholder="请按顺序输入或粘贴资料正文..." style="width: 100%; box-sizing: border-box; font-family: inherit; font-size: 0.92rem; padding: 0.75rem; border: 1px solid var(--line, #cbd5e1); border-radius: 6px;"></textarea>
+          `;
+          if (initialText) {
+            div.querySelector('.mat-content').value = initialText;
+          }
+          container.appendChild(div);
+          renumberMaterials();
+        }
+
+        function removeMaterialField(btn) {
+          const card = btn.closest('.material-card');
+          if (card) {
+            card.remove();
+            renumberMaterials();
+          }
+        }
+
+        function renumberMaterials() {
+          const cards = document.querySelectorAll('#materials-container .material-card');
+          cards.forEach((card, idx) => {
+            const badge = card.querySelector('.mat-badge');
+            if (badge) badge.innerText = `给定资料 ${idx + 1}`;
+            const textarea = card.querySelector('.mat-content');
+            if (textarea && !textarea.value) {
+              textarea.placeholder = `请按顺序输入或粘贴第 ${idx + 1} 篇给定资料正文...`;
+            }
+          });
+        }
+
+        function addQuestionField(initialPrompt = '', initialRef = '', initialReferenceMeta = null) {
+          const container = document.getElementById('questions-container');
+          const div = document.createElement('div');
+          div.className = 'question-card-item';
+          div.style.cssText = 'border: 1px solid var(--line, #e2e8f0); border-radius: 6px; padding: 1.25rem; background: var(--bg-alt, #f8fafc);';
+          div.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <strong class="q-badge" style="color: var(--green, #16a34a); font-size: 1rem;">第 1 题</strong>
+                <span style="font-size: 0.8rem; color: var(--muted, #64748b);">（题目 + 一份参考答案）</span>
+              </div>
+              <button type="button" class="button ghost small" onclick="removeQuestionField(this)" style="color: #ef4444; padding: 0.2rem 0.5rem;" title="删除此题">✕ 删除题目</button>
+            </div>
+            <div style="margin-bottom: 0.85rem;">
+              <label style="display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.35rem; color: var(--text, #1e293b);">
+                题目（题干与作答要求） <span style="color: #ef4444;">*</span>
+              </label>
+              <textarea class="q-prompt" rows="3" placeholder="在此输入题目内容与作答要求，例如：根据“给定资料1”，概括某某的主要做法。要求：全面、准确、有条理，不超过200字。（20分）" style="width: 100%; box-sizing: border-box; font-family: inherit; font-size: 0.92rem; padding: 0.75rem; border: 1px solid var(--line, #cbd5e1); border-radius: 6px;"></textarea>
+            </div>
+            <div>
+              <label style="display: block; font-weight: 600; font-size: 0.9rem; margin-bottom: 0.35rem; color: var(--text, #1e293b);">
+                参考答案（一份） <small class="muted" style="font-weight: normal;">（选填，AI 将以给定资料为最高真理源独立做题并进行纠错）</small>
+              </label>
+              <textarea class="q-ref-answer" rows="4" placeholder="在此输入此题的一份参考答案（选填。AI 将依据 Shenlun.skill 体系自主做题，参考答案不准确时绝不作为扣分依据）" style="width: 100%; box-sizing: border-box; font-family: inherit; font-size: 0.92rem; padding: 0.75rem; border: 1px solid var(--line, #cbd5e1); border-radius: 6px;"></textarea>
+            </div>
+          `;
+          if (initialPrompt) {
+            div.querySelector('.q-prompt').value = initialPrompt;
+          }
+          if (initialRef) {
+            div.querySelector('.q-ref-answer').value = initialRef;
+          }
+          div.dataset.referenceMeta = JSON.stringify(initialReferenceMeta || {});
+          container.appendChild(div);
+          renumberQuestions();
+        }
+
+        function removeQuestionField(btn) {
+          const card = btn.closest('.question-card-item');
+          if (card) {
+            card.remove();
+            renumberQuestions();
+          }
+        }
+
+        function renumberQuestions() {
+          const cards = document.querySelectorAll('#questions-container .question-card-item');
+          cards.forEach((card, idx) => {
+            const badge = card.querySelector('.q-badge');
+            if (badge) badge.innerText = `第 ${idx + 1} 题`;
+          });
+        }
+
+        // 初始化默认展示 1 个资料框和 1 个题目框
+        document.addEventListener('DOMContentLoaded', () => {
+          if (document.querySelectorAll('#materials-container .material-card').length === 0) {
+            addMaterialField();
+          }
+          if (document.querySelectorAll('#questions-container .question-card-item').length === 0) {
+            addQuestionField();
+          }
+        });
+
+        async function submitCustomPaper() {
+          const nameInput = document.getElementById('field-paper-name');
+          const paperName = (nameInput.value || '').trim();
+          const statusEl = document.getElementById('submit-status');
+          const btn = document.getElementById('btn-save-paper');
+
+          if (!paperName) {
+            nameInput.focus();
+            statusEl.innerHTML = '<span style="color: #ef4444; font-weight: 600;">请填写试卷名称或一句话描述</span>';
+            return;
+          }
+
+          // 收集材料
+          const matEls = document.querySelectorAll('#materials-container .mat-content');
+          const materials = [];
+          matEls.forEach((el, idx) => {
+            const val = el.value.trim();
+            if (val) {
+              materials.push({ material_number: idx + 1, content: val, title: `给定资料${idx + 1}` });
+            }
+          });
+
+          // 收集题目
+          const qCards = document.querySelectorAll('#questions-container .question-card-item');
+          const questions = [];
+          qCards.forEach((card, idx) => {
+            const prompt = (card.querySelector('.q-prompt')?.value || '').trim();
+            const ref = (card.querySelector('.q-ref-answer')?.value || '').trim();
+            if (prompt) {
+              let referenceAnswer = ref;
+              try {
+                const meta = JSON.parse(card.dataset.referenceMeta || '{}');
+                if (ref && Object.keys(meta).length) {
+                  referenceAnswer = { ...meta, answer_text: ref };
+                }
+              } catch (error) {
+                referenceAnswer = ref;
+              }
+              questions.push({
+                question_number: idx + 1,
+                prompt: prompt,
+                reference_answer: referenceAnswer
+              });
+            }
+          });
+
+          if (questions.length === 0) {
+            statusEl.innerHTML = '<span style="color: #ef4444; font-weight: 600;">请至少录入一道题目的内容</span>';
+            return;
+          }
+
+          statusEl.innerHTML = '<span style="color: var(--blue, #2563eb);">正在保存试卷与题目...</span>';
+          btn.disabled = true;
+
+          try {
+            const res = await fetch('/papers/new', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                paper_name: paperName,
+                materials: materials,
+                questions: questions,
+                source_url: (window.urlImportSource && window.urlImportSource.url) || '',
+                source_kind: (window.urlImportSource && window.urlImportSource.kind) || '',
+                source_note: (window.urlImportDraft && window.urlImportDraft.import_note) || ''
+              })
+            });
+            const data = await res.json();
+            if (data.ok && data.redirect) {
+              statusEl.innerHTML = '<span style="color: #16a34a; font-weight: 600;">✓ 保存成功，正在跳转...</span>';
+              window.location.href = data.redirect;
+            } else {
+              statusEl.innerHTML = '<span style="color: #ef4444; font-weight: 600;">保存失败: ' + (data.error || '未知错误') + '</span>';
+              btn.disabled = false;
+            }
+          } catch (err) {
+            statusEl.innerHTML = '<span style="color: #ef4444; font-weight: 600;">网络异常: ' + err.message + '</span>';
+            btn.disabled = false;
+          }
+        }
+        </script>
+        """
+        import_panel = """
+        <section id="url-import-panel" class="card url-import-panel">
+          <div class="url-import-head">
+            <div class="url-import-kicker"><span class="url-import-kicker-dot"></span><span>Fenbi · URL Import</span></div>
+            <h2 class="url-import-title">从 URL 自动录入</h2>
+            <p class="url-import-description">粘贴粉笔套卷解析页或练习页 URL。练习页未提交时，应用会自动填写占位答案并提交，以获取每道题的粉笔踩分树；已提交页面会直接读取踩分树。参考答案与踩分树仅供批改对照。</p>
+          </div>
+          <div class="url-import-url-row">
+            <label class="url-import-field-label" for="url-import-input">来源页面 URL</label>
+            <div class="url-import-url-control">
+              <input id="url-import-input" class="url-import-url-input" type="url" placeholder="https://spa.fenbi.com/ti/exam/solution/..." value="__URL_IMPORT_SOURCE_HTML__">
+              <button type="button" class="button primary" id="url-import-button">直接导入并预览</button>
+            </div>
+          </div>
+          <details id="url-import-credentials" class="url-import-credentials">
+            <summary class="url-import-credentials-summary">
+              <span class="url-import-summary-main"><strong>粉笔登录态</strong><small>首次使用或登录失效时填写</small></span>
+              <span class="url-import-summary-hint">可选</span>
+            </summary>
+            <div class="url-import-credentials-body">
+              <div class="url-import-field url-import-cookie-field">
+                <div class="url-import-label-row">
+                  <label class="url-import-field-label" for="url-import-cookie">Cookie-Editor 导出的粉笔 Cookie</label>
+                  <span class="url-import-field-hint">支持 JSON / Cookie Header</span>
+                </div>
+                <textarea id="url-import-cookie" class="url-import-cookie" rows="4" placeholder="首次使用：把 Cookie-Editor 导出的 JSON 数组完整粘贴到这里；也支持 Cookie: sess=...; userid=... 格式。只会保留粉笔域名 Cookie。"></textarea>
+              </div>
+              <div class="url-import-field">
+                <label class="url-import-field-label" for="url-import-device-id">DeviceSid <span class="url-import-optional">可选</span></label>
+                <input id="url-import-device-id" class="url-import-device-id" type="text" placeholder="如果提示 DeviceSid 无效，可从粉笔浏览器登录态中填写">
+              </div>
+              <div class="url-import-actions">
+                <label class="url-import-remember"><input id="url-import-remember" class="url-import-remember-checkbox" type="checkbox" checked><span class="url-import-remember-text">保存到本机，之后只输入 URL</span></label>
+                <button type="button" class="button ghost small" id="url-import-clear-credentials">清除本机登录态</button>
+              </div>
+              <p class="url-import-credential-state"><span class="url-import-state-label">本机状态</span><span id="url-import-credential-state">__URL_IMPORT_CREDENTIAL_STATE__</span></p>
+              <p class="url-import-help">凭据保存在本机应用数据目录的受限文件中，只发送到粉笔域名，不会写入题库或日志。</p>
+            </div>
+          </details>
+          <div id="url-import-status"></div>
+          <div id="url-import-preview" hidden></div>
+          <script type="application/json" id="url-import-seed">__URL_IMPORT_SEED__</script>
+        </section>
+        """
+        credential_state = (
+            f"已保存（{credentials_summary['cookie_count']} 个 Cookie"
+            + ("，含 DeviceSid" if credentials_summary["device_id_present"] else "")
+            + ")"
+            if credentials_summary["configured"]
+            else "尚未保存"
+        )
+        import_panel = (
+            import_panel
+            .replace("__URL_IMPORT_SOURCE_HTML__", esc(import_source_url))
+            .replace("__URL_IMPORT_CREDENTIAL_STATE__", esc(credential_state))
+            .replace("__URL_IMPORT_SEED__", import_seed)
+        )
+        body = body.replace("<!-- URL_IMPORT_PANEL -->", import_panel)
+        self.send_html(layout("录入新套卷 - 研申", body, "papers"))
+
+    def handle_paper_parse_text(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(length).decode("utf-8") if length else ""
+        raw_text = ""
+        if self.headers.get("Content-Type", "").startswith("application/json"):
+            try:
+                payload = json.loads(body)
+                raw_text = payload.get("raw_text", "")
+            except Exception:
+                pass
+        else:
+            form = parse_qs(body)
+            raw_text = form.get("raw_text", [""])[0]
+
+        if not raw_text.strip():
+            self.send_json({"ok": False, "error": "文本内容为空"}, status=400)
+            return
+
+        try:
+            parsed = parse_raw_paper_text(raw_text)
+            self.send_json({"ok": True, "parsed": parsed})
+        except Exception as e:
+            self.send_json({"ok": False, "error": str(e)}, status=500)
+
+    def _local_absolute_url(self, path):
+        host, port = self.server.server_address[:2]
+        if host in {"0.0.0.0", "::", ""}:
+            host = "127.0.0.1"
+        return f"http://{host}:{port}{local_url(path)}"
+
+    def handle_paper_url_import(self):
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        if length > 768 * 1024:
+            self.send_json({"ok": False, "error": "URL 导入请求过大"}, status=413)
+            self.close_connection = True
+            return
+        body = self.rfile.read(length).decode("utf-8", errors="replace") if length else ""
+        try:
+            data = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            self.send_json({"ok": False, "error": "请求数据不是有效 JSON"}, status=400)
+            return
+
+        if data.get("clear_credentials"):
+            FENBI_CREDENTIALS.clear()
+            self.send_json({
+                "ok": True,
+                "credentials": fenbi_credentials_summary(None),
+                "message": "已清除本机保存的粉笔登录态",
+            })
+            return
+
+        source_url = str(data.get("source_url") or "").strip()
+        cookie_text = data.get("cookie_text", data.get("cookie", ""))
+        cookie_text = str(cookie_text or "")
+        device_id = str(data.get("device_id") or "").strip()
+        has_explicit_credentials = bool(cookie_text.strip() or device_id)
+        remember_session = data.get("remember_session", True) is not False
+        try:
+            source = parse_source_url(source_url)
+            if has_explicit_credentials:
+                credentials = parse_fenbi_credentials(cookie_text, device_id)
+            else:
+                credentials = FENBI_CREDENTIALS.load()
+            result = fetch_source_draft(
+                source.source_url,
+                credentials=credentials,
+                auto_submit=data.get("auto_submit", True) is not False,
+            )
+        except UrlImportError as exc:
+            self.send_json({"ok": False, "error": str(exc)}, status=400)
+            return
+        except Exception as exc:
+            logging.exception("URL 导入处理异常: %s", source_url)
+            self.send_json({"ok": False, "error": f"URL 导入失败：{exc}"}, status=502)
+            return
+
+        stored_credentials = False
+        if has_explicit_credentials and remember_session and result.get("ok"):
+            try:
+                FENBI_CREDENTIALS.save(credentials)
+                stored_credentials = True
+            except (OSError, UrlImportError) as exc:
+                self.send_json({"ok": False, "error": f"导入成功，但保存本机粉笔登录态失败：{exc}"}, status=500)
+                return
+
+        session_id = IMPORT_SESSIONS.create(source, result.get("draft"))
+        response = public_import_summary(result)
+        response["session_id"] = session_id
+        response["credentials"] = fenbi_credentials_summary(credentials)
+        response["stored_credentials"] = stored_credentials
+        if result.get("requires_browser_bridge") and not result.get("requires_credentials"):
+            callback_url = self._local_absolute_url("/papers/import-url/bridge/payload")
+            response["bookmarklet"] = build_fenbi_bookmarklet(session_id, callback_url)
+            response["preview_url"] = self._local_absolute_url(f"/papers/new?import_session={session_id}")
+        self.send_json(response)
+
+    def handle_paper_url_bridge_payload(self):
+        length = int(self.headers.get("Content-Length", "0") or 0)
+        origin = self._allowed_bridge_origin()
+        if length > MAX_BRIDGE_BYTES:
+            self.send_json({"ok": False, "error": "浏览器桥接数据过大"}, status=413, cors_origin=origin)
+            self.close_connection = True
+            return
+        body = self.rfile.read(length).decode("utf-8", errors="replace") if length else ""
+        try:
+            data = json.loads(body) if body else {}
+        except json.JSONDecodeError:
+            self.send_json({"ok": False, "error": "浏览器桥接数据不是有效 JSON"}, status=400, cors_origin=origin)
+            return
+        session_id = str(data.get("session_id") or "").strip()
+        session = IMPORT_SESSIONS.get(session_id)
+        if not session:
+            self.send_json({"ok": False, "error": "导入会话不存在或已过期，请重新粘贴 URL"}, status=404, cors_origin=origin)
+            return
+        requested_url = str(data.get("source_url") or session.get("source", {}).get("source_url") or "").strip()
+        try:
+            requested_host = (urlparse(requested_url).hostname or "").lower().rstrip(".")
+            if requested_host in {"127.0.0.1", "localhost", "::1"}:
+                raise UrlImportError("请在已登录的粉笔套卷解析页点击书签脚本；不要直接在研申本地页面点击")
+            source = parse_source_url(requested_url)
+            saved_source = session.get("source") or {}
+            if (
+                source.key != saved_source.get("key")
+                or source.source_kind != saved_source.get("source_kind")
+                or source.routecs != saved_source.get("routecs")
+            ):
+                raise UrlImportError("浏览器当前页面与最初提交的套卷 URL 不一致")
+            draft = draft_from_bridge_payload(data.get("payload") or {}, source.source_url)
+            if not IMPORT_SESSIONS.set_draft(session_id, draft):
+                raise UrlImportError("导入会话已过期，请重新开始")
+        except UrlImportError as exc:
+            self.send_json({"ok": False, "error": str(exc)}, status=400, cors_origin=origin)
+            return
+        except Exception as exc:
+            self.send_json({"ok": False, "error": f"浏览器桥接解析失败：{exc}"}, status=422, cors_origin=origin)
+            return
+
+        response = public_import_summary({"ok": True, "draft": draft})
+        response["redirect"] = self._local_absolute_url(f"/papers/new?import_session={session_id}")
+        self.send_json(response, cors_origin=origin)
+
+    def handle_paper_create(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(length).decode("utf-8") if length else ""
+        data = {}
+        if self.headers.get("Content-Type", "").startswith("application/json"):
+            try:
+                data = json.loads(body)
+            except Exception:
+                pass
+        else:
+            form = parse_qs(body)
+            data = {k: v[0] for k, v in form.items()}
+
+        paper_name = data.get("paper_name", "").strip()
+        if not paper_name:
+            paper_name = "个人申论练习卷"
+
+        materials = []
+        raw_mats = data.get("materials")
+        if isinstance(raw_mats, list):
+            materials = raw_mats
+        elif isinstance(raw_mats, str):
+            try:
+                materials = json.loads(raw_mats)
+            except Exception:
+                materials = [raw_mats]
+        elif data.get("materials_json"):
+            try:
+                materials = json.loads(data["materials_json"])
+            except Exception:
+                materials = []
+        elif data.get("materials_text"):
+            parsed = parse_raw_paper_text(data["materials_text"])
+            materials = parsed.get("materials", [])
+
+        questions = []
+        raw_qs = data.get("questions")
+        if isinstance(raw_qs, list):
+            questions = raw_qs
+        elif isinstance(raw_qs, str):
+            try:
+                questions = json.loads(raw_qs)
+            except Exception:
+                questions = []
+        elif data.get("questions_json"):
+            try:
+                questions = json.loads(data["questions_json"])
+            except Exception:
+                questions = []
+
+        source_url = str(data.get("source_url") or "").strip()
+        source_kind = str(data.get("source_kind") or "").strip()
+        source_note = str(data.get("source_note") or "").strip()
+
+        with connect(self.db_path) as conn:
+            paper_id = create_custom_paper(
+                conn=conn,
+                paper_name=paper_name,
+                year=data.get("year"),
+                region=data.get("region"),
+                exam_type=data.get("exam_type"),
+                paper_category=data.get("paper_category"),
+                materials=materials,
+                source_url=source_url,
+                source_kind=source_kind,
+                source_note=source_note,
+            )
+            for idx, q_data in enumerate(questions, start=1):
+                if isinstance(q_data, str):
+                    q_data = {"prompt": q_data}
+                prompt = (q_data.get("prompt") or "").strip()
+                if not prompt:
+                    continue
+                ref_ans = q_data.get("reference_answer")
+                ref_text = ""
+                ref_org = (q_data.get("reference_org") or "参考答案").strip()
+                ref_scoring_points = (q_data.get("scoring_points") or "").strip()
+                ref_notes = (q_data.get("reference_notes") or "").strip()
+                ref_is_reviewed = 1
+                if isinstance(ref_ans, dict):
+                    ref_text = (ref_ans.get("answer_text") or ref_ans.get("answerText") or "").strip()
+                    ref_org = (ref_ans.get("organization") or ref_ans.get("orgName") or ref_org).strip()
+                    ref_scoring_points = (ref_ans.get("scoring_points") or ref_ans.get("scoringPoints") or ref_scoring_points).strip()
+                    ref_notes = (ref_ans.get("notes") or ref_notes).strip()
+                    ref_is_reviewed = 1 if ref_ans.get("is_reviewed", 1) else 0
+                elif isinstance(ref_ans, str):
+                    ref_text = ref_ans.strip()
+                q_id = add_paper_question(
+                    conn=conn,
+                    paper_id=paper_id,
+                    title=q_data.get("title", ""),
+                    question_type=q_data.get("question_type", ""),
+                    prompt=prompt,
+                    original_text=q_data.get("original_text") or prompt,
+                    materials=q_data.get("materials") or q_data.get("materials_scope") or "",
+                    requirements=q_data.get("requirements", ""),
+                    word_limit=q_data.get("word_limit", ""),
+                    score=q_data.get("score"),
+                    question_number=q_data.get("question_number") or idx,
+                    source_url=q_data.get("source_url") or source_url,
+                    source_kind=q_data.get("source_kind") or source_kind,
+                    source_provider=q_data.get("source_provider") or data.get("source_provider") or "",
+                    source_note=q_data.get("source_note") or source_note,
+                    reference_answer=ref_ans,
+                    reference_org=ref_org,
+                    scoring_points=ref_scoring_points,
+                    reference_notes=ref_notes,
+                    reference_is_reviewed=ref_is_reviewed,
+                )
+
+        if self.headers.get("Content-Type", "").startswith("application/json") or self.headers.get("Accept", "").startswith("application/json"):
+            self.send_json({"ok": True, "paper_id": paper_id, "redirect": f"/papers/{paper_id}"})
+            return
+        self.redirect(f"/papers/{paper_id}")
+
+    def page_question_new(self, path, query=None):
+        try:
+            paper_id = int(path.strip("/").split("/")[1])
+        except (ValueError, IndexError):
+            self.send_error(404)
+            return
+
+        with connect(self.db_path) as conn:
+            paper = conn.execute("SELECT * FROM papers WHERE id = ?", (paper_id,)).fetchone()
+            if not paper:
+                self.send_error(404)
+                return
+            existing_questions = conn.execute(
+                "SELECT * FROM questions WHERE paper_id = ? ORDER BY question_number, id",
+                (paper_id,),
+            ).fetchall()
+            materials = conn.execute(
+                "SELECT * FROM paper_materials WHERE paper_id = ? ORDER BY material_number",
+                (paper_id,),
+            ).fetchall()
+
+        next_q_num = len(existing_questions) + 1
+        mat_options = "".join(
+            f'<span style="margin-right: 0.75rem;"><label><input type="checkbox" name="material_numbers" value="{m["material_number"]}"> 材料{m["material_number"]}</label></span>'
+            for m in materials
+        ) or '<span class="muted">该试卷暂无材料</span>'
+
+        body = f"""
+        <section class="page-head">
+          <div>
+            <p class="eyebrow"><a href="/papers/{paper_id}">{esc(paper["paper_name"])}</a></p>
+            <h1>添加题目</h1>
+            <p class="page-lede">为此套卷录入新题目及作答要求，支持同步录入参考答案。</p>
+          </div>
+          <div class="actions">
+            <a class="button ghost" href="/papers/{paper_id}">返回试卷</a>
+          </div>
+        </section>
+
+        <form class="settings-panel" method="post" action="/papers/{paper_id}/questions/new" style="border: 1px solid var(--line, #e2e8f0); border-radius: 8px; padding: 1.5rem; background: var(--bg-card, #ffffff);">
+          <div class="settings-fields" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+            <label>
+              <span>题型 *</span>
+              <select name="question_type" required>
+                <option value="归纳概括">归纳概括</option>
+                <option value="提出对策">提出对策</option>
+                <option value="综合分析">综合分析</option>
+                <option value="应用文写作">应用文写作</option>
+                <option value="文章写作">文章写作（大作文）</option>
+                <option value="其他题型">其他题型</option>
+              </select>
+            </label>
+            <label><span>题号</span><input name="question_number" type="number" value="{next_q_num}"></label>
+            <label><span>分值(分)</span><input name="score" type="number" value="20" placeholder="如：20"></label>
+            <label><span>字数限制</span><input name="word_limit" placeholder="如：不超过300字、1000-1200字"></label>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <label><span>题干 (Prompt) *</span>
+              <textarea name="prompt" rows="3" required placeholder="如：根据“给定资料1”，概括某某做法的主要成效。" style="width: 100%; font-family: inherit; margin-top: 0.25rem;"></textarea>
+            </label>
+          </div>
+
+          <div style="margin-bottom: 1rem;">
+            <label><span>作答要求 (Requirements)</span>
+              <textarea name="requirements" rows="2" placeholder="如：全面、准确、有条理，不超过250字。" style="width: 100%; font-family: inherit; margin-top: 0.25rem;"></textarea>
+            </label>
+          </div>
+
+          <div style="margin-bottom: 1.25rem;">
+            <label style="display: block; margin-bottom: 0.25rem;"><span>关联材料范围</span></label>
+            <div style="padding: 0.5rem; background: var(--bg-alt, #f8fafc); border-radius: 6px;">
+              {mat_options}
+            </div>
+            <input type="text" name="materials_scope" placeholder="或直接输入范围文本，如：给定资料1、给定资料2" style="margin-top: 0.5rem; width: 100%;">
+          </div>
+
+          <fieldset style="border: 1px dashed var(--line, #cbd5e1); border-radius: 6px; padding: 1rem; margin-bottom: 1.5rem;">
+            <legend style="padding: 0 0.5rem; font-size: 0.9rem; font-weight: 600;">可选：同步录入参考答案</legend>
+            <p class="muted" style="font-size: 0.82rem; margin-bottom: 0.75rem;">如已有机构（华图、粉笔、中公等）参考答案可在此录入。AI 批改将结合材料和名师体系对参考答案进行客观纠错与审计。</p>
+            <div style="display: flex; gap: 0.75rem; margin-bottom: 0.5rem; flex-wrap: wrap;">
+              <input type="text" name="ref_organization" placeholder="机构名称（如：粉笔、华图、自拟）" style="flex: 1; min-width: 180px;">
+              <input type="number" name="ref_score" placeholder="预估满分" style="width: 120px;">
+            </div>
+            <textarea name="ref_answer_text" rows="5" placeholder="粘贴参考答案正文..." style="width: 100%; font-family: inherit; font-size: 0.88rem;"></textarea>
+          </fieldset>
+
+          <div style="display: flex; gap: 1rem; align-items: center;">
+            <button class="button primary" type="submit">保存题目</button>
+            <a class="button ghost" href="/papers/{paper_id}">取消</a>
+          </div>
+        </form>
+        """
+        self.send_html(layout("添加题目 - 研申", body, "papers"))
+
+    def handle_question_create(self, path):
+        try:
+            paper_id = int(path.strip("/").split("/")[1])
+        except (ValueError, IndexError):
+            self.send_error(404)
+            return
+
+        length = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(length).decode("utf-8") if length else ""
+        form = parse_qs(body)
+
+        question_type = form.get("question_type", ["归纳概括"])[0]
+        prompt = form.get("prompt", [""])[0].strip()
+        requirements = form.get("requirements", [""])[0].strip()
+        word_limit = form.get("word_limit", [""])[0].strip()
+        try:
+            score = int(form.get("score", ["20"])[0] or "20")
+        except ValueError:
+            score = 20
+        try:
+            question_number = int(form.get("question_number", ["1"])[0] or "1")
+        except ValueError:
+            question_number = 1
+
+        mat_numbers = form.get("material_numbers", [])
+        materials_scope = form.get("materials_scope", [""])[0].strip()
+        if not materials_scope and mat_numbers:
+            materials_scope = "给定资料" + "、给定资料".join(sorted(mat_numbers, key=int))
+
+        if not prompt:
+            self.send_error(400, "题干不能为空")
+            return
+
+        with connect(self.db_path) as conn:
+            question_id = add_paper_question(
+                conn=conn,
+                paper_id=paper_id,
+                question_type=question_type,
+                prompt=prompt,
+                requirements=requirements,
+                word_limit=word_limit,
+                score=score,
+                question_number=question_number,
+                materials_scope=materials_scope,
+            )
+            ref_org = form.get("ref_organization", [""])[0].strip()
+            ref_text = form.get("ref_answer_text", [""])[0].strip()
+            if ref_text:
+                try:
+                    ref_score = int(form.get("ref_score", [""])[0] or str(score))
+                except ValueError:
+                    ref_score = score
+                add_question_reference_answer(
+                    conn=conn,
+                    question_id=question_id,
+                    organization=ref_org or "参考答案",
+                    answer_text=ref_text,
+                    score=ref_score,
+                )
+
+        self.redirect(f"/questions/{question_id}")
+
+    def handle_reference_create(self, path):
+        try:
+            question_id = int(path.strip("/").split("/")[1])
+        except (ValueError, IndexError):
+            self.send_error(404)
+            return
+
+        length = int(self.headers.get("Content-Length", "0"))
+        body = self.rfile.read(length).decode("utf-8") if length else ""
+        form = parse_qs(body)
+
+        organization = form.get("organization", [""])[0].strip()
+        answer_text = form.get("answer_text", [""])[0].strip()
+        score_val = form.get("score", [""])[0].strip()
+        score = None
+        if score_val:
+            try:
+                score = int(score_val)
+            except ValueError:
+                pass
+
+        if not organization:
+            organization = "参考答案"
+        if not answer_text:
+            self.redirect(f"/questions/{question_id}")
+            return
+
+        with connect(self.db_path) as conn:
+            add_question_reference_answer(
+                conn=conn,
+                question_id=question_id,
+                organization=organization,
+                answer_text=answer_text,
+                score=score,
+            )
+
+        self.redirect(f"/questions/{question_id}")
+
+    def handle_question_ai_solve(self, path):
+        try:
+            question_id = int(path.strip("/").split("/")[1])
+        except (ValueError, IndexError):
+            self.send_error(404)
+            return
+
+        with connect(self.db_path) as conn:
+            question = conn.execute("SELECT id FROM questions WHERE id = ?", (question_id,)).fetchone()
+            if not question:
+                self.send_error(404)
+                return
+            ai_settings = conn.execute("SELECT * FROM ai_settings WHERE id = 1").fetchone()
+            if not ai_settings or not ai_settings["api_key"]:
+                self.redirect(f"/questions/{question_id}?solve_error=no_api_key")
+                return
+            try:
+                solve_question_with_ai(conn, question_id)
+            except Exception as e:
+                import urllib.parse
+                err_msg = urllib.parse.quote(str(e))
+                self.redirect(f"/questions/{question_id}?solve_error={err_msg}")
+                return
+
+        self.redirect(f"/questions/{question_id}")

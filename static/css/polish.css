@@ -155,8 +155,51 @@
   display: none !important;
 }
 
-/* Default vertical sidebar layout, automatic top bar below 1024px */
-@media (max-width: 1024px) {
+/* Enforce full-height vertical sidebar for desktop app, seamless down to viewport bottom */
+.shell {
+  display: grid !important;
+  grid-template-columns: var(--sidebar-width) minmax(0, 1fr) !important;
+  min-height: 100vh !important;
+  background: #f7faf8 !important;
+}
+.main {
+  grid-column: 2 !important;
+  min-width: 0 !important;
+  background: #ffffff !important;
+  min-height: 100vh !important;
+}
+.sidebar {
+  position: fixed !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: var(--sidebar-width) !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+  padding: 22px 16px 20px !important;
+  border-right: 1px solid var(--line) !important;
+  background: #f7faf8 !important;
+  z-index: 90 !important;
+}
+.sidebar .nav {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  gap: 3px !important;
+}
+.sidebar .nav .nav-settings,
+body .sidebar .nav .nav-settings,
+body[data-active-section] .sidebar .nav .nav-settings {
+  margin-top: auto !important;
+  margin-bottom: 0 !important;
+}
+
+/* Default vertical sidebar layout, automatic top bar only on mobile below 768px */
+@media (max-width: 768px) {
   .shell {
     display: block !important;
   }
@@ -1050,3 +1093,4 @@
     opacity: 1 !important;
   }
 }
+

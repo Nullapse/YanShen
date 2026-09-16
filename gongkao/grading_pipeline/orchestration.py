@@ -4,14 +4,6 @@ import threading
 
 from ..agent_modules import FEATURE_HASH_MODEL
 from ..db import connect
-from ..grading import (
-    build_revised_answer_retry_prompt,
-    compact_revised_answer_linebreaks,
-    normalize_revised_answer_word_count,
-    parse_revised_answer_repair,
-    replace_revised_answer_body,
-    revised_answer_word_count_status,
-)
 from .calibration import load_calibration_policy
 from .common import (
     PIPELINE_VERSION,
@@ -37,9 +29,12 @@ from .persistence import load_job_context as _load_job_context
 from .persistence import update_job as _update_job
 from .report import render_grading_report
 from .rubric import (
+    build_fenbi_tree_rubric,
     build_rubric_prompt,
     compact_reference_consensus,
     extract_tagged_json,
+    fenbi_tree_is_applicable,
+    is_current_holistic_essay_rubric,
     manual_grading_basis,
     validate_rubric,
 )
@@ -113,8 +108,16 @@ def _smart_response_parts(response, expects_rubric):
 
 
 def _build_review_prompt(question, rubric, answer_text, result):
-    essay_guidance = ESSAY_SCORING_GUIDANCE if question.get("question_type") == "综合写作" else ""
-    return f"""你正在复核一份申论智能评分中的结构化冲突。只纠正采分点状态、证据短引文和维度分，不重写点评或修改版答案。
+    is_essay = question.get("question_type") == "综合写作"
+    essay_guidance = ESSAY_SCORING_GUIDANCE if is_essay else ""
+    essay_review_fields = (
+        '  "overall_band": "A|B|C|D|E",\n'
+        '  "band_reason": "复核后的整篇档位依据",\n'
+        '  "high_band_evidence": {"precise_task_and_theme": false, "clear_thesis": false, "coherent_argument_structure": false, "material_accurate_and_specific": false, "major_arguments_fully_developed": false, "depth_or_innovation": false, "no_fact_or_logic_hard_error": false},\n'
+        if is_essay
+        else ""
+    )
+    return f"""你正在复核一份申论智能评分中的结构化冲突。只纠正采分点状态、证据短引文、整篇档位和维度分，不生成或改写任何完整答案。
 
 题目信息：
 {json.dumps({key: question.get(key) for key in ('question_type', 'prompt', 'requirements', 'word_limit')}, ensure_ascii=False)}
@@ -133,18 +136,27 @@ def _build_review_prompt(question, rubric, answer_text, result):
 只输出 <smart_grading_json> 包裹的合法 JSON：
 <smart_grading_json>
 {{"evaluation": {{
-  "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "coverage_ratio": 0.0, "answer_quote": "一段短连续原文，或用……连接按顺序出现的短片段", "reason": "复核依据", "confidence": 0.0, "missing_elements": []}}],
+{essay_review_fields}
+  "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "score_level": "full|mostly|half|slight|none", "coverage_ratio": 0.0, "answer_quote": "一段短连续原文，或用……连接按顺序出现的短片段", "reason": "复核依据", "confidence": 0.0, "missing_elements": []}}],
   "dimension_scores": [{{"dimension": "", "score": 0.0, "reason": "复核后的维度依据"}}]
 }}}}
 </smart_grading_json>
 
-规则：每个评分基准 point_key 和每个维度必须且只能出现一次；不得输出总分；不得因空格、标点、引号或省略号形式差异把已有语义改判为未命中；综合写作不要求机械覆盖每一则材料案例。
+规则：每个评分基准 point_key 和每个维度必须且只能出现一次；不得输出数值总分；不得因空格、标点、引号或省略号形式差异把已有语义改判为未命中；综合写作必须先复核 overall_band，再在该档区间内分配维度分；B档至少要求除 depth_or_innovation 外其余六项证据为 true 且无事实/逻辑硬伤，A档还要求 depth_or_innovation 为 true，普通模板化或仅语言流畅最多按C档。综合写作粉笔答案仅用于校核中心立意与论点切题度，绝不是客观给分点，严禁逐句对齐扣分，亦不要求机械覆盖每一则材料案例。非作文题按真实阅卷全面性与准确性阶梯分档：全面且准确判 hit/full=1；概括不全面或不够准确必须判 partial（mostly=0.75、half=0.5、slight=0.25），并在 missing_elements 中说明缺失要素或不准确原因；完全未答或答错判 miss/none=0。不得把粗糙沾边无原则给满分，亦不得用粉笔答案没写的材料细节扣分。
 """
 
 
 def _merge_review_evaluation(original, reviewed):
     merged = dict(original or {})
-    for key in ("point_matches", "dimension_scores", "holistic_adjustment_reason"):
+    for key in (
+        "point_matches",
+        "dimension_scores",
+        "holistic_adjustment_reason",
+        "overall_band",
+        "band_reason",
+        "high_band_evidence",
+        "band_evidence",
+    ):
         if reviewed.get(key) is not None:
             merged[key] = reviewed[key]
     return merged
@@ -217,12 +229,40 @@ def run_grading_job(db_path, job_id, chat_completion_func):
                 reused = True
 
         deep_thinking = bool(options.get("deep_thinking"))
+        is_essay = question.get("question_type") == "综合写作"
+        if is_essay and reused and not is_current_holistic_essay_rubric(rubric):
+            # Older caches could contain a Fenbi score tree for essays. Essay
+            # totals must come from Yuan Dong's fixed five-dimension banding.
+            cached_row = None
+            rubric = None
+            reused = False
 
-        if reused:
+        if fenbi_tree_is_applicable(question, references):
+            if reused and rubric and rubric.get("scoring_mode") == "fenbi_tree":
+                _update_job(db_path, job_id, "reusing_rubric", 42, "已复用粉笔踩分树，正在准备逐点批改…")
+                consensus = {}
+            else:
+                _update_job(db_path, job_id, "building_rubric", 20, "正在固化粉笔踩分树…")
+                rubric = build_fenbi_tree_rubric(question, references)
+                cached_row, rubric = _save_rubric_to_db(
+                    db_path,
+                    question,
+                    references,
+                    materials,
+                    settings,
+                    question_feedback,
+                    rubric,
+                    consensus={},
+                    prevalidated=True,
+                )
+                consensus = {}
+                reused = False
+        elif reused:
             _update_job(db_path, job_id, "reusing_rubric", 42, "已复用评分基准，正在准备综合批改…")
             consensus = {}
         else:
-            _update_job(db_path, job_id, "building_rubric", 20, "正在独立建立评分基准…")
+            msg = "正在独立建立评分基准（深度推导中，耗时约 1~2 分钟）…" if deep_thinking else "正在独立建立评分基准…"
+            _update_job(db_path, job_id, "building_rubric", 20, msg)
             try:
                 with connect(db_path) as conn:
                     consensus = compact_reference_consensus(conn, references, materials)
@@ -307,12 +347,13 @@ def run_grading_job(db_path, job_id, chat_completion_func):
                 "retrieval_error": str(retrieval_error)[:300],
             }
 
+        msg = "已连接 AI，正在完成采分点分析与综合评分（深度推导中，耗时约 1~2 分钟）…" if deep_thinking else "已连接 AI，正在完成采分点分析与综合评分…"
         _update_job(
             db_path,
             job_id,
             "grading",
             58,
-            "已连接 AI，正在完成采分点分析与综合评分…",
+            msg,
         )
         prompt = build_grading_prompt(
             question,
@@ -412,36 +453,18 @@ def run_grading_job(db_path, job_id, chat_completion_func):
             )
         effective_word_limit = question_word_limit_text(question)
         result["word_limit"] = effective_word_limit
-        result["revised_answer"] = compact_revised_answer_linebreaks(
-            result.get("revised_answer") or "",
-            effective_word_limit,
-        )
+        result.pop("revised_answer", None)
         result["answer_snapshot"] = attempt.get("answer_text") or ""
         report_text = render_grading_report(result, rubric, evidence)
-        report_text = normalize_revised_answer_word_count(report_text, effective_word_limit)
-        status = revised_answer_word_count_status(report_text, effective_word_limit)
-        if status["over_limit"] and run_state.can_call():
-            _update_job(db_path, job_id, "repairing_answer", 90, "修改版答案超出硬限制，正在局部压缩…")
-            retry_prompt = build_revised_answer_retry_prompt(prompt, report_text, effective_word_limit)
-            run_state.reserve_model_call(
-                "revised_answer_compression",
-                f"修改版答案超过字数硬上限 {status['over_by']} 字",
-            )
-            repair_response, repair_raw = _call_grading_model(
-                chat_completion_func,
-                settings,
-                retry_prompt,
-                False,
-            )
-            raw_parts.append(repair_raw)
-            repaired_answer = parse_revised_answer_repair(repair_response)
-            if repaired_answer:
-                result["revised_answer"] = repaired_answer
-                report_text = render_grading_report(result, rubric, evidence)
-                report_text = replace_revised_answer_body(
-                    report_text, repaired_answer, effective_word_limit
-                )
-        status = revised_answer_word_count_status(report_text, effective_word_limit)
+        status = {
+            "has_revised_answer": False,
+            "actual_chars": 0,
+            "max_chars": 0,
+            "budget_status": "not_applicable",
+            "over_limit": False,
+            "over_by": 0,
+            "streams": [],
+        }
         latency_ms = run_state.latency_ms()
         validation = {
             "errors": result.get("validation_errors") or [],
@@ -490,14 +513,17 @@ def run_grading_job(db_path, job_id, chat_completion_func):
                     latency_ms,
                 ),
             )
-        completed_message = (
-            f"智能批改完成，修改版答案超出字数限制 {status['over_by']} 字。"
-            if status["over_limit"]
-            else (
-                "智能批改已生成待复核结果。"
-                if result.get("score_status") == "provisional"
-                else "智能批改完成。"
+            # A successful regrade replaces the previous report atomically.
+            # Contexts, feedback and retrieval-index cleanup cascade from the
+            # report deletion; failed grading runs never touch the old report.
+            conn.execute(
+                "DELETE FROM grading_reports WHERE attempt_id = ? AND id <> ?",
+                (attempt["id"], report_id),
             )
+        completed_message = (
+            "智能批改已生成待复核结果。"
+            if result.get("score_status") == "provisional"
+            else "智能批改完成。"
         )
         _update_job(db_path, job_id, "completed", 100, completed_message, report_id=report_id, retryable=0)
         logging.info(
@@ -602,13 +628,20 @@ def rubric_cache_status(conn, question_id, references, question, materials):
     source_hash = rubric_source_hash(question, materials, references)
     row = conn.execute(
         """
-        SELECT id, updated_at FROM grading_rubrics
+        SELECT id, updated_at, rubric_json FROM grading_rubrics
          WHERE question_id = ? AND reference_set_hash = ? AND source_hash = ?
            AND rubric_version = ? AND status = 'ready'
       ORDER BY updated_at DESC LIMIT 1
         """,
         (question_id, ref_hash, source_hash, RUBRIC_VERSION),
     ).fetchone()
+    if row and question.get("question_type") == "综合写作":
+        try:
+            rubric = json.loads(row["rubric_json"])
+            if not is_current_holistic_essay_rubric(rubric):
+                return {"cached": False, "rubric_id": None, "updated_at": None}
+        except Exception:
+            return {"cached": False, "rubric_id": None, "updated_at": None}
     return {
         "cached": bool(row),
         "rubric_id": row["id"] if row else None,
@@ -674,8 +707,6 @@ def apply_report_feedback(conn, report_id, point_key, corrected_status, correcte
     result["score_status"] = "stale"
     result["feedback_applied"] = True
     report_text = render_grading_report(result, rubric, evidence)
-    question = conn.execute("SELECT word_limit FROM questions WHERE id = ?", (report["question_id"],)).fetchone()
-    report_text = normalize_revised_answer_word_count(report_text, question["word_limit"] if question else "")
     conn.execute("UPDATE grading_reports SET report_text = ? WHERE id = ?", (report_text, report_id))
     conn.execute(
         "UPDATE grading_report_contexts SET result_json = ?, validation_json = ? WHERE report_id = ?",

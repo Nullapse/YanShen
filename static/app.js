@@ -20,6 +20,7 @@ import {
   playPartialViewTransition,
 } from "./js/navigation.js";
 import { initializePractice } from "./js/practice.js";
+import { initializePaperBuilder } from "./js/paper-builder.js";
 import {
   initializeFilters,
   initializeGlobalForms,
@@ -61,6 +62,7 @@ export function mountPage() {
   initializeAgent(signal, navigatePartial);
   initializeShellControls(signal);
   initializePractice(signal);
+  initializePaperBuilder();
   initializeAnnotations(signal);
   initializeFilters(signal, navigatePartial);
   initializeGrading(signal, navigatePartial);

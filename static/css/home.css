@@ -693,7 +693,6 @@
 .home-week-card > div .done i { color: #fff; background: #7da696; }
 .home-week-card > div .today i { box-shadow: 0 0 0 2px #dceae4; background: var(--green); }
 .home-week-card > a { color: var(--green); font-size: 10px; font-weight: 800; }
-body[data-active-section="home"] .nav .nav-settings { margin-top: 8px; }
 .shell.sidebar-top .home-week-card { display: none; }
 
 .home-welcome-side { display: grid; justify-items: end; gap: 8px; }

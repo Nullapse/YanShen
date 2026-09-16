@@ -111,7 +111,9 @@ def _read_rows(file_storage):
     if suffix == ".xlsx":
         return _read_xlsx(raw)
 
-    text = raw.decode("utf-8-sig")
+    if raw.startswith(b"\xef\xbb\xbf"):
+        raw = raw[3:]
+    text = raw.decode("utf-8")
     reader = csv.DictReader(io.StringIO(text))
     return [{k.strip(): (v or "").strip() for k, v in row.items()} for row in reader]
 

@@ -32,6 +32,21 @@ def _dimension_score_template(dimensions):
     ]
 
 
+def _essay_band_prompt_contract(is_essay):
+    """Return the explicit first-round band contract for essay grading."""
+    if not is_essay:
+        return "", ""
+    fields = (
+        '  "overall_band": "A|B|C|D|E",\n'
+        '  "band_reason": "先定整篇档位的具体依据；不能只写语句流畅或结构完整",\n'
+        '  "high_band_evidence": {"precise_task_and_theme": false, "clear_thesis": false, "coherent_argument_structure": false, "material_accurate_and_specific": false, "major_arguments_fully_developed": false, "depth_or_innovation": false, "no_fact_or_logic_hard_error": false},\n'
+    )
+    rules = (
+        "大作文必须填写 overall_band、band_reason 和 high_band_evidence。B（二类文，70—79）至少要求除 depth_or_innovation 外其余六项证据为 true，且无事实/逻辑硬伤；A（一类文，80—100）还要求 depth_or_innovation 也为 true。普通模板化、仅语句流畅、仅标题完整或仅分段清楚，最多进入C（三类文，60—69）。如果任一证据不确定就填 false，并按C/D/E档给分。overall_band 是整篇分数上限约束，不是可忽略的标签。\n"
+    )
+    return fields, rules
+
+
 DIMENSION_SCORING_GUIDANCE = """维度分采用符合真实考场阅卷强度的“得分制”，不是从满分起步的扣分制，也不是概率或0—1置信度。必须先看实际完成质量，再从0分向上给分。
 - 90%—100%仅用于几乎可直接作为考场高分范文的表现：任务完整、材料转化准确、重点突出且基本没有可见缺陷；普通“写到了”不能进入此档。
 - 75%—89%用于完成度较高但仍有明确提升空间的表现。
@@ -39,16 +54,76 @@ DIMENSION_SCORING_GUIDANCE = """维度分采用符合真实考场阅卷强度的
 - 40%—59%用于完成不充分、遗漏较多或结构表达明显影响阅卷识别的答案。
 - 低于40%用于核心任务大面积缺失、严重偏题、文种/结构根本错误或表达大面积不可理解。
 - 不得因答案语句通顺就默认给结构、表达、格式高分；每个高于80%的维度都必须指出达到高分档的具体证据。
-- 称谓、落款等仅在题干或相应文种确实要求时评分；题目不要求的要素缺失不得扣分。"""
+- 称谓、落款等仅在题干或相应文种确实要求时评分；题目不要求的要素缺失不得扣分。
+- 【错别字免扣分铁律】：考生在电脑端作答采用键盘输入，拼音同音字、联想误差等非原则性错别字一律免予扣分，重在采分点语义识别与材料提取能力。"""
 
 
-ESSAY_SCORING_GUIDANCE = """综合写作必须先判断整篇文章所处的整体档位，再把该档位总分合理分配到各维度；不能先给每个维度“看起来不错”的高比例后相加。
-- 80—100：罕见的考场优秀范文。立意深刻准确，主要论证线均充分展开，材料转化准确且几乎没有事实、逻辑或表达硬伤。
-- 70—79：明显高于一般水平。立意、结构和主要论证均较强，材料名称与事实基本准确，不得存在主要段落空泛或明显材料误读。
-- 60—69：主体任务成立的中上档。立意与结构较好，但存在一个主要部分论证偏薄、若干材料事实不准确，或论据转化较普通等常见问题。
-- 50—59：基本切题但完成质量一般，论证、材料转化或结构存在多处明显不足。
-- 50以下：偏题、任务完成不充分，或论证结构存在严重缺陷。
-若诊断中已经指出“事实偏差/材料误读”且某一主要论证部分空泛、缺少展开，通常不得给到80分以上；语言流畅、标题完整和分段清楚本身不足以进入优秀档。"""
+ESSAY_SCORING_GUIDANCE = """【袁东大作文（综合写作）专业评审方法论】：
+一、核心思想与审题逻辑（决定分论点推导框架）：
+袁东大作文体系核心：不是先想“怎么写”，而是先判断“是什么类型”。从题干判断主题类型 → 按类型确定分论点框架 → 从题干和材料填充关键词。分论点的框架是类型决定的，内容是从材料中提取的。
+1. 单主题：题干围绕单一核心概念（如“以‘创新驱动发展’为主题”）。
+   - 框架：围绕单一主题的多个维度展开——为什么重要（意义）、怎么做（举措）、从哪些方面发力。
+2. 双主题：
+   - AB型：题干为两个并列/对立/互补概念（如“守正与创新”“变与不变”“有为与不为”“效率与公平”）。
+     * 分论点一：A 对 B 的影响/作用/前提（如：守正是创新的前提，守好根本创新才不跑偏）；
+     * 分论点二：B 对 A 的影响/作用/保障（如：创新是守正的保障，没有创新守正会僵化失去生命力）；
+     * 分论点三：A 和 B 双向奔赴、互相作用产生更大价值，推动事业行稳致远。
+   - ABC型：题干出现三个概念，A和B共同服务于C（如“以法治和德治推动社会治理现代化”）。
+     * 分论点一：A 对 C 的作用（刚性约束与制度保障）；
+     * 分论点二：B 对 C 的作用（柔性引导与价值支撑）；
+     * 分论点三：A + B 刚柔并济、协同发力对 C 的整体推动。
+3. 多主题：出现三个及以上并列概念（如“改革、发展、稳定”）。
+   - 框架：强调“组合拳”式整体效应（分论点一：改革是动力；分论点二：发展是目的；分论点三：稳定是前提）。
+* 评分依据：严查考生中心论点与分论点是否严格符合所属主题类型的推导逻辑，立意是否切合题意，严禁偏题、跑题或核心概念割裂。
+
+二、分论点寻找法与材料结合度（三步走原则，严禁脱离材料空发议论）：
+1. Step 1 从题干圈定核心词（标题与分论点必须直接包含题干关键词）；
+2. Step 2 从给定材料寻找观点句、典型做法与成效，作为分论点与论据的直接依据；
+3. Step 3 关联前序小题材料提取论据与案例，实现全卷材料融会贯通。
+* 核心动作：分论点核心术语与论据必须来自题目或材料，严禁通篇空洞套话或脱离材料的主观发挥。
+
+三、五段三分规范结构与段内四层链条：
+1. 标题（1行）：观点式（直接亮明中心论点）、对仗式（两短语对仗）或比喻式，必须直接关联题干核心词。阅卷人2秒内判断是否偏题。
+2. 首段（150-200字，三层递进）：引出话题（1-2句） → 点明问题/意义（1-2句） → 亮明中心论点（1句，段尾明确亮出，绝不含糊）。
+3. 分论点一、二、三（各250-300字，字数基本对等）：每段严格遵循段内四层结构与双线论证：
+   - 第①层（1句，段首置顶）：明确提出分论点句；
+   - 第②层（2-3句，政策理论线）：转述政策精神，点明与话题关联，不整段抄录，点到为止；
+   - 第③层（3-4句，案例分析线）：选取给定材料或前序小题典型案例，有名有姓有细节，结合案例提炼启示；
+   - 第④层（1-2句，小结回扣）：总结回扣本段分论点。
+4. 尾段（100-150字）：用新话术回扣中心论点（严禁照抄首段原话） + 自然上升到国家发展、人民幸福高度升华（不得提新论点、不用转折句、不用主观口号）。
+
+四、双线论述法（政策理论线 + 案例分析线）：
+每个分论点段内部坚持政策理论线（政策精神转述）与案例分析线（有名有姓有细节、提炼启示）双线融合，严禁通篇纯理论空谈或纯讲故事。
+
+五、模板与创新加分规则（模板是底线，不是天花板）：
+1. 模板是保底工具，只能说明结构方向基本可用，不代表自动达到70分；模板化但论证空洞、材料转化薄弱的文章仍按实际完成质量定为三类或四类。
+2. 超越模板的创新加分情形：
+   - 独到的切入角度（如从哲学高度切入，格局更高，予以加分）；
+   - 新颖的论证结构（以核心故事贯穿全文层层剥开，只要自洽深刻，不扣结构分，反而加分）；
+   - 深刻的独立分析（在材料事实基础上独立思考提出深层归因，加分）；
+   - 辨识度的语言风格（有文采但不浮夸，节奏有力，加分）。
+3. 评判标准：按模板写结构对=基础分稳；没按模板但逻辑自洽深刻=不扣结构分并额外加分；按模板但内容空洞=指出套路化问题；结构混乱=建议先用模板稳住。
+
+六、粉笔大作文参考答案定位铁律（立意校核）：
+1. 【粉笔参考答案仅作立意校核】：大作文不是客观小题！粉笔大作文参考答案仅用于辅助判断考生的中心立意与分论点方向是否正确切题。
+2. 【严禁逐句对齐扣分】：严禁把粉笔大作文参考答案当成客观采分点去逐句比对考生作答扣分！
+3. 【非机械覆盖】：综合写作不要求机械覆盖每一则材料案例。中心立意是必需要素；不同材料案例属于可替代论据。
+4. 【具体评分依据袁东定级】：具体评分严格按袁东两轮阅卷五档标准裁决。
+
+七、两轮阅卷五档定级赋分标准：
+综合写作必须先第一轮判断整篇档位，再第二轮细化分配各维度分；不能先给每个维度高比例后相加。
+固定五维权重：立意准确性30%、结构规范性20%、论证充分性20%、素材运用度15%、语言表达力15%。
+- 80—100分（一类文/优秀范文）：考场优秀范文。审题精准，立意深刻高远，五段三分严密，双线论证充分展开，紧扣材料关键词，无事实/逻辑硬伤，有独到深度或创新加分。
+- 70—79分（二类文/良好）：明显高于一般水平。切题准确，中心论点鲜明，符合五段三分，立意、结构和主要论证均较强，材料基本准确，无主要段落空泛。
+- 60—69分（三类文/主体任务成立中上档）：立意较好，但存在主要论证偏薄、材料事实不准或套路化空洞等问题。
+- 50—59分（四类文）：基本切题但完成质量一般，论证、材料转化或结构存在多处明显不足。
+- 50分以下（五类文）：偏题、跑题、任务完成严重不充分，或论证结构存在严重缺陷。
+若诊断中指出“事实偏差/材料误读”且主要论据空泛无展开，通常不得给到80分以上；语言流畅、标题完整本身不足以进入优秀档。
+
+八、修改建议、字数与错别字铁律：
+1. 修改建议必须说明用户答案应补、应删、应合并或应规范的具体位置，只给局部动作，禁止输出重写后的完整答案。
+2. 字数只统计用户作答纯正文。
+3. 【错别字免扣分铁律】：电脑键盘输入同音错别字、联想误差一律免予扣分，语义可识别即正常判定给分。"""
 
 
 def _evidence_card(row, role, confidence=None):
@@ -234,6 +309,11 @@ def build_combined_grading_prompt(
 ):
     history_meta = history_meta or {}
     reference_context = _full_reference_context(references or [])
+    single_reference_policy = (
+        "本题只有一份粉笔标准答案：它是内容采分点的唯一边界。只能拆分该答案已经写出的语义；材料不得新增采分点或追加必需细节。"
+        if len(reference_context) == 1 and question.get("question_type") != "综合写作"
+        else "按题干、材料和所选参考答案共同核验评分边界。"
+    )
     word_budget = word_limit_budget(question_word_limit_text(question))
     budget_guidance = _word_budget_guidance(word_budget)
     question_context = {
@@ -273,11 +353,35 @@ def build_combined_grading_prompt(
         if row.get("corrected_status") in {"hit", "partial", "miss"}
     ][:20]
 
+    is_essay = question.get("question_type") == "综合写作"
+    if is_essay:
+        role_instruction = (
+            "你正在评审申论大作文（综合写作）。请严格依据【袁东大作文方法论】进行专业审题判断与定级赋分。\n"
+            "你是阅卷与诊断老师，不是参考答案作者；只分析立意、五段三分框架、材料论据转化与固定维度得分。\n"
+            "【先定档，后分维度】：先对整篇文章做第一轮五档定级，再在该档允许的分数区间内分配各维度；不得先把内容、论证、结构、表达、格式分别打高分后再相加。\n"
+            "【粉笔答案仅作立意校核】：大作文不是客观小题！粉笔参考答案仅用于判断考生的中心立意与分论点是否切题、正确，绝不是客观给分点，严禁把粉笔答案逐句对齐扣分！\n"
+            "【修改建议与字数】：修改建议必须说明用户答案应补、应删、应合并或应规范的具体位置与局部动作，只给局部动作，严禁输出重写后的完整文章。字数只统计用户作答纯正文。\n"
+            "禁止生成、改写、压缩或润色任何完整答案。coaching_context 只用于点评建议，不得影响任何得分。"
+        )
+        essay_guidance = ESSAY_SCORING_GUIDANCE
+    else:
+        role_instruction = (
+            f"你正在执行申论小题联合批改。你是阅卷与诊断老师，不是参考答案作者；"
+            "系统已提供明确的采分点和分值，AI 绝不生成任何答案，只逐点判断用户在这些得分点的得分情况。\n"
+            f"评分只能依据 current_scoring：{single_reference_policy} "
+            "【全面性与准确性阶梯评分铁律】：真实申论阅卷与粉笔评分均以“全面、准确”为核心尺度。\n"
+            "1. 既全面又准确才可判 hit/full（100%全分）：核心要素完整（举措、对象、成效无缺失），专业规范提炼精准，不苛求机械逐字一致，但绝不可放水；\n"
+            "2. 概括不全面或不够准确必须判 partial 阶梯赋分：若表述过于宽泛、笼统、口语化、提炼偏弱（不够准确），或遗漏重要宾语/成效/并列要点（概括不全），严禁判 full，必须判定为 partial，并严格根据缺损程度梯次定档（mostly=0.75、half=0.5 或 slight=0.25），同时在 missing_elements 和 reason 中明确指出具体是不全面（漏了什么）还是不够准确（何处泛化/口语化）；\n"
+            "3. 严禁因为材料中未作要求的细枝末节（如额外地名、人名）苛扣，但参考答案本身的核心要素与精准提炼必须严格考核；\n"
+            "4. 完全未答或理解错误判 miss/none=0。\n"
+            "禁止生成、改写、压缩或润色任何完整答案。coaching_context 只用于点评建议，不得影响任何得分。"
+        )
+        essay_guidance = DIMENSION_SCORING_GUIDANCE
+
     dimension_profile = _default_criteria(question.get("question_type"))
     dimension_score_template = _dimension_score_template(dimension_profile)
-    return f"""你正在执行申论单次智能联合批改。请在一次响应中先建立独立评分基准，再分析全部采分点，最后按题型维度综合评分。
-
-最高事实来源是本题题干与材料。机构答案只是候选解释。没有本题材料依据的内容不得成为主要扣分点。
+    return f"""{role_instruction}
+【错别字免扣分铁律】：考生采用电脑键盘拼音输入法打字作答，同音错别字、输入法联想失误等非原则性错字属正常录入现象，一律免予扣分，严禁以此作为扣分依据！评分核心在于采分点语义识别与材料提取能力；只要语义表达能识别出采分点（无论是否存在同音错别字），均须判定为命中给分！
 建立 rubric 时不得根据本次作答增删采分点或改变权重；本次作答只能用于 evaluation。
 
 本题完整信息：
@@ -289,7 +393,7 @@ def build_combined_grading_prompt(
 本题材料：
 {_material_text(materials)}
 
-本题已选择的机构参考答案全文（共 {len(reference_context)} 份，属于本题主证据）：
+本题已选择的机构参考答案全文（共 {len(reference_context)} 份；只有一份时只能从该答案切分计分点，不得依据材料自主补点）：
 {json.dumps(reference_context, ensure_ascii=False)}
 {limited_reference_guidance(len(reference_context))}
 
@@ -313,15 +417,10 @@ def build_combined_grading_prompt(
 本题固定维度框架（满分合计100）：
 {json.dumps(dimension_profile, ensure_ascii=False)}
 
-{DIMENSION_SCORING_GUIDANCE}
+{essay_guidance}
 
 输出保持干练：每个 reason、weight_reason 最多 60 字；aliases 每点最多 3 个；
-annotations 最多 6 条；material_reading 最多 6 条；optimization_suggestions 最多 5 条；
-personalized_findings 最多 3 条。不要重复题干、材料或参考答案全文。
-personalized_findings 必须做深层归因，而不是复述症状：每条都要写清“反复出现的现象 →
-导致它的具体作答机制/原因 → 下一步练什么”。禁止出现“多次遗漏要点”“多次失分”“需要加强”
-这类只有结论没有机制的句子；root_cause 要指出具体环节（如审题时未先圈定任务动词、
-提取材料时按自然段逐段摘抄而没有先做主题归并、要点堆叠后未回读题干核对对象）。
+annotations 最多 6 条。不要重复题干、材料或参考答案全文。
 
 只输出一个由 <smart_grading_json> 与 </smart_grading_json> 包裹的合法 JSON：
 <smart_grading_json>
@@ -331,7 +430,11 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
     "task_constraints": {{"object": "", "required_structure": [], "format_rules": []}},
     "points": [{{
       "point_key": "point-1",
-      "label": "简短采分点名",
+      "group_key": "group-1",
+      "group_label": "粉笔答案中的一级要点",
+      "group_order": 1,
+      "point_order": 1,
+      "label": "完整给分点名称",
       "canonical_expression": "规范表达",
       "aliases": ["同义表达"],
       "tier": "core|material_core|supporting|disputed",
@@ -342,6 +445,7 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
       "required_elements": ["不可缺少的语义"],
       "optional_details": ["可省略的例子或修饰"],
       "minimum_expression": "最短完整写法",
+      "reference_quote": "粉笔答案中仅对应当前小点的连续原文",
       "material_evidence": [{{"material_number": 1, "quote": "材料连续原文"}}],
       "reference_ids": [1],
       "confidence": 0.9
@@ -350,37 +454,50 @@ personalized_findings 必须做深层归因，而不是复述症状：每条都�
     "conflicts": []
   }},
   "evaluation": {{
-    "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "coverage_ratio": 0.0, "answer_quote": "尽量使用用户答案短且连续的原文", "reason": "覆盖或缺失说明", "confidence": 0.0, "missing_elements": []}}],
+    "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "score_level": "full|mostly|half|slight|none", "coverage_ratio": 0.0, "answer_quote": "尽量使用用户答案短且连续的原文", "reason": "覆盖或缺失说明", "confidence": 0.0, "missing_elements": []}}],
     "dimension_scores": {json.dumps(dimension_score_template, ensure_ascii=False)},
     "holistic_adjustment_reason": "",
     "annotations": [{{"kind": "good|polish|change|delete|add|critical", "severity": "positive|low|medium|high|critical", "quote": "非补充类必须为用户答案连续原文", "anchor": "补充类必须为用户答案连续原文，表示插入在此句之后", "replacement": "", "reason": "", "point_key": ""}}],
-    "reference_fusion": "共性核心点和差异补充点",
-    "material_reading": ["材料信息 -> 可转化要点 -> 答案表达"],
-    "optimization_suggestions": ["具体建议"],
-    "personalized_findings": [{{"finding": "跨题共性现象", "root_cause": "导致该现象的具体作答机制/原因", "next_step": "下一步针对这个原因练什么", "evidence_ids": [""], "confidence": "stage|recurring"}}],
-    "summary": {{"verdict": "不含分数的整体判断", "strengths": ["主要优点"], "weaknesses": ["主要问题"]}},
-    "revised_answer": "可直接替换的修改版答案正文"
+    "summary": {{"verdict": "不含分数的整体判断", "strengths": ["主要优点"], "weaknesses": ["主要问题"]}}
   }}
 }}
 </smart_grading_json>
 
 规则：
 1. rubric 的采分点权重总和必须等于 content 维度满分。明确评分标准中的数值优先；否则依据任务必要性、材料层级和机构共识动态分配，禁止无理由平均分配。
-2. rubric.point_key 只使用 point-1、point-2 这类 ASCII 标识；evaluation.point_matches 必须逐字复制对应的 rubric.point_key，不得翻译、改写或另起编号。先逐点分析，再给 dimension_scores。内容分是结合重点覆盖、准确性、完整性和材料转化质量的综合判断，不得机械等于逐点覆盖加总。
-3. dimension_scores 必须逐项覆盖固定维度；JSON 中 max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。各维度问题只扣一次，不再输出整体质量乘数。
-4. hit/partial 应提供用户答案中的短连续原文；若同一要点散落在多处，可用“……”连接多个按原文顺序出现的短片段，不得因此改判 miss。annotations 中除 add 外 quote 必须是连续原文；add 必须填写可在原文精确定位的 anchor，并把拟补文字写入 replacement。
-5. coaching context（跨题、知识、历史证据）只用于建议和 personalized_findings，绝不能影响 point_matches 或 dimension_scores。
-6. personalized_findings 的 finding 必须指出跨题共性（至少 2 条证据支撑才算 recurring）；root_cause 分析具体环节而不是复述症状；next_step 给出可执行的下一道题训练动作。宁可少写一条，也不要写空话。
-7. 修改版答案以 suggested_min—suggested_max 为目标，低于硬上限并预留至少8格。
-8. 只输出上述单个 JSON 块，不输出 Markdown 或额外解释。
+2. rubric.point_key 只使用 point-1、point-2 这类 ASCII 标识；evaluation.point_matches 必须逐字复制对应的 rubric.point_key，不得翻译、改写或另起编号。先逐点分析，再给 dimension_scores。
+3. dimension_scores 必须逐项覆盖固定维度；JSON 中 max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。
+4. 【全面性与准确性审查】：申论答案不苛求机械逐字一致，但必须以“全面”与“准确”为硬性审查指标。既全面又准确才判命中满分；概括不全面或不够准确严禁给满分。
+5. 【真实阅卷式划点】：先按粉笔答案识别一级要点组，再把每组合理归并为1—3个完整给分点；20分题通常共5—10个给分点，每点一般1—3分。不得把每个词、地点、案例拆成0.5分碎片，也不得把整组措施合成一个笼统大点。
+6. 【同一状态源】：每个 rubric 点必须提供粉笔答案中的逐字 reference_quote；evaluation 只判该 point_key 的 hit/partial/miss。参考答案着色、用户答案着色和得分都将直接使用这个状态，禁止另设一套判断。
+7. 【梯次分档给分】：核心意思完整为 hit/full=1；部分命中必须选择 mostly=0.75、half=0.5 或 slight=0.25，0.5只是分档刻度，禁止把参考答案每个词机械切成0.5分；miss/none=0。
+   - hit/full=1.0：既全面又准确，核心举措、对象与成效要素完整，规范提炼精准。
+   - partial mostly=0.75：表达准确，主体框架完整，仅有极细微要素或规范修饰语轻微欠缺。
+   - partial half=0.5：①概括不全面（如写出举措但遗漏关键对象/成效，或并列项只答出一半）；②不够准确（表述过于宽泛、笼统、口语化，未精准提炼材料要义）。
+   - partial slight=0.25：零星沾边或仅提及个别词汇，缺乏完整准确逻辑。
+   - miss/none=0：完全未答或答非所问。
+   判定 partial 必须在 missing_elements 和 reason 中明确说明是不全面还是不够准确。不得因同义沾边就无原则判满分。
+8. hit/partial 应提供用户答案中的短连续原文；若同一要点散落在多处，可用“……”连接多个按原文顺序出现的短片段，不得因此改判 miss。annotations 中除 add 外 quote 必须是连续原文。
+9. 你是阅卷与诊断老师，不是答案作者。禁止输出、改写、压缩或润色任何完整答案；禁止自创任何替代答案。
+10. 只输出上述单个 JSON 块，不输出 Markdown 或额外解释。
 """
 
 
-def _save_rubric_to_db(db_path, question, references, materials, settings, feedback, parsed, consensus=None):
+def _save_rubric_to_db(
+    db_path,
+    question,
+    references,
+    materials,
+    settings,
+    feedback,
+    parsed,
+    consensus=None,
+    prevalidated=False,
+):
     consensus = consensus or {}
     ref_hash = reference_set_hash(references)
     source_hash = rubric_source_hash(question, materials, references)
-    rubric = validate_rubric(parsed, question, materials, references, feedback)
+    rubric = parsed if prevalidated else validate_rubric(parsed, question, materials, references, feedback)
     rubric["source_hash"] = source_hash
     rubric["reference_set_hash"] = ref_hash
     rubric["consensus_summary"] = {
@@ -436,6 +553,18 @@ def build_grading_prompt(
 ):
     history_meta = history_meta or {}
     reference_context = _full_reference_context(references or [])
+    fenbi_tree = rubric.get("scoring_mode") == "fenbi_tree"
+    if fenbi_tree:
+        single_reference_policy = (
+            "本题评分标准已由粉笔踩分树固化。只能逐点判断 hit/partial/miss，"
+            "禁止新增、删除、合并、拆散或重算任何采分点，禁止依据材料补充必写细节。"
+        )
+    else:
+        single_reference_policy = (
+            "本题只有一份粉笔标准答案：它是内容采分点的唯一边界。不得从材料新增采分点或追加标答未写的必需细节。"
+            if len(reference_context) == 1 and question.get("question_type") != "综合写作"
+            else "按已校验评分基准逐点判定。"
+        )
     question_context = {
         key: question.get(key)
         for key in (
@@ -478,8 +607,39 @@ def build_grading_prompt(
     dimension_score_template = _dimension_score_template(dimension_profile)
     budget_guidance = _word_budget_guidance(question_context["word_budget"])
     essay_guidance = ESSAY_SCORING_GUIDANCE if question.get("question_type") == "综合写作" else ""
-    return f"""你正在使用已校验的不等权评分基准执行申论综合批改。先分析全部采分点，再按评分基准中的固定维度综合评分。
-评分只能依据 current_scoring：本题信息、材料、参考答案和评分基准。coaching_context 只用于点评建议，不得影响任何得分。
+    scoring_mode_label = "粉笔固定踩分树" if fenbi_tree else "已校验的不等权评分基准"
+    fenbi_tree_instruction = (
+        "【固定踩分树】：下面的 points 是唯一可判分点，weight/display_weight/full_mark 已经固化；"
+        "禁止重新划点、合点、拆点或重算权重，point_key 必须原样使用。\n"
+        if fenbi_tree
+        else ""
+    )
+    is_essay = question.get("question_type") == "综合写作"
+    if is_essay:
+        role_instruction = (
+            "你正在评审申论大作文（综合写作）。请严格依据【袁东大作文方法论】进行专业审题判断与定级赋分。\n"
+            "你是阅卷与诊断老师，不是参考答案作者；只分析立意、五段三分框架、材料论据转化与固定维度得分。\n"
+            "【先定档，后分维度】：先对整篇文章做第一轮五档定级，再在该档允许的分数区间内分配各维度；不得先把内容、论证、结构、表达、格式分别打高分后再相加。\n"
+            "【粉笔答案仅作立意校核】：大作文不是客观小题！粉笔参考答案仅用于判断考生的中心立意与分论点是否切题、正确，绝不是客观给分点，严禁把粉笔答案逐句对齐扣分！\n"
+            "【修改建议与字数】：修改建议必须说明用户答案应补、应删、应合并或应规范的具体位置与局部动作，只给局部动作，严禁输出重写后的完整文章。字数只统计用户作答纯正文。\n"
+            "禁止生成、改写、压缩或润色任何完整答案。coaching_context 只用于点评建议，不得影响任何得分。"
+        )
+    else:
+        role_instruction = (
+            f"你正在使用{scoring_mode_label}执行申论小题批改。你是阅卷与诊断老师，不是参考答案作者；"
+            "系统已提供明确的采分点和分值，AI 绝不生成任何答案，只逐点判断用户在这些得分点的得分情况。\n"
+            f"评分只能依据 current_scoring：{single_reference_policy} "
+            "【全面性与准确性阶梯评分铁律】：真实申论阅卷与粉笔评分均以“全面、准确”为核心尺度。\n"
+            "1. 既全面又准确才可判 hit/full（100%全分）：核心要素完整（举措、对象、成效无缺失），专业规范提炼精准，不苛求机械逐字一致，但绝不可放水；\n"
+            "2. 概括不全面或不够准确必须判 partial 阶梯赋分：若表述过于宽泛、笼统、口语化、提炼偏弱（不够准确），或遗漏重要宾语/成效/并列要点（概括不全），严禁判 full，必须判定为 partial，并严格根据缺损程度梯次定档（mostly=0.75、half=0.5 或 slight=0.25），同时在 missing_elements 和 reason 中明确指出具体是不全面（漏了什么）还是不够准确（何处泛化/口语化）；\n"
+            "3. 严禁因为材料中未作要求的细枝末节（如额外地名、人名）苛扣，但参考答案本身的核心要素与精准提炼必须严格考核；\n"
+            "4. 完全未答或理解错误判 miss/none=0。\n"
+            "禁止生成、改写、压缩或润色任何完整答案。coaching_context 只用于点评建议，不得影响任何得分。"
+        )
+
+    essay_output_fields, essay_band_rules = _essay_band_prompt_contract(is_essay)
+
+    return f"""{role_instruction}
 
 与旧批改包一致的本题完整信息：
 {json.dumps(question_context, ensure_ascii=False)}
@@ -487,7 +647,7 @@ def build_grading_prompt(
 本题材料：
 {_material_text(materials)}
 
-系统校验后的评分基准：
+{fenbi_tree_instruction}系统校验后的评分基准：
 {json.dumps(rubric, ensure_ascii=False)}
 
 本题已选择的机构参考答案全文（共 {len(reference_context)} 份，属于 current_scoring 主证据，旧批改模式中的答案、采分点和备注均完整保留）：
@@ -505,7 +665,8 @@ coaching_context（跨题、知识和历史最小证据）：
 
 历史证据状态：{json.dumps(history_meta, ensure_ascii=False)}
 
-本题修改版答案占格要求：{budget_guidance}
+本次用户作答占格要求：{budget_guidance}
+{ANSWER_GRID_RULES}
 
 同题人工纠错校准：
 {json.dumps(feedback_calibration, ensure_ascii=False)}
@@ -517,44 +678,35 @@ coaching_context（跨题、知识和历史最小证据）：
 
 {essay_guidance}
 
-输出保持干练：每个 reason 最多 60 字；annotations 最多 6 条；
-material_reading 最多 6 条；optimization_suggestions 最多 5 条；
-personalized_findings 最多 3 条。不要重复题干、材料或参考答案全文。
-personalized_findings 必须做深层归因，而不是复述症状：每条都要写清“反复出现的现象 →
-导致它的具体作答机制/原因 → 下一步练什么”。禁止出现“多次遗漏要点”“多次失分”“需要加强”
-这类只有结论没有机制的句子；root_cause 要指出具体环节（如审题时未先圈定任务动词、
-提取材料时按自然段逐段摘抄而没有先做主题归并、要点堆叠后未回读题干核对对象）。
+{essay_band_rules}
+
+输出保持干练：每个 reason 最多 60 字；annotations 最多 6 条。不要重复题干、材料或参考答案全文。
 
 只输出一个由 <smart_grading_json> 与 </smart_grading_json> 包裹的合法 JSON：
 <smart_grading_json>
 {{
   "evaluation": {{
-    "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "coverage_ratio": 0.0, "answer_quote": "尽量使用用户答案短且连续的原文", "reason": "覆盖或缺失说明", "confidence": 0.0, "missing_elements": []}}],
+{essay_output_fields}  "point_matches": [{{"point_key": "", "status": "hit|partial|miss", "score_level": "full|mostly|half|slight|none", "coverage_ratio": 0.0, "answer_quote": "尽量使用用户答案短且连续的原文", "reason": "覆盖或缺失说明", "confidence": 0.0, "missing_elements": []}}],
     "dimension_scores": {json.dumps(dimension_score_template, ensure_ascii=False)},
     "holistic_adjustment_reason": "",
     "annotations": [{{"kind": "good|polish|change|delete|add|critical", "severity": "positive|low|medium|high|critical", "quote": "非补充类必须为用户答案连续原文", "anchor": "补充类必须为用户答案连续原文，表示插入在此句之后", "replacement": "", "reason": "", "point_key": ""}}],
-    "reference_fusion": "共性核心点和差异补充点",
-    "material_reading": ["材料信息 -> 可转化要点 -> 答案表达"],
-    "optimization_suggestions": ["具体建议"],
-    "personalized_findings": [{{"finding": "跨题共性现象", "root_cause": "导致该现象的具体作答机制/原因", "next_step": "下一步针对这个原因练什么", "evidence_ids": [""], "confidence": "stage|recurring"}}],
-    "summary": {{"verdict": "不含分数的整体判断", "strengths": ["主要优点"], "weaknesses": ["主要问题"]}},
-    "revised_answer": "可直接替换的修改版答案正文"
+    "summary": {{"verdict": "不含分数的整体判断", "strengths": ["主要优点"], "weaknesses": ["主要问题"]}}
   }}
 }}
 </smart_grading_json>
 
 规则：
-1. 每个可计分 point_key 必须且只能出现一次，并逐字复制评分基准中的 point_key，不得翻译、改写或另起编号；先在原答案中查找同义表达，避免误判漏点。
-2. point_matches 的每项还必须输出 coverage_ratio（0—1）。hit 固定为1，miss固定为0；partial 根据 required_elements 中实际覆盖的核心语义给出0.1—0.9，不得把所有 partial 机械写成0.5。简洁同义表达完整覆盖核心语义时应判 hit，不能因没写 optional_details 而降分。
-3. hit/partial 应提供用户答案中的短连续原文；若语义散落在多处，可用“……”连接按顺序出现的多个短片段。找不到一个完整长句不等于未命中。annotations 的定位规则保持严格。
-4. dimension_scores 必须逐项覆盖评分基准 dimensions；max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。point_based 模式的内容分最终由系统按必答点计算；holistic_essay 模式必须整体评价立意、材料转化和论证质量，具体材料案例只是可替代论据，不得因未使用某一则材料直接判核心任务失败。
-5. 同一个问题只能在最相关维度扣一次，不得再使用 overall_quality_ratio、总分系数或统一封顶。
-6. recurring 只在 history_stable=true 时使用，否则写 stage。
-7. personalized_findings 只能引用上面存在且 role=personalization 的 evidence_id。
-8. personalized_findings 的 finding 必须指出跨题共性（至少 2 条证据支撑才算 recurring）；root_cause 分析具体环节而不是复述症状；next_step 给出可执行的下一道题训练动作。宁可少写一条，也不要写空话。
-9. 修改版答案必须按结构化 word_budget 生成，以 suggested_min—suggested_max 为目标，并至少预留8格安全余量。{ANSWER_GRID_RULES}
-10. 输出修改版答案前先在内部按上述规则估算占格；除文种或结构确有需要外避免手动换行，因为换行会结算当前行剩余格。不得用空话凑字数，也不得为了写全 optional_details 挤占 required 点。
-11. 不直接输出总分、分数算式、折算分或等级；系统将各维度 score 相加、校准并缩放到原题满分。
-12. 同题人工纠错优先用于识别同义表达，但本次 hit/partial 仍必须给出当前用户答案中的连续原句。
-13. 上面的机构参考答案数量大于 0 时，reference_fusion 必须说明实际纳入的机构答案及其共性/差异，严禁写“无参考答案”“无额外参考答案”或“未提供参考答案”。
+1. 每个可计分 point_key 必须且只能出现一次，并逐字复制评分基准中的 point_key，不得翻译、改写或另起编号。
+2. 【全面性与准确性审查】：既全面又准确才判 hit/full（1.0）。若核心意思虽然沾边，但概括不够全面（缺少关键对象、举措或成效）或不够准确（用词泛化、笼统、口语化、未能提炼出专业规范词），严禁判 full，必须判定为 partial！不得因个别词同义就放水给全分。
+3. 【梯次分档赋分】：point_matches 按真实阅卷尺度梯次定档。核心意思完整为 hit/full=1；部分命中必须选择 mostly=0.75、half=0.5 或 slight=0.25，0.5只是分档刻度，禁止把参考答案每个词机械切成0.5分；miss/none=0。
+   - hit/full=1.0：全面且准确，核心要素完整，规范提炼精准。
+   - partial mostly=0.75：表达准确，主体框架完整，仅有个别细微要素或规范修饰语轻微欠缺。
+   - partial half=0.5：①概括不全面（如写出举措但漏掉对象/成效，或并列项只答一半）；②不够准确（表述过于宽泛、大而化之、口语化，未精准提炼材料专业规范要义）。
+   - partial slight=0.25：零星沾边或仅写出个别词，缺乏完整准确逻辑。
+   - miss/none=0：完全未答或答非所问。
+   判定 partial 必须在 missing_elements 和 reason 中明确说明是不全面（漏了什么）还是不够准确（何处宽泛/口语化）。禁止把参考答案机械切成碎片。
+4. hit/partial 应提供用户答案中的短连续原文；若语义散落在多处，可用“……”连接按顺序出现的多个短片段。
+5. dimension_scores 必须逐项覆盖评分基准 dimensions；max_score 只用于明确尺度，score 必须遵守上述得分制标尺且在0到 max_score之间。
+6. 你是阅卷与诊断老师，不是答案作者。禁止输出、改写、压缩或润色任何完整答案；禁止自创任何替代答案。
+7. 非作文题不直接输出总分、分数算式、折算分或等级；综合写作必须输出 overall_band 作为第一轮整篇定档，但仍不得输出数值总分或算式，系统负责校验档位上限并缩放到原题满分。
 """
