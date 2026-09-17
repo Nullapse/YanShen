@@ -553,7 +553,10 @@ def build_grading_prompt(
 ):
     history_meta = history_meta or {}
     reference_context = _full_reference_context(references or [])
-    fenbi_tree = rubric.get("scoring_mode") == "fenbi_tree"
+    fenbi_tree = (
+        rubric.get("scoring_mode") == "fenbi_tree"
+        and question.get("question_type") != "综合写作"
+    )
     if fenbi_tree:
         single_reference_policy = (
             "本题评分标准已由粉笔踩分树固化。只能逐点判断 hit/partial/miss，"
