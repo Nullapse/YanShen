@@ -250,6 +250,71 @@ test("annotation dialogs and popovers work after repeated partial navigation", a
   dom.window.close();
 });
 
+test("coach streams escaped text, replaces it on completion and stops polling", async () => {
+  const dom = installDom(`
+    <div class="agent-message-stream"><div data-agent-pending>
+      <p class="agent-status-note"></p>
+    </div></div>
+  `, "http://localhost/agent/conversations/7");
+  Object.defineProperty(document, "hidden", { value: false, configurable: true });
+  window.__gongkaoPageIntervals = [];
+  const originalFetch = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return { ok: true, json: async () => calls === 1 ? {
+      pending: true, steps: [], progress: { stage: "answering", text: "先补回访。<img src=x onerror=alert(1)>" },
+    } : { pending: false, awaiting: false, latest_message_id: 9,
+      message_html: '<div data-agent-message-id="9">完整答案</div>' } };
+  };
+  const controller = new AbortController();
+  try {
+    const { initializeAgent } = await import("../../static/js/agent.js");
+    initializeAgent(controller.signal, () => assert.fail("should update in place"));
+    window.dispatchEvent(new Event("focus"));
+    await new Promise((resolve) => window.setTimeout(resolve, 5));
+    const preview = document.querySelector("[data-agent-preview]");
+    assert.match(preview.textContent, /先补回访/);
+    assert.equal(preview.querySelector("img"), null);
+    assert.equal(document.querySelector(".agent-status-note").textContent, "正在生成回复…");
+    window.dispatchEvent(new Event("focus"));
+    await new Promise((resolve) => window.setTimeout(resolve, 5));
+    assert.equal(document.querySelector("[data-agent-pending]"), null);
+    assert.equal(document.querySelector('[data-agent-message-id="9"]').textContent, "完整答案");
+    window.dispatchEvent(new Event("focus"));
+    assert.equal(calls, 2);
+  } finally {
+    controller.abort();
+    globalThis.fetch = originalFetch;
+    dom.window.close();
+  }
+});
+
+test("coach ignores late status responses after page navigation", async () => {
+  const dom = installDom('<div data-agent-pending><p class="agent-status-note">等待</p></div>',
+    "http://localhost/agent/conversations/7");
+  Object.defineProperty(document, "hidden", { value: false, configurable: true });
+  window.__gongkaoPageIntervals = [];
+  const originalFetch = globalThis.fetch;
+  let finish;
+  globalThis.fetch = () => new Promise((resolve) => { finish = resolve; });
+  const controller = new AbortController();
+  try {
+    const { initializeAgent } = await import("../../static/js/agent.js");
+    initializeAgent(controller.signal, () => assert.fail("stale navigation"));
+    window.dispatchEvent(new Event("focus"));
+    controller.abort();
+    finish({ ok: true, json: async () => ({ pending: true, progress: { stage: "answering", text: "旧页面答案" } }) });
+    await new Promise((resolve) => window.setTimeout(resolve, 5));
+    assert.equal(document.querySelector("[data-agent-preview]"), null);
+    assert.equal(document.querySelector(".agent-status-note").textContent, "等待");
+  } finally {
+    controller.abort();
+    globalThis.fetch = originalFetch;
+    dom.window.close();
+  }
+});
+
 test("workflow more menu opens on click and its actions remain clickable", async () => {
   const dom = installDom(`
     <div data-workflow-menu>

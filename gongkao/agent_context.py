@@ -135,14 +135,23 @@ def pack_messages(prefix, transcript, tools, store, final_round=False, limit=MAX
 
 
 def stable_prefix(messages, tools, history_limit=10000):
-    """Prune optional older history before freezing the prefix for this run."""
+    """Budget history separately and keep room for a subsequent tool result."""
     messages = convert_to_messages(messages)
     removed = 0
-    # First system message and final current task are mandatory. Optional history/memory
-    # lies between them and is discarded oldest-first as a whole message.
-    while len(messages) > 2 and input_units(messages, tools) > min(history_limit, MAX_INPUT_UNITS):
-        messages.pop(1)
-        removed += 1
-    if input_units(messages, tools) > MAX_INPUT_UNITS:
+    if len(messages) < 2:
+        return messages, removed
+    mandatory_units = input_units([messages[0], messages[-1]], tools)
+    if mandatory_units > MAX_INPUT_UNITS:
         raise ContextBudgetError("当前问题超出输入预算，请缩短输入。")
+    # A larger task must not silently turn the optional-history allowance into zero.
+    budget = min(max(0, history_limit), max(0, MAX_INPUT_UNITS - mandatory_units - 4000))
+    while len(messages) > 2 and input_units(messages, tools) - mandatory_units > budget:
+        # Keep preference/summary system messages while dropping the oldest full
+        # conversational turn. Never leave an orphaned assistant answer behind.
+        index = next((i for i in range(1, len(messages) - 1) if messages[i].type != "system"), 1)
+        message = messages.pop(index)
+        removed += 1
+        if message.type == "human" and index < len(messages) - 1 and messages[index].type == "ai":
+            messages.pop(index)
+            removed += 1
     return messages, removed

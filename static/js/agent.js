@@ -1,26 +1,12 @@
 import { escapeHtml, paragraphHtml } from "./core.js";
 
 export function initializeAgent(signal, navigatePartial) {
-  const phases = [
-    ["classify_module", "理解问题"],
-    ["load_user_context", "读取训练资料"],
-    ["retrieve_candidates", "筛选上下文"],
-    ["build_rag_context", "检索证据"],
-    ["ChatOpenAI", "生成回复"],
-  ];
-  const renderStatusSteps = (steps) => {
-    const names = new Set((steps || []).map((step) => step.tool_name));
-    let currentUsed = false;
-    return phases.map(([toolName, label]) => {
-      let state = "todo";
-      let prefix = "";
-      if (names.has(toolName)) {
-        state = "done";
-        prefix = "✓ ";
-      } else if (!currentUsed) {
-        state = "current";
-        currentUsed = true;
-      }
+  const phases = ["理解问题", "整理依据", "生成回复"];
+  const renderStatusSteps = (steps, stage) => {
+    const current = stage === "answering" ? 2 : stage === "reading" || steps?.length ? 1 : 0;
+    return phases.map((label, index) => {
+      const state = index < current ? "done" : index === current ? "current" : "todo";
+      const prefix = index < current ? "✓ " : "";
       return `<span class="${state}">${escapeHtml(prefix + label)}</span>`;
     }).join("");
   };
@@ -51,17 +37,23 @@ export function initializeAgent(signal, navigatePartial) {
   };
 
   if (document.querySelector("[data-agent-pending]") || document.querySelector("[data-agent-awaiting]")) {
+    let inFlight = false;
+    let finished = false;
     const pollStatus = () => {
-      if (signal.aborted || document.hidden) return;
+      if (signal.aborted || document.hidden || inFlight || finished) return;
+      inFlight = true;
       const statusUrl = `${window.location.pathname.replace(/\/$/, "")}/status`;
-      fetch(statusUrl, { cache: "no-store" })
+      fetch(statusUrl, { cache: "no-store", signal })
         .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`status failed: ${response.status}`))))
         .then((payload) => {
+          if (signal.aborted || finished) return;
           if (payload.deleted) {
             navigatePartial(new URL("/agent", window.location.origin), { replace: true });
             return;
           }
           if (!payload.pending && !payload.awaiting) {
+            finished = true;
+            window.clearInterval(pollTimer);
             unlockComposer();
             const pendingCard = document.querySelector("[data-agent-pending]");
             const stream = document.querySelector(".agent-message-stream");
@@ -84,6 +76,19 @@ export function initializeAgent(signal, navigatePartial) {
             return;
           }
           const pendingCard = document.querySelector("[data-agent-pending]");
+          if (pendingCard && payload.progress) {
+            const note = pendingCard.querySelector(".agent-status-note");
+            const labels = { thinking: "正在分析问题…", reading: "正在补充相关证据…", answering: "正在生成回复…" };
+            if (note && labels[payload.progress.stage]) note.textContent = labels[payload.progress.stage];
+            let preview = pendingCard.querySelector("[data-agent-preview]");
+            if (!preview && payload.progress.text) {
+              preview = document.createElement("div");
+              preview.setAttribute("data-agent-preview", "");
+              preview.className = "agent-stream-preview";
+              pendingCard.append(preview);
+            }
+            if (preview) preview.textContent = payload.progress.text || "";
+          }
           let box = pendingCard?.querySelector(".agent-status-steps");
           if (!box && pendingCard) {
             box = document.createElement("div");
@@ -97,10 +102,11 @@ export function initializeAgent(signal, navigatePartial) {
             }
           }
           if (box && payload.steps) {
-            box.innerHTML = renderStatusSteps(payload.steps);
+            box.innerHTML = renderStatusSteps(payload.steps, payload.progress?.stage);
           }
         })
         .catch((err) => {
+          if (signal.aborted) return;
           if (err?.message?.includes("404") || !window.location.pathname.startsWith("/agent/conversations/")) {
             return;
           }
@@ -108,10 +114,16 @@ export function initializeAgent(signal, navigatePartial) {
           if (note) {
             note.textContent = "后台仍在处理，暂时无法读取状态，稍后会继续尝试。";
           }
-        });
+        })
+        .finally(() => { inFlight = false; });
     };
-    window.setTimeout(pollStatus, 1200);
-    window.__gongkaoPageIntervals.push(window.setInterval(pollStatus, 3000));
+    const firstPoll = window.setTimeout(pollStatus, 150);
+    const pollTimer = window.setInterval(pollStatus, 800);
+    window.__gongkaoPageIntervals.push(pollTimer);
+    signal.addEventListener("abort", () => {
+      window.clearTimeout(firstPoll);
+      window.clearInterval(pollTimer);
+    }, { once: true });
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) pollStatus();
     }, { signal: signal });

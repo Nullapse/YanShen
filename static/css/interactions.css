@@ -1270,3 +1270,9 @@ summary:active {
     transition: none !important;
   }
 }
+.agent-stream-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.8;
+  margin-top: 12px;
+}

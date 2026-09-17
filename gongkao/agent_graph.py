@@ -7,6 +7,8 @@ from typing import Any, Dict, TypedDict
 
 from .agent_context import pack_messages, receipt, result_id, stable_prefix
 from .agent_modules import classify_module_heuristic
+from .agent_policy import response_policy
+from .agent_progress import clear_progress, update_progress
 from .agent_prompts import (
     AGENT_PROMPT_VERSION,
     build_agent_messages,
@@ -81,6 +83,9 @@ class AgentState(TypedDict, total=False):
     message_fingerprints: list[str]
     prefix_history_removed: int
     stop_reason: str
+    response_policy: Dict[str, Any]
+    budget_escalations: int
+    needs_more_evidence: bool
 
 
 def _subject_type(task_type):
@@ -324,7 +329,7 @@ def _rerank_evidence_with_llm(llm, user_goal, rag_context, limit=20):
     }
 
 
-def _graph_for(settings, db_path, stack=None):
+def _graph_for(settings, db_path, stack=None, on_progress=None):
     from langchain_core.messages import ToolMessage
 
     ChatOpenAI, StateGraph, START, END = _load_langgraph()
@@ -337,6 +342,7 @@ def _graph_for(settings, db_path, stack=None):
         timeout=45,
         max_retries=0,
         max_tokens=2048,
+        stream_usage=True,
     )
 
     def prepare_node(state):
@@ -345,11 +351,13 @@ def _graph_for(settings, db_path, stack=None):
         plan = normalize_query_plan(
             None, state.get("user_goal", ""), state["task_type"], state.get("subject_ids") or [], module
         )
+        policy = response_policy(state, plan)
         selected, catalog = {}, {}
         if plan.get("scope") == "current_attempt" and state.get("subject_ids"):
             with connect(state["db_path"]) as conn:
                 selected, catalog = prepare_selected_evidence(
-                    conn, {**state, "module": module, "context_plan": {"rag_query_plan": plan}}
+                    conn, {**state, "module": module, "context_plan": {"rag_query_plan": plan},
+                           "response_policy": policy}
                 )
         messages = build_agent_messages(
             state["task_type"],
@@ -360,6 +368,7 @@ def _graph_for(settings, db_path, stack=None):
             {"rag_route": route_from_plan(plan)},
             _response_style(state),
             system_suffix=REACT_INSTRUCTION,
+            policy=policy,
         )
         messages[-1] = ("human", messages[-1][1] + "\n本轮范围：" + json.dumps(plan, ensure_ascii=False))
         if selected:
@@ -371,7 +380,8 @@ def _graph_for(settings, db_path, stack=None):
             state.get("user_goal") or "",
         )
         messages = with_long_term_memories(messages, state.get("long_term_memories") or [])
-        specs = tool_specs({**state, "module": module, "context_plan": {"rag_query_plan": plan}})
+        specs = tool_specs({**state, "module": module, "context_plan": {"rag_query_plan": plan},
+                            "selected_evidence": selected})
         prefix, removed = stable_prefix(messages, specs)
         return {
             "module": module,
@@ -389,6 +399,9 @@ def _graph_for(settings, db_path, stack=None):
             "tool_calls_count": 0,
             "tool_cache": {},
             "deadline": deadline,
+            "response_policy": policy,
+            "budget_escalations": 0,
+            "needs_more_evidence": False,
         }
 
     def model_node(state):
@@ -399,7 +412,20 @@ def _graph_for(settings, db_path, stack=None):
                 "final_text": "本轮分析达到运行预算，请缩小问题范围后重试。",
                 "stop_reason": "budget",
             }
-        final_round = state["model_calls"] == MAX_MODEL_CALLS - 1 or state["tool_calls_count"] >= MAX_TOOL_CALLS
+        policy = state["response_policy"]
+        escalations = state["budget_escalations"]
+        call_limit = min(MAX_MODEL_CALLS, policy["model_calls"] + escalations)
+        tool_limit = min(MAX_TOOL_CALLS, policy["tool_calls"] + escalations * 2)
+        # Upgrade once only when tools reported a concrete evidence gap. Keep
+        # enough time for a final answer even when the model keeps exploring.
+        if (state["needs_more_evidence"] and escalations < policy["max_escalations"]
+                and remaining > 25 and (state["model_calls"] >= call_limit - 1
+                                       or state["tool_calls_count"] >= tool_limit)):
+            escalations += 1
+            call_limit = min(MAX_MODEL_CALLS, policy["model_calls"] + escalations)
+            tool_limit = min(MAX_TOOL_CALLS, policy["tool_calls"] + escalations * 2)
+        final_round = (state["model_calls"] >= call_limit - 1 or state["tool_calls_count"] >= tool_limit
+                       or remaining < 15)
         specs = state["tool_definitions"]
         messages, context_metrics = pack_messages(
             state["base_messages"], state["react_messages"], specs, state["result_store"], final_round
@@ -413,10 +439,30 @@ def _graph_for(settings, db_path, stack=None):
             shared += 1
         context_metrics.update(shared_prefix_messages=shared, prefix_history_removed=state["prefix_history_removed"])
         started = time.monotonic()
+        first_text_ms = None
         try:
-            response = llm.bind_tools(specs, tool_choice="none" if final_round else "auto").invoke(
-                messages, timeout=min(45, remaining)
-            )
+            bound = llm.bind_tools(specs, tool_choice="none" if final_round else "auto")
+            options = {"timeout": min(45, remaining), "max_tokens": policy["output_tokens"]}
+            if on_progress is None:
+                response = bound.invoke(messages, **options)
+            else:
+                from langchain_core.messages import message_chunk_to_message
+
+                on_progress("thinking", "")
+                aggregate = None
+                for chunk in bound.stream(messages, **options):
+                    if time.monotonic() >= state["deadline"]:
+                        raise AgentRunError("本轮生成超时，请缩小问题范围后重试。")
+                    aggregate = chunk if aggregate is None else aggregate + chunk
+                    if aggregate.tool_call_chunks:
+                        on_progress("reading", "")
+                    elif isinstance(aggregate.content, str) and aggregate.content:
+                        if first_text_ms is None:
+                            first_text_ms = round((time.monotonic() - started) * 1000)
+                        on_progress("answering", aggregate.content)
+                if aggregate is None:
+                    raise AgentRunError("模型未返回有效回复，请重试。")
+                response = message_chunk_to_message(aggregate)
         except Exception as exc:
             # Keep provider response bodies and credentials out of persisted user-facing errors.
             raise AgentRunError("教练模型调用失败，请检查连接及模型的工具调用支持后重试。") from exc
@@ -439,6 +485,9 @@ def _graph_for(settings, db_path, stack=None):
                 "prompt_version": AGENT_PROMPT_VERSION,
                 "context": context_metrics,
                 "latency_ms": round((time.monotonic() - started) * 1000),
+                "first_text_ms": first_text_ms,
+                "response_tier": policy["tier"],
+                "budget_escalations": escalations,
             },
         )
         update = {
@@ -446,6 +495,8 @@ def _graph_for(settings, db_path, stack=None):
             "model_calls": state["model_calls"] + 1,
             "message_fingerprints": fingerprints,
             "pending_calls": calls,
+            "budget_escalations": escalations,
+            "needs_more_evidence": False,
         }
         if calls and not final_round:
             return update
@@ -476,10 +527,14 @@ def _graph_for(settings, db_path, stack=None):
         store = dict(state["result_store"])
         count = state["tool_calls_count"]
         updates = {}
+        needs_more = False
+        tool_limit = min(MAX_TOOL_CALLS, state["response_policy"]["tool_calls"] + state["budget_escalations"] * 2)
+        if on_progress:
+            on_progress("reading", "")
         for call in state["pending_calls"]:
             name, args = call.get("name", ""), call.get("args")
             status = "ok"
-            if count >= MAX_TOOL_CALLS or time.monotonic() >= state["deadline"]:
+            if count >= tool_limit or time.monotonic() >= state["deadline"] - 15:
                 result = json.dumps({"ok": False, "error": "本轮工具预算耗尽，请使用现有结果。"}, ensure_ascii=False)
                 status = "budget"
             else:
@@ -504,6 +559,15 @@ def _graph_for(settings, db_path, stack=None):
                         identifier = result_id(result)
                         store[identifier] = result
                         cache[key] = (change, identifier)
+                    detail = change.get("source_detail") or {}
+                    observed = json.loads(result)
+                    search = change.get("search_observation") or {}
+                    needs_more |= bool(
+                        detail.get("next_offset") is not None or detail.get("available") is False
+                        or observed.get("truncated") or observed.get("ok") is False
+                        or search.get("returned_count") == 0
+                        or search.get("evidence_sufficiency", {}).get("level") == "insufficient"
+                    )
                     if "evidence_catalog" in change:
                         change = {
                             **change,
@@ -514,11 +578,13 @@ def _graph_for(settings, db_path, stack=None):
                 except ValueError as exc:
                     result = json.dumps({"ok": False, "error": str(exc)}, ensure_ascii=False)
                     status = "invalid_arguments"
+                    needs_more = True
                 except Exception:
                     result = json.dumps(
                         {"ok": False, "error": "工具读取失败，可调整查询或说明资料暂不可用。"}, ensure_ascii=False
                     )
                     status = "error"
+                    needs_more = True
             identifier = result_id(result)
             store[identifier] = result
             transcript.append(ToolMessage(content=receipt(identifier), tool_call_id=call["id"], name=name))
@@ -531,7 +597,8 @@ def _graph_for(settings, db_path, stack=None):
                 {"status": status, "result_id": identifier, "observation_chars": len(result)},
             )
         updates.update(
-            react_messages=transcript, tool_calls_count=count, tool_cache=cache, result_store=store, pending_calls=[]
+            react_messages=transcript, tool_calls_count=count, tool_cache=cache, result_store=store, pending_calls=[],
+            needs_more_evidence=needs_more,
         )
         return updates
 
@@ -628,7 +695,8 @@ def run_agent(
 
     try:
         with ExitStack() as stack:
-            graph = _graph_for(settings, db_path, stack)
+            graph = _graph_for(settings, db_path, stack,
+                               on_progress=lambda stage, text: update_progress(db_path, run_id, stage, text))
             graph.invoke(
                 {
                     "db_path": str(db_path),
@@ -663,4 +731,6 @@ def run_agent(
         with connect(db_path) as conn:
             fail_run(conn, run_id, f"Agent 运行失败：{exc}")
         raise AgentRunError(str(exc)) from exc
+    finally:
+        clear_progress(db_path, run_id)
     return run_id

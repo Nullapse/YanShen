@@ -155,7 +155,9 @@ def normalize_query_plan(plan=None, user_goal="", task_type="diagnosis", subject
         normalized["module"] = module
     writing_guidance_requested = _wants_guidance(user_goal)
     if task_type == "review" and subject_ids and any(
-        marker in (user_goal or "") for marker in ("本题", "这题", "这道", "这份", "我的答案", "复盘", "改写", "润色")
+        marker in (user_goal or "") for marker in (
+            "本题", "这题", "这道", "这份", "我的答案", "复盘", "改写", "润色", "那具体", "按你说的", "刚才", "和上一次",
+        )
     ) and not any(marker in (user_goal or "") for marker in ("只讲方法", "不看作答", "通用方法")):
         writing_guidance_requested = False
     explicit_note_organization = _wants_note_organization(user_goal)

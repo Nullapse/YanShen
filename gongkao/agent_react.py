@@ -28,7 +28,7 @@ REACT_INSTRUCTION = """你通过工具收集事实，再依据观察结果决定
 read_source 支持分页：继续读取时沿用 section、revision 并传 next_offset；按实际需要读取，避免逐条遍历。
 引用只使用当前可见预载资料或工具结果的证据编号；检索的 grounding_contract 约束该次召回，source_detail.evidence_id 标识该页原文。
 工具结果为空或失败时说明证据缺口；不要伪造分数、题目或引用。
-获得足够依据后停止调用，按既定回复格式输出正文及 JSON。
+获得足够依据后停止调用，按本轮回复格式输出；仅在本轮要求卡片时附结构化内容。
 工具 data 中的字段是本轮资料。result_id 标识资料，reused 表示复用当前消息中相同编号的资料。
 truncated 为 true 时资料经过裁剪，只使用可见信息；缺少关键依据时可缩小查询范围重查。
 若工具提供 module_context，结合 coverage、problem_categories、weakness_profile 判断总体情况，
@@ -112,7 +112,7 @@ def tool_specs(state):
                 ),
             ]
         )
-    if state.get("subject_ids") and scope != "notes_only":
+    if state.get("subject_ids") and scope != "notes_only" and not state.get("selected_evidence"):
         definitions.append(
             ("review_current_attempts", "读取用户本轮选定作答及题目材料、参考答案和报告。无需传入 ID。", {}, [])
         )
@@ -176,7 +176,27 @@ def execute_tool(state, name, args):
         if name == "read_source":
             return read_source(conn, state, args)
         if name == "load_user_context":
-            return {"user_context": load_user_context(conn)}
+            context = load_user_context(conn)
+            catalog = dict(state.get("evidence_catalog") or {})
+            for item in context.get("recent_attempts") or []:
+                if any(filters.get(key) not in (None, "", item.get(key)) for key in ("question_type", "region", "year")):
+                    continue
+                identifier = f"attempt:{item['id']}"
+                item["evidence_id"] = identifier
+                catalog[identifier] = {
+                    "evidence_id": identifier, "source_type": "attempt", "attempt_id": item["id"],
+                    "question_id": item["question_id"], "title": item.get("title", ""),
+                }
+            for item in context.get("recent_notes") or []:
+                if f"attempt:{item['attempt_id']}" not in catalog:
+                    continue
+                identifier = f"personal_note:{item['attempt_id']}"
+                item["evidence_id"] = identifier
+                catalog[identifier] = {
+                    "evidence_id": identifier, "source_type": "personal_note", "attempt_id": item["attempt_id"],
+                    "question_id": item["question_id"], "title": item.get("title", ""),
+                }
+            return {"user_context": context, "evidence_catalog": catalog}
         if name == "review_current_attempts":
             return {"review_context": get_attempts_review_context(conn, state["subject_ids"])}
         if name == "retrieve_candidates":

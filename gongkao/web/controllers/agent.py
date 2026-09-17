@@ -615,6 +615,8 @@ class AgentController:
         self.redirect(f"/agent/conversations/{conversation_id}")
 
     def handle_agent_conversation_status(self, path):
+        from ...agent_progress import read_progress
+
         try:
             conversation_id = int(path.strip("/").split("/")[2])
         except (ValueError, IndexError):
@@ -659,6 +661,7 @@ class AgentController:
                         "pending": is_pending,
                         "awaiting": latest["role"] == "user",
                         "steps": steps,
+                        "progress": read_progress(self.db_path, latest["run_id"]) if is_pending else {},
                         "message_html": ""
                         if is_pending
                         else render_agent_message_row(latest, f"/agent/conversations/{conversation_id}", steps),

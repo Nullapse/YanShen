@@ -18,9 +18,13 @@ def call(name="load_user_context", args=None, identifier="c1"):
 class ReactGraphTests(unittest.TestCase):
     def run_graph(self, responses, execute=None, **overrides):
         prepared = overrides.pop("prepared", ({}, {}))
+        on_progress = overrides.pop("on_progress", None)
+        chunks = overrides.pop("chunks", None)
         client = Mock()
         client.bind_tools.return_value = client
         client.invoke.side_effect = responses
+        if chunks is not None:
+            client.stream.side_effect = chunks
         state = {
             "db_path": "unused",
             "run_id": 1,
@@ -44,7 +48,8 @@ class ReactGraphTests(unittest.TestCase):
             ) as tool,
         ):
             graph = _graph_for(
-                {"model": "test", "api_base_url": "https://example.invalid/v1", "temperature": 0}, "unused"
+                {"model": "test", "api_base_url": "https://example.invalid/v1", "temperature": 0}, "unused",
+                on_progress=on_progress,
             )
             result = graph.invoke(state)
         return result, client, tool, complete
@@ -104,7 +109,8 @@ class ReactGraphTests(unittest.TestCase):
         result, client, tool, _ = self.run_graph(
             [AIMessage(content="", tool_calls=[call(identifier=f"c{i}")]) for i in range(MAX_MODEL_CALLS)]
         )
-        self.assertEqual(client.invoke.call_count, MAX_MODEL_CALLS)
+        self.assertEqual(client.invoke.call_count, 4)
+        self.assertLess(client.invoke.call_count, MAX_MODEL_CALLS)
         self.assertEqual(result["stop_reason"], "budget")
         self.assertEqual(client.bind_tools.call_args.kwargs["tool_choice"], "none")
 
@@ -115,7 +121,7 @@ class ReactGraphTests(unittest.TestCase):
                 AIMessage(content="根据已取得的资料整理。"),
             ]
         )
-        self.assertEqual(result["tool_calls_count"], MAX_TOOL_CALLS)
+        self.assertEqual(result["tool_calls_count"], 6)
         self.assertEqual(client.bind_tools.call_args.kwargs["tool_choice"], "none")
 
     def test_provider_error_does_not_leak_raw_message(self):
