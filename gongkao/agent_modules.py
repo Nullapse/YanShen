@@ -1,4 +1,5 @@
 import json
+import os
 import re
 
 from . import agent_retrieval as _retrieval
@@ -34,6 +35,7 @@ from .agent_retrieval.indexing import (
     _sqlite_vec_search,
     ensure_agent_context_index,
 )
+from .agent_retrieval.llamaindex_retriever import retrieve_knowledge_chunks as _retrieve_llamaindex_knowledge_chunks
 from .agent_retrieval.query import where_for_scope as _where_for_scope
 
 VECTOR_DIM = _retrieval.VECTOR_DIM
@@ -178,7 +180,7 @@ def _all_scope_problem_categories(conn, scope):
     return _problem_categories([dict(row) for row in rows])
 
 
-def _search_chunks(conn, scope, user_goal, limit=40, prefer_dense=True):
+def _search_chunks(conn, scope, user_goal, limit=40, prefer_dense=True, retriever_backend="hybrid"):
     clauses, params = _where_for_scope(scope)
     query = user_goal if scope.get("query_mode") == "knowledge" else _module_query(scope["module"], user_goal)
     words = [word for word in re.split(r"\s+", query) if word]
@@ -226,7 +228,21 @@ def _search_chunks(conn, scope, user_goal, limit=40, prefer_dense=True):
             ).fetchall()
         except Exception:
             fts_rows = []
-    if prefer_dense:
+    if retriever_backend == "llamaindex":
+        if scope.get("query_mode") != "knowledge":
+            raise ValueError("LlamaIndex retrieval is currently limited to static knowledge cards.")
+        vector_rows = _retrieve_llamaindex_knowledge_chunks(
+            conn,
+            query,
+            scope.get("module") or "overview",
+            limit=max(120, limit * 3),
+        )
+        vector_backend = (
+            vector_rows[0].get("_vector_backend")
+            if vector_rows
+            else "llamaindex:empty"
+        )
+    elif prefer_dense:
         query_vector, embedding_model = _dense_query_embedding(conn, query)
         try:
             vector_rows = _sqlite_vec_search(
@@ -242,7 +258,12 @@ def _search_chunks(conn, scope, user_goal, limit=40, prefer_dense=True):
         query_vector, _ = _embed_text(query)
         embedding_model = FEATURE_HASH_MODEL
         vector_rows = []
-    vector_backend = f"sqlite-vec:{embedding_model}" if vector_rows else "python-recent-scan:feature-hash-v1"
+    if retriever_backend != "llamaindex":
+        vector_backend = (
+            f"sqlite-vec:{embedding_model}"
+            if vector_rows
+            else "python-recent-scan:feature-hash-v1"
+        )
     if not vector_rows:
         query_vector, _ = _embed_text(query)
         vector_rows = conn.execute(
@@ -257,6 +278,7 @@ def _search_chunks(conn, scope, user_goal, limit=40, prefer_dense=True):
             """,
             (*params, FEATURE_HASH_MODEL),
         ).fetchall()
+        vector_backend = f"python-recent-scan:{FEATURE_HASH_MODEL}"
     scored = {}
     for rank, row in enumerate(keyword_rows, start=1):
         item = dict(row)
@@ -399,12 +421,21 @@ def retrieve_knowledge_evidence(
     *,
     ensure_index=True,
     prefer_dense=True,
+    retriever_backend=None,
 ):
     if ensure_index:
         ensure_agent_context_index(conn)
         # Never carry an index-maintenance write lock into query embedding.
         conn.commit()
     module_id = valid_module_id(module_id or "overview")
+    retriever_backend = str(
+        retriever_backend
+        or os.environ.get("GONGKAO_KNOWLEDGE_RETRIEVER", "hybrid")
+    ).strip().lower()
+    if retriever_backend not in {"hybrid", "llamaindex"}:
+        raise ValueError(f"unsupported knowledge retriever: {retriever_backend}")
+    if retriever_backend == "llamaindex" and not prefer_dense:
+        raise ValueError("LlamaIndex knowledge retrieval requires vector retrieval to be enabled.")
     scope = {
         "module": module_id,
         "module_label": module_definition(module_id)["label"],
@@ -420,6 +451,7 @@ def retrieve_knowledge_evidence(
         user_goal,
         limit=max(24, int(limit) * 4),
         prefer_dense=prefer_dense,
+        retriever_backend=retriever_backend,
     )
     for item in scored:
         try:

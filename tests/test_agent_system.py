@@ -1144,6 +1144,38 @@ class AgentSystemTest(unittest.TestCase):
         self.assertIn("knowledge", {card["source_type"] for card in rag_context["evidence_cards"]})
         self.assertNotIn("personal_note", {card["source_type"] for card in rag_context["evidence_cards"]})
 
+    def test_llamaindex_candidates_keep_the_existing_evidence_pipeline(self):
+        with connect(self.db_file) as conn:
+            rebuild_agent_context_index(conn)
+            row = conn.execute(
+                "SELECT * FROM agent_context_chunks WHERE source_type = 'knowledge' ORDER BY id LIMIT 1"
+            ).fetchone()
+            candidate = dict(row)
+            metadata = json.loads(candidate["metadata_json"])
+            candidate.update(
+                {
+                    "_vector_score": 0.99,
+                    "_vector_rank": 1,
+                    "_vector_backend": "llamaindex:feature-hash-v1",
+                }
+            )
+            with patch(
+                "gongkao.agent_modules._retrieve_llamaindex_knowledge_chunks",
+                return_value=[candidate],
+            ) as retrieve:
+                evidence = retrieve_knowledge_evidence(
+                    conn,
+                    metadata["module"],
+                    candidate["title"],
+                    limit=5,
+                    retriever_backend="llamaindex",
+                )
+
+        retrieve.assert_called_once()
+        self.assertTrue(any(item["evidence_ref"] == metadata["knowledge_id"] for item in evidence))
+        selected = next(item for item in evidence if item["evidence_ref"] == metadata["knowledge_id"])
+        self.assertEqual(selected["retrieval"]["vector_backend"], "llamaindex:feature-hash-v1")
+
     def test_knowledge_can_mix_with_notes_when_user_requests_it(self):
         with connect(self.db_file) as conn:
             question_id = conn.execute("SELECT id FROM questions LIMIT 1").fetchone()["id"]
