@@ -26,9 +26,9 @@
 
 配置方法见 [DeepSeek API 配置教程](docs/deepseek-api-setup.md)。检索、参考答案聚类和证据筛选在本地完成；只有主动使用智能批改或 AI 功能时，当前题必要数据和少量命中证据才会发送给所配置的模型服务。API Key 不应提交到仓库。
 
-### 检索实验：可选 LlamaIndex Retriever
+### 静态知识检索：可选 LlamaIndex
 
-现有混合检索仍是默认路径，继续负责 FTS5、RRF、证据卡片和来源读取。安装评测依赖后，可把 LlamaIndex `VectorStoreIndex` 用作知识卡片的向量候选检索器；它复用项目当前启用的本地 embedding，并按题型模块过滤结果。其候选仍进入现有排序和证据流程。
+现有 SQLite 混合检索仍是默认路径。设置 `GONGKAO_KNOWLEDGE_RETRIEVER=llamaindex` 后，静态方法知识卡由 LlamaIndex 负责 TextNode、持久化 dense index、BM25、模块 metadata filter 和 RRF 融合；它复用项目当前启用的本地 embedding。历史作答、批改报告和个人训练记录继续由 SQLite、FTS5 与 sqlite-vec 检索。两条路径最后转换为项目现有 Evidence，供 LangGraph 和 `read_source` 使用。详见[静态知识 RAG 架构说明](docs/llamaindex-static-rag.md)。
 
 ```powershell
 pip install -r requirements-eval.txt
@@ -36,7 +36,7 @@ $env:GONGKAO_KNOWLEDGE_RETRIEVER = "llamaindex"
 python app.py
 ```
 
-可用同一批检索金标对比两种 Retriever。评测在临时数据库副本上运行，保留原数据库；`--backend bge` 要求本地已缓存 BGE 模型。
+可用同一批检索金标对比两种检索路径。评测在临时数据库副本上运行，保留原数据库；`--backend bge` 要求本地已缓存 BGE 模型。
 
 ```powershell
 python scripts/run_retrieval_eval.py --backend bge --retriever hybrid --output output/retrieval-hybrid.json

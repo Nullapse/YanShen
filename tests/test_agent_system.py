@@ -33,6 +33,7 @@ from gongkao.agent_modules import (
 from gongkao.agent_prompts import build_agent_messages, with_conversation_history, with_long_term_memories
 from gongkao.agent_rag import (
     build_rag_context,
+    cards_from_module_context,
     fallback_query_plan,
     normalize_query_plan,
     route_rag,
@@ -1175,6 +1176,43 @@ class AgentSystemTest(unittest.TestCase):
         self.assertTrue(any(item["evidence_ref"] == metadata["knowledge_id"] for item in evidence))
         selected = next(item for item in evidence if item["evidence_ref"] == metadata["knowledge_id"])
         self.assertEqual(selected["retrieval"]["vector_backend"], "llamaindex:feature-hash-v1")
+
+    def test_module_retrieval_routes_static_and_dynamic_sources_separately(self):
+        with connect(self.db_file) as conn:
+            rebuild_agent_context_index(conn)
+            row = conn.execute(
+                "SELECT * FROM agent_context_chunks WHERE source_type = 'knowledge' "
+                "AND json_extract(metadata_json, '$.module') = 'analysis' ORDER BY id LIMIT 1"
+            ).fetchone()
+            candidate = dict(row)
+            candidate.update(
+                {
+                    "_fusion_score": 2 / 60,
+                    "_rrf_score": 0.5,
+                    "_rerank_score": 0.5,
+                    "_vector_backend": "llamaindex:query-fusion:feature-hash-v1",
+                }
+            )
+            with patch.dict("os.environ", {"GONGKAO_KNOWLEDGE_RETRIEVER": "llamaindex"}):
+                with patch("gongkao.agent_modules._search_chunks", return_value=[]) as sqlite_search:
+                    with patch(
+                        "gongkao.agent_modules._retrieve_llamaindex_knowledge_chunks",
+                        return_value=[candidate],
+                    ) as llama_search:
+                        context = retrieve_module_evidence(
+                            conn,
+                            "analysis",
+                            "分析基层治理问题",
+                            filters={"source_types": ["knowledge", "attempt"]},
+                        )
+
+        sqlite_search.assert_called_once()
+        self.assertEqual(sqlite_search.call_args.args[1]["source_types"], ["attempt"])
+        llama_search.assert_called_once()
+        self.assertEqual(context["evidence_chunks"][0]["source_type"], "knowledge")
+        metadata = json.loads(candidate["metadata_json"])
+        cards = cards_from_module_context(context)
+        self.assertTrue(any(card["evidence_id"] == metadata["knowledge_id"] for card in cards))
 
     def test_knowledge_can_mix_with_notes_when_user_requests_it(self):
         with connect(self.db_file) as conn:
