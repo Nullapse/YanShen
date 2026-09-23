@@ -9,9 +9,9 @@ import json
 import logging
 import threading
 
+from ..paths import user_data_dir
 from .embeddings import FEATURE_HASH_MODEL, embed_text, tokenize
 from .indexing import _active_embedding, _load_dense_model
-from ..paths import user_data_dir
 
 _CACHE_LOCK = threading.RLock()
 _CACHE_STORE_KEY = None
@@ -287,10 +287,10 @@ def _tokenized_node(node):
 
 def _build_fusion_retriever(index, module_id, limit):
     try:
+        from llama_index.core.llms.mock import MockLLM
         from llama_index.core.retrievers import BaseRetriever, QueryFusionRetriever
         from llama_index.core.schema import NodeWithScore, QueryBundle
         from llama_index.core.vector_stores import MetadataFilter, MetadataFilters
-        from llama_index.core.llms.mock import MockLLM
         from llama_index.retrievers.bm25 import BM25Retriever
     except ImportError as exc:
         raise _missing_dependency() from exc
