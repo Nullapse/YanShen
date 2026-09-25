@@ -1,4 +1,5 @@
 import json
+import os
 import re
 
 from . import agent_retrieval as _retrieval
@@ -34,6 +35,7 @@ from .agent_retrieval.indexing import (
     _sqlite_vec_search,
     ensure_agent_context_index,
 )
+from .agent_retrieval.llamaindex_retriever import retrieve_knowledge_chunks as _retrieve_llamaindex_knowledge_chunks
 from .agent_retrieval.query import where_for_scope as _where_for_scope
 
 VECTOR_DIM = _retrieval.VECTOR_DIM
@@ -242,7 +244,11 @@ def _search_chunks(conn, scope, user_goal, limit=40, prefer_dense=True):
         query_vector, _ = _embed_text(query)
         embedding_model = FEATURE_HASH_MODEL
         vector_rows = []
-    vector_backend = f"sqlite-vec:{embedding_model}" if vector_rows else "python-recent-scan:feature-hash-v1"
+    vector_backend = (
+        f"sqlite-vec:{embedding_model}"
+        if vector_rows
+        else "python-recent-scan:feature-hash-v1"
+    )
     if not vector_rows:
         query_vector, _ = _embed_text(query)
         vector_rows = conn.execute(
@@ -257,6 +263,7 @@ def _search_chunks(conn, scope, user_goal, limit=40, prefer_dense=True):
             """,
             (*params, FEATURE_HASH_MODEL),
         ).fetchall()
+        vector_backend = f"python-recent-scan:{FEATURE_HASH_MODEL}"
     scored = {}
     for rank, row in enumerate(keyword_rows, start=1):
         item = dict(row)
@@ -329,6 +336,16 @@ def _search_chunks(conn, scope, user_goal, limit=40, prefer_dense=True):
     )[:limit]
 
 
+def _selected_knowledge_retriever(retriever_backend=None):
+    backend = str(
+        retriever_backend
+        or os.environ.get("GONGKAO_KNOWLEDGE_RETRIEVER", "hybrid")
+    ).strip().lower()
+    if backend not in {"hybrid", "llamaindex"}:
+        raise ValueError(f"unsupported knowledge retriever: {backend}")
+    return backend
+
+
 def retrieve_module_evidence(conn, module_id, user_goal="", filters=None):
     module_id = valid_module_id(module_id)
     ensure_agent_context_index(conn)
@@ -336,7 +353,35 @@ def retrieve_module_evidence(conn, module_id, user_goal="", filters=None):
     conn.commit()
     scope = build_analysis_scope(user_goal, module_id, filters)
     coverage = _coverage(conn, scope)
-    chunks = _search_chunks(conn, scope, user_goal)
+    backend = _selected_knowledge_retriever()
+    static_evidence = []
+    dynamic_scope = scope
+    if backend == "llamaindex":
+        requested_sources = [str(value) for value in (scope.get("source_types") or [])]
+        include_knowledge = not requested_sources or "knowledge" in requested_sources
+        if requested_sources:
+            dynamic_sources = [value for value in requested_sources if value != "knowledge"]
+        else:
+            dynamic_sources = [
+                row["source_type"]
+                for row in conn.execute(
+                    "SELECT DISTINCT source_type FROM agent_context_chunks WHERE source_type <> 'knowledge'"
+                ).fetchall()
+            ]
+        dynamic_scope = dict(scope)
+        dynamic_scope["source_types"] = dynamic_sources
+        chunks = _search_chunks(conn, dynamic_scope, user_goal) if dynamic_sources else []
+        if include_knowledge:
+            static_evidence = retrieve_knowledge_evidence(
+                conn,
+                module_id,
+                user_goal,
+                limit=8,
+                ensure_index=False,
+                retriever_backend="llamaindex",
+            )
+    else:
+        chunks = _search_chunks(conn, scope, user_goal)
     recent_limit = scope.get("recent_limit")
     if recent_limit:
         chunks = sorted(chunks, key=lambda item: (item.get("created_at") or "", item.get("id") or 0), reverse=True)[:recent_limit * 4]
@@ -368,6 +413,26 @@ def retrieve_module_evidence(conn, module_id, user_goal="", filters=None):
         }
         for row in chunks[:28]
     ]
+    static_representative = [
+        {
+            "evidence_ref": item["evidence_ref"],
+            "source_type": "knowledge",
+            "source_id": item.get("source_id"),
+            "attempt_id": None,
+            "question_id": None,
+            "question_type": module_definition(module_id).get("question_type") or "",
+            "region": None,
+            "year": None,
+            "title": item["title"],
+            "body": _clean(item["body"], 650),
+            "score": None,
+            "created_at": None,
+            "metadata": item.get("metadata") or {},
+            "retrieval": item.get("retrieval") or {},
+        }
+        for item in static_evidence
+    ]
+    representative = static_representative + representative
     source_counts = _source_counts(conn, scope)
     return {
         "module": module_id,
@@ -377,7 +442,12 @@ def retrieve_module_evidence(conn, module_id, user_goal="", filters=None):
         "source_counts": source_counts,
         "analysis_basis": {
             "coverage_mode": "all_matching_history" if scope.get("scope") == "all" else "recent_matching_history",
-            "retrieval_strategy": "full local scan for coverage and categories; keyword/vector/rerank selects representative evidence for the prompt",
+            "retrieval_strategy": (
+                "LlamaIndex retrieves static knowledge; SQLite keyword/vector/rerank retrieves other sources; "
+                "full local scan computes coverage and categories"
+                if backend == "llamaindex"
+                else "full local scan for coverage and categories; keyword/vector/rerank selects representative evidence for the prompt"
+            ),
             "representative_evidence_count": len(representative),
             "matched_chunk_count": coverage.get("chunk_count", 0),
         },
@@ -399,12 +469,16 @@ def retrieve_knowledge_evidence(
     *,
     ensure_index=True,
     prefer_dense=True,
+    retriever_backend=None,
 ):
     if ensure_index:
         ensure_agent_context_index(conn)
         # Never carry an index-maintenance write lock into query embedding.
         conn.commit()
     module_id = valid_module_id(module_id or "overview")
+    retriever_backend = _selected_knowledge_retriever(retriever_backend)
+    if retriever_backend == "llamaindex" and not prefer_dense:
+        raise ValueError("LlamaIndex knowledge retrieval requires vector retrieval to be enabled.")
     scope = {
         "module": module_id,
         "module_label": module_definition(module_id)["label"],
@@ -414,13 +488,21 @@ def retrieve_knowledge_evidence(
         "source_types": ["knowledge"],
         "query_mode": "knowledge",
     }
-    scored = _search_chunks(
-        conn,
-        scope,
-        user_goal,
-        limit=max(24, int(limit) * 4),
-        prefer_dense=prefer_dense,
-    )
+    if retriever_backend == "llamaindex":
+        scored = _retrieve_llamaindex_knowledge_chunks(
+            conn,
+            user_goal,
+            module_id,
+            limit=max(1, int(limit)),
+        )
+    else:
+        scored = _search_chunks(
+            conn,
+            scope,
+            user_goal,
+            limit=max(24, int(limit) * 4),
+            prefer_dense=prefer_dense,
+        )
     for item in scored:
         try:
             metadata = json.loads(item.get("metadata_json") or "{}")
@@ -448,6 +530,14 @@ def retrieve_knowledge_evidence(
                 "vector_backend": row.get("_vector_backend") or "none",
                 "rrf_score": row.get("_rrf_score", 0),
                 "rerank_score": row.get("_rerank_score", 0),
+                **(
+                    {
+                        "fusion_score": round(row.get("_fusion_score", 0), 6),
+                        "fusion_backend": "llamaindex.query_fusion",
+                    }
+                    if retriever_backend == "llamaindex"
+                    else {}
+                ),
             },
         }
         for row in scored[:limit]

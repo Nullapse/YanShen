@@ -510,7 +510,19 @@ def cards_from_module_context(module_context):
             )
         )
     for chunk in module_context.get("evidence_chunks") or []:
-        evidence_id = f"{chunk['source_type']}:{chunk['source_id']}" if chunk.get("source_id") is not None else _normalize_evidence_id(chunk.get("evidence_ref"), chunk.get("source_type"), chunk.get("source_id"))
+        chunk_metadata = chunk.get("metadata") or {}
+        if chunk.get("source_type") == "knowledge":
+            evidence_id = chunk_metadata.get("knowledge_id") or chunk.get("evidence_ref")
+            evidence_id = evidence_id or f"knowledge:{chunk.get('source_id')}"
+        else:
+            evidence_id = f"{chunk['source_type']}:{chunk['source_id']}" if chunk.get("source_id") is not None else _normalize_evidence_id(chunk.get("evidence_ref"), chunk.get("source_type"), chunk.get("source_id"))
+        card_metadata = {
+            "source_id": chunk.get("source_id"),
+            "score": chunk.get("score"),
+            "retrieval": chunk.get("retrieval") or {},
+        }
+        if chunk.get("source_type") == "knowledge":
+            card_metadata["knowledge"] = chunk_metadata
         cards.append(
             make_card(
                 evidence_id,
@@ -522,7 +534,7 @@ def cards_from_module_context(module_context):
                 attempt_id=chunk.get("attempt_id"),
                 supports=supports,
                 confidence=(chunk.get("retrieval") or {}).get("rerank_score") or 0.76,
-                metadata={"source_id": chunk.get("source_id"), "score": chunk.get("score"), "retrieval": chunk.get("retrieval") or {}},
+                metadata=card_metadata,
             )
         )
     return cards

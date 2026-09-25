@@ -334,7 +334,13 @@ def _content_hash(source_type, source_id, title, body, metadata=None):
 
 def knowledge_signature(items=None):
     items = items if items is not None else load_knowledge_items()
-    payload = json.dumps(items, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    payload = json.dumps(
+        {"index_schema": 2, "items": items},
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        default=str,
+    )
     return sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -381,6 +387,27 @@ def _knowledge_body(item):
     return "\n".join(part for part in parts if part.strip())
 
 
+def _knowledge_metadata(item, module_id, definition):
+    source = dict(item.get("source") or {})
+    return {
+        "knowledge_id": item["id"],
+        "module": module_id,
+        "module_label": definition.get("label") or module_id,
+        "tags": item.get("tags") or [],
+        "kind": item.get("kind") or "",
+        "source_version": item.get("version") or 1,
+        "source_file": item.get("_source_file") or "",
+        "source": source,
+        "source_name": source.get("name") or "",
+        "source_section": source.get("section") or "",
+        "source_license": source.get("license") or "",
+        "skill": item.get("skill") or "",
+        "difficulty": item.get("difficulty"),
+        "review_status": (item.get("review") or {}).get("status") or "draft",
+        "visibility": source.get("visibility") or "public",
+    }
+
+
 def _insert_knowledge_chunks(conn):
     for item in load_knowledge_items():
         module_id = valid_module_id(item.get("module") or "overview")
@@ -392,19 +419,7 @@ def _insert_knowledge_chunks(conn):
             item["title"],
             _knowledge_body(item),
             question_type=definition.get("question_type") or "",
-            metadata={
-                "knowledge_id": item["id"],
-                "module": module_id,
-                "module_label": definition.get("label") or module_id,
-                "tags": item.get("tags") or [],
-                "kind": item.get("kind") or "",
-                "source_version": item.get("version") or 1,
-                "source_file": item.get("_source_file") or "",
-                "skill": item.get("skill") or "",
-                "difficulty": item.get("difficulty"),
-                "review_status": (item.get("review") or {}).get("status") or "draft",
-                "visibility": (item.get("source") or {}).get("visibility") or "public",
-            },
+            metadata=_knowledge_metadata(item, module_id, definition),
         )
 
 
@@ -860,19 +875,7 @@ def _refresh_knowledge_chunks(conn, items=None):
             item["title"],
             _knowledge_body(item),
             question_type=definition.get("question_type") or "",
-            metadata={
-                "knowledge_id": item["id"],
-                "module": module_id,
-                "module_label": definition.get("label") or module_id,
-                "tags": item.get("tags") or [],
-                "kind": item.get("kind") or "",
-                "source_version": item.get("version") or 1,
-                "source_file": item.get("_source_file") or "",
-                "skill": item.get("skill") or "",
-                "difficulty": item.get("difficulty"),
-                "review_status": (item.get("review") or {}).get("status") or "draft",
-                "visibility": (item.get("source") or {}).get("visibility") or "public",
-            },
+            metadata=_knowledge_metadata(item, module_id, definition),
         )
     rebuild_skill_graph(conn, items)
     return knowledge_signature(items)

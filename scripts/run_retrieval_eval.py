@@ -2,6 +2,7 @@ import argparse
 import json
 import statistics
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,16 +41,9 @@ def percentile(values, fraction):
     return round(values[index], 3)
 
 
-def main():
-    parser = argparse.ArgumentParser(description="运行 Agent v2 Hybrid RAG gold retrieval 评测。")
-    parser.add_argument("--db", default=str(user_db_path()))
-    parser.add_argument("--dataset", default=str(DEFAULT_DATASET))
-    parser.add_argument("--backend", choices=("feature", "bge", "current"), default="current")
-    parser.add_argument("--output")
-    args = parser.parse_args()
-    cases = load_cases(args.dataset)
+def evaluate_cases(db_path, args, cases):
     results = []
-    with connect(args.db) as conn:
+    with connect(db_path) as conn:
         state = conn.execute(
             "SELECT embedding_model, embedding_dimensions FROM agent_context_index_state WHERE id = 1"
         ).fetchone()
@@ -65,9 +59,9 @@ def main():
                     dense_status = sync_dense_embeddings(conn, batch_size=48, limit=768)
                     if not dense_status.get("available") or dense_status.get("remaining", 0) == 0:
                         break
-            active = conn.execute(
+            active = dict(conn.execute(
                 "SELECT embedding_model, embedding_dimensions FROM agent_context_index_state WHERE id = 1"
-            ).fetchone()
+            ).fetchone())
             for case in cases:
                 started = time.perf_counter()
                 evidence = retrieve_knowledge_evidence(
@@ -75,6 +69,7 @@ def main():
                     case["module"],
                     case["query"],
                     limit=10,
+                    retriever_backend=args.retriever,
                 )
                 latency_ms = round((time.perf_counter() - started) * 1000, 3)
                 retrieved = [item["evidence_ref"] for item in evidence]
@@ -93,6 +88,26 @@ def main():
                 "UPDATE agent_context_index_state SET embedding_model = ?, embedding_dimensions = ? WHERE id = 1",
                 original,
             )
+    return results, active
+
+
+def main():
+    parser = argparse.ArgumentParser(description="运行 Agent v2 Hybrid RAG gold retrieval 评测。")
+    parser.add_argument("--db", default=str(user_db_path()))
+    parser.add_argument("--dataset", default=str(DEFAULT_DATASET))
+    parser.add_argument("--backend", choices=("feature", "bge", "current"), default="current")
+    parser.add_argument("--retriever", choices=("hybrid", "llamaindex"), default="hybrid")
+    parser.add_argument("--output")
+    args = parser.parse_args()
+    cases = load_cases(args.dataset)
+    source_db = Path(args.db)
+    if not source_db.exists():
+        raise FileNotFoundError(source_db)
+    with tempfile.TemporaryDirectory(prefix="gongkao-retrieval-eval-") as temp_dir:
+        evaluation_db = Path(temp_dir) / "evaluation.sqlite3"
+        with connect(source_db) as source, connect(evaluation_db) as snapshot:
+            source.backup(snapshot)
+        results, active = evaluate_cases(evaluation_db, args, cases)
     latencies = [item["latency_ms"] for item in results]
     report = {
         "schema_version": "agent-retrieval-eval-v1",
@@ -100,6 +115,7 @@ def main():
         "dataset": str(Path(args.dataset)),
         "case_count": len(results),
         "requested_backend": args.backend,
+        "requested_retriever": args.retriever,
         "active_embedding_model": active["embedding_model"],
         "active_dimensions": active["embedding_dimensions"],
         "summary": {
